@@ -410,6 +410,38 @@ Direct instruction: "it needs everything... better pitch." Two small, honest add
   match pitch, and confirmed the match HUD/lineup/gameplay still render correctly on top of
   the updated background (no regression from the tile-index shift).
 
+### Throw/catch animation: motion + impact flash, not new art (2026-07-20)
+
+Direct instruction: "it needs everything... animations." The plan was to generate real
+distinct THROW/CATCH pose art through the same Pixel-Art-XL pipeline used for the stand pose -
+but ComfyUI's own `/prompt` API started returning a bare `500 Server got itself in trouble` for
+every request, including a trivial unrelated test prompt with no LoRA at all, proving it's a
+problem with the local ComfyUI server's current state, not our workflow JSON. Restarting that
+desktop app risked losing the user's own separate, already-queued image/video generation work
+visible in its job history, so it was left alone rather than force-restarted.
+
+Rather than skip the request or hand-edit the existing detailed AI-generated pixel art blind
+(genuinely risky without a way to preview iterations quickly), shipped a real, verifiable
+animation improvement that doesn't depend on new art:
+
+- **Distinct pose motion**: `player_draw()` (`src/player.c`) now nudges the sprite up 3px
+  during THROW (a coiled "reaching up on release" read) and down 2px during CATCH (a braced
+  "crouching to absorb it" read) - on top of the existing run-cycle mirroring. Cheap (a Y
+  offset, no new tiles) but a real, distinct silhouette cue per pose, not just a shared static
+  pose with a different name.
+- **Impact flash**: new `sprites_data_flash_team()` (`src/sprites_data.c`) whites-out a team's
+  kit-ramp colors for 4 frames the instant a throw resolves (catch or hit), restored
+  automatically via the existing `sprites_data_apply_teams()`. Honest hardware-budget note:
+  with only 4 total palette lines, this flashes the whole team's shared palette, not just the
+  one player involved - a real constraint, not an oversight.
+- **Verified live in Fusion**: played through several throw/catch/eliminate exchanges and
+  confirmed team colors always restore correctly afterward (no stuck white palette), and that
+  round/score progression continues working normally alongside the new effects.
+- **Honest limitation, still open**: the 4 poses still share one drawn art block - this pass
+  adds real motion and lighting-based animation on top of it, not new hand-drawn or AI-
+  generated per-pose artwork. Revisiting the Pixel-Art-XL pipeline once ComfyUI's API is
+  healthy again is the natural next step if per-pose art is still wanted.
+
 ---
 
 ## 📝 Design Decisions

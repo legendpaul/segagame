@@ -16,7 +16,11 @@
  *
  * All 4 poses (stand/run/throw/catch) currently share this one AI-
  * derived 32x32 block - see the honest note in sprites_data.c and
- * docs/planning.md about why per-pose art isn't split out yet.
+ * docs/planning.md about why per-pose art isn't split out yet. THROW
+ * and CATCH get real distinct animation on top of the shared art
+ * anyway: a coiled/braced position offset (player.c) plus a whole-team
+ * impact flash (sprites_data_flash_team()) on the frame the ball
+ * actually connects.
  */
 #ifndef _SPRITES_DATA_H_
 #define _SPRITES_DATA_H_
@@ -58,5 +62,14 @@ void sprites_data_init(void);
  * teams actually chosen on the menu. Call once per match, before the
  * first player_draw(). */
 void sprites_data_apply_teams(u8 teamAIndex, u8 teamBIndex);
+
+/* Briefly whites-out a team's kit-ramp colors for an impact "flash" on
+ * catches/hits, the same visual feedback trick real sports games use.
+ * Only 4 palette lines exist total (PAL0 court/font, PAL1/PAL2 teams,
+ * PAL3 ball) so this flashes the whole team's shared palette, not just
+ * the one player involved - an honest hardware-budget tradeoff, not a
+ * per-sprite effect. Caller is responsible for restoring real colors
+ * a few frames later via sprites_data_apply_teams(). */
+void sprites_data_flash_team(u8 palLine);
 
 #endif /* _SPRITES_DATA_H_ */

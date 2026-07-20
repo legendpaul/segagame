@@ -40,7 +40,19 @@ static u16 roundEndTimer;
 static u8  server;          /* 0 = team A serves, 1 = team B serves */
 static u8  roundWinnerIsA;
 
+static u8  flashTimer;      /* frames left in the current impact flash, 0 = none */
+
 /* --- small helpers -------------------------------------------------- */
+
+/* Whites-out the team whose player the ball just reached, for a couple
+ * of frames - real "impact" feedback on both a catch and a hit, not
+ * just the sound effect. Restored automatically once flashTimer hits 0
+ * (see scene_match_update()). */
+static void trigger_flash(u8 palLine)
+{
+    sprites_data_flash_team(palLine);
+    flashTimer = 4;
+}
 
 static s16 lane_x(u8 i)
 {
@@ -178,6 +190,7 @@ void scene_match_enter(void)
      * hardcoded colors no matter which team you chose. */
     sprites_data_apply_teams(gTeamAIndex, gTeamBIndex);
 
+    flashTimer = 0;
     server = 0;
     start_round();
 }
@@ -210,6 +223,8 @@ static void resolve_throw_to_B(void)
 {
     bool inRange = abs(teamB[responderB].x - ball.targetX) <= CATCH_WINDOW_X;
     bool caught = inRange && ai_willCatch();
+
+    trigger_flash(PAL_TEAM_B);
 
     if (caught)
     {
@@ -253,6 +268,8 @@ static void resolve_throw_to_A(void)
     bool caught = isHuman ? (inRange && input_held(BUTTON_A))
                            : (inRange && ai_willCatch());
 
+    trigger_flash(PAL_TEAM_A);
+
     if (caught)
     {
         sound_mgr_catch();
@@ -290,6 +307,13 @@ void scene_match_update(void)
     u8 i;
 
     input_mgr_update();
+
+    if (flashTimer > 0)
+    {
+        flashTimer--;
+        if (flashTimer == 0)
+            sprites_data_apply_teams(gTeamAIndex, gTeamBIndex);
+    }
 
     /* Switch which teammate you're directly controlling - always skips
      * eliminated slots. */

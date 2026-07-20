@@ -168,3 +168,14 @@ void sprites_data_apply_teams(u8 teamAIndex, u8 teamBIndex)
     PAL_setPalette(PAL_TEAM_A, pal_teams[teamAIndex], DMA);
     PAL_setPalette(PAL_TEAM_B, pal_teams[teamBIndex], DMA);
 }
+
+void sprites_data_flash_team(u8 palLine)
+{
+    /* Whites-out every non-transparent index on the line so the whole
+     * sprite reads as a bright flash for a couple of frames - cheap
+     * (one DMA palette write, no tile re-upload) and instantly readable
+     * impact feedback for a catch/hit. */
+    u16 i;
+    for (i = 1; i < 16; i++)
+        PAL_setColor(palLine * 16 + i, RGB24_TO_VDPCOLOR(0xF8F8F8));
+}
