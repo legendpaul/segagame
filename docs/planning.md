@@ -181,6 +181,60 @@ installed ComfyUI app plus AI tooling. Did this for real, not just cosmetically:
   built-in way to keep a consistent character across separate generations without a
   reference-conditioning workflow this environment doesn't have configured).
 
+### Correction pass: 16x16 was the real bottleneck, not the AI generation (2026-07-20)
+
+Fair, direct pushback on the pass above: in-game it still read as a small, low-detail red
+blob - not a meaningful upgrade. The mistake wasn't the AI generation itself (that part was
+real and worked), it was quantizing that generation down into the old 16x16 (2x2-tile)
+sprite size, which is the actual Genesis 2x2-hardware-sprite footprint this project had used
+since the very first pass. At that resolution almost none of a 512x512 AI image's detail can
+survive - no amount of better prompting or classification fixes that; the sprite's own pixel
+budget was the ceiling.
+
+Fix: player sprites now use a full 4x4 hardware sprite block - **32x32px, the actual maximum
+single-sprite size the Genesis VDP supports** - instead of 16x16. Re-ran the same AI-derived
+pipeline (crop, hue/brightness classify into the 5-color plan, block-mode-pool downsample)
+against the *full* character from the original ComfyUI throw-pose generation (head, raised
+arm, torso, legs - not just the torso/legs crop used last time, with the held ball manually
+masked out of frame since it's drawn as its own separate sprite), targeting a true 32x32 grid
+instead of 16x16. `src/sprites_data.h`/`src/sprites_data.c` now upload one 16-tile block
+(`tile_player_stand[16][8]`) instead of four separate 4-tile pose blocks; `src/player.c` draws
+at `SPRITE_SIZE(4,4)` with an offset so the bigger sprite stays centered on the same gameplay
+position. Verified live in Fusion: renders cleanly (no VRAM/tile corruption), and is now
+plainly recognizable as an athlete - head, hair, extended arm, jersey shading, wide lunging
+legs - not a colored block.
+
+**Honest trade-off, not hidden**: all 4 poses (stand/run/throw/catch) now share this single
+32x32 block; RUN still gets a cheap 2-frame sway from hardware hflip (the pose is
+asymmetric, so flipping it reads as a weight shift) but THROW and CATCH no longer have
+distinct arm art of their own - they show the same block the whole pose timer runs. Giving
+each pose its own 16-tile block at this resolution is a real follow-up, not a limitation of
+the hardware: it needs either additional AI generations that stay visually consistent with
+this exact character (SD1.5 alone doesn't guarantee that across separate runs) or hand-edits
+at 32x32 scale, both bigger jobs than this pass.
+
+### Stronger elevated-camera pitch (2026-07-20)
+
+Also pushed back on: the pitch was meant to read as isometric, like FIFA. Worth being
+precise about this rather than just agreeing: FIFA International Soccer's actual camera
+(checked in the earlier reference pass) is an elevated/tilted perspective, not a true
+isometric projection (a true isometric pitch would need a diamond-shaped tile grid and
+depth-sorted sprites - a much bigger architecture change than this project's straight
+row/column tilemap and Y-position-based sprite draw order). What's fixable without that
+rewrite, and what actually reads as "looking down at an angle" rather than "looking straight
+down", is a stronger perspective cue - so:
+
+- **Diagonal mown-stripe bands** (`src/court_bg.c`): the grass light/mid/dark bands now
+  shift diagonally across the pitch (one band step every 6 columns) instead of running dead
+  horizontal - real elevated-camera sports pitches show mowing stripes raking across at an
+  angle, and a horizontal-only stripe pattern was quietly undercutting the perspective effect
+  everywhere else on screen.
+- **Doubled the sideline taper**: the gap between the two sidelines is now roughly half as
+  wide at the top of the pitch as at the bottom (previously a much subtler ~4-column shift),
+  a much more pronounced vanishing-point effect.
+
+Verified live in Fusion - the pitch now visibly reads as an angled/elevated camera view.
+
 ---
 
 ## 📝 Design Decisions

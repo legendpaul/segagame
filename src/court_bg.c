@@ -133,19 +133,29 @@ void court_bg_draw(void)
         }
 
         u16 dt = row - PITCH_TOP_ROW;
-        /* Light -> mid -> dark -> mid -> repeat, 3 rows per band, so the
-         * mown-stripe pattern reads as a smooth gradient rather than an
-         * abrupt 2-tone flip (closer to the smoother look of the Sega CD
-         * FIFA re-release versus the grainier original cart version). */
-        u16 band = (dt / 3) % 4;
-        u16 grassTile = (band == 0) ? TILE_GRASS_A
-                       : (band == 2) ? TILE_GRASS_B
-                       : TILE_GRASS_M;
-        u16 leftCol  = 6 - (dt * 4) / (PITCH_BOTTOM_ROW - PITCH_TOP_ROW);
-        u16 rightCol = 33 + (dt * 4) / (PITCH_BOTTOM_ROW - PITCH_TOP_ROW);
+        /* Doubled from the previous pass for a much more pronounced
+         * elevated-camera vanishing-point taper - the sideline gap is
+         * now roughly half as wide at the top of the pitch as at the
+         * bottom, instead of a subtle ~4-column shift. */
+        u16 leftCol  = 8 - (dt * 8) / (PITCH_BOTTOM_ROW - PITCH_TOP_ROW);
+        u16 rightCol = 31 + (dt * 8) / (PITCH_BOTTOM_ROW - PITCH_TOP_ROW);
 
         for (col = 0; col < 40; col++)
+        {
+            /* Mown-stripe bands now run DIAGONALLY (shifting one band
+             * every 6 columns) instead of dead horizontal - real
+             * elevated/tilted sports-camera pitches (FIFA Int'l Soccer
+             * included) show mowing stripes that rake across the pitch
+             * at an angle rather than as flat horizontal rows, which is
+             * what actually reads as "looking down at an angle" instead
+             * of "looking straight down". Light -> mid -> dark -> mid,
+             * still a smooth gradient rather than an abrupt 2-tone flip. */
+            u16 band = ((dt + (col / 6)) / 3) % 4;
+            u16 grassTile = (band == 0) ? TILE_GRASS_A
+                           : (band == 2) ? TILE_GRASS_B
+                           : TILE_GRASS_M;
             VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, grassTile), col, row);
+        }
 
         if (row == HALFWAY_ROW)
         {

@@ -84,26 +84,13 @@ void player_draw(Player *p)
     u16 base = TILE_PLAYER_STAND;
     bool flip = FALSE;
 
-    switch (p->pose)
-    {
-        case POSE_RUN:
-            base = TILE_PLAYER_RUN;
-            /* Same lifted-leg art, mirrored: a front-facing "one leg
-             * forward" pose flipped horizontally reads as the other
-             * leg forward, giving a 2-frame gait from one tile. */
-            flip = (p->animFrame != 0);
-            break;
-        case POSE_THROW:
-            base = TILE_PLAYER_THROW;
-            break;
-        case POSE_CATCH:
-            base = TILE_PLAYER_CATCH;
-            break;
-        default:
-            break;
-    }
+    /* All 4 poses currently alias the same 32x32 AI-derived tile block
+     * (see sprites_data.c) - hflip during RUN still gives a cheap
+     * side-to-side sway since the pose itself is asymmetric. */
+    if (p->pose == POSE_RUN)
+        flip = (p->animFrame != 0);
 
-    VDP_setSpriteFull(p->spriteSlot, p->x, p->y, SPRITE_SIZE(2, 2),
+    VDP_setSpriteFull(p->spriteSlot, p->x - 8, p->y - 16, SPRITE_SIZE(4, 4),
                        TILE_ATTR_FULL(p->pal, 0, FALSE, flip, base),
                        p->spriteSlot + 1);
 }

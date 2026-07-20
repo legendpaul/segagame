@@ -4,109 +4,50 @@
 /* 8x8, 4bpp, one u32 per row (8 pixels x 4 bits, MSB = leftmost pixel).
  * Shared color plan for every player tile, only index 1 (kit color)
  * changes per team:
- *   0 = transparent   1 = kit (team color)   2 = skin
- *   3 = shorts/socks (white)   4 = hair / shoes (dark trim)
+ *   0 = transparent   1 = kit (team color)   2 = skin/hair
+ *   3 = white highlight   4 = dark outline / trim
  *
- * Each 16x16 pose is 4 tiles in hardware sprite order (column-major:
- * top-left, bottom-left, top-right, bottom-right). Standing quadrants
- * are reused byte-for-byte across poses that don't change that part of
- * the body (see the loadTileData calls in sprites_data_init) - only 3
- * quadrants below are genuinely new art for the run/throw/catch poses. */
-
-/* Base STAND quadrants below are AI-generated art, not hand-authored:
- * produced via a local ComfyUI (Stable Diffusion 1.5) txt2img run - a
- * "16-bit pixel art dodgeball player, wind-up throw pose" reference
- * image - then run through a real quantization pipeline (crop to the
- * clean torso/leg silhouette, classify every pixel into this same
- * 5-color plan by hue/brightness, block-mode-pool down to a true 16x16
- * grid, split into the 4 hardware quadrants) rather than resizing/
- * guessing. Honest limitation: a 512x512 AI image collapsed into a
- * 16x16 hardware sprite necessarily loses almost all of its fine
- * detail - what actually survives is the pose silhouette (a wide,
- * athletic lunging stance) and color-region choices, not per-pixel
- * fidelity. The pose-variant quadrants below (run/throw/catch) are
- * still the earlier hand-authored art layered on top of this new base. */
-static const u32 tile_tl[8] = {
-    0x44111144,
-    0x11111111,
-    0x11222111,
-    0x14222111,
-    0x14222111,
-    0x44414111,
-    0x22211111,
-    0x02211111
-};
-
-static const u32 tile_bl[8] = {
-    0x04111441,
-    0x41114004,
-    0x11140000,
-    0x11140000,
-    0x11100000,
-    0x11100000,
-    0x14000000,
-    0x40000000
-};
-
-static const u32 tile_tr[8] = {
-    0x44411000,
-    0x44111400,
-    0x11001400,
-    0x01111400,
-    0x01111400,
-    0x11111000,
-    0x14440000,
-    0x14000000
-};
-
-static const u32 tile_br[8] = {
-    0x11400000,
-    0x11114000,
-    0x41111400,
-    0x01111100,
-    0x00111140,
-    0x00411144,
-    0x00044444,
-    0x00000044
-};
-
-/* RUN pose: right leg lifted mid-stride (bottom-right only - the
- * mirrored frame reuses this same tile with hflip, showing the left
- * leg lifted instead). */
-static const u32 tile_br_run[8] = {
-    0x11112200,
-    0x33300000,
-    0x33300000,
-    0x03300000,
-    0x02200000,
-    0x00000000,
-    0x00000000,
-    0x00000000
-};
-
-/* THROW pose: right arm extended fully outward (wind-up/release). */
-static const u32 tile_tr_throw[8] = {
-    0x44000000,
-    0x24000000,
-    0x22200000,
-    0x22000000,
-    0x20000000,
-    0x11110000,
-    0x11112222,
-    0x11112222
-};
-
-/* CATCH pose: left arm extended outward too, mirrors tile_tr_throw on
- * the other side for a symmetrical "arms open" stance. */
-static const u32 tile_tl_catch[8] = {
-    0x00000044,
-    0x00000422,
-    0x00000222,
-    0x00000022,
-    0x00000002,
-    0x00001111,
-    0x22221111,
-    0x22221111
+ * tile_player_stand[16][8] is a full 4x4 hardware sprite block (32x32px
+ * - the actual max single-sprite size the Genesis VDP supports), tiles
+ * in column-major hardware order (col0 top-to-bottom 4 tiles, then
+ * col1, col2, col3).
+ *
+ * This is a second, corrected pass at using AI generation for this
+ * sprite. The first pass generated real art via a local ComfyUI
+ * (Stable Diffusion 1.5) run but then quantized it down into the old
+ * 16x16 (2x2-tile) sprite size - at that resolution almost all of the
+ * generated detail was destroyed and it read as a small blob in-game,
+ * which was a fair criticism, not a matter of taste. The fix wasn't
+ * more prompting, it was recognizing the actual bottleneck was sprite
+ * resolution: the same AI reference (full body, wind-up throw, ball
+ * masked out of frame), quantized into this same 5-color plan by
+ * hue/brightness and block-mode-pooled down to a true 32x32 grid
+ * instead of 16x16, keeps the head/hair, extended arm, jersey shading
+ * and lunging legs actually visible on screen.
+ * Honest limitation: all 4 poses (stand/run/throw/catch) currently
+ * share this single block - see sprites_data_init() and
+ * docs/planning.md. Per-pose art at this resolution (16 new tiles per
+ * pose) needs either separately-generated AI images that stay aligned
+ * to this same character/silhouette, or hand-editing at this larger
+ * scale - both bigger jobs than this pass, called out explicitly
+ * rather than left unstated. */
+static const u32 tile_player_stand[16][8] = {
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000004, 0x00000041, 0x00000411 },
+    { 0x00000111, 0x00000111, 0x00000444, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000004, 0x00000004, 0x00000444, 0x00000441, 0x00004444, 0x00044444, 0x04444444 },
+    { 0x00000004, 0x00000044, 0x00000044, 0x00000044, 0x00000000, 0x00000002, 0x00000002, 0x00000002 },
+    { 0x00000044, 0x00000044, 0x00000011, 0x00000011, 0x41111111, 0x11122221, 0x11422221, 0x11422221 },
+    { 0x34444411, 0x34444144, 0x32222111, 0x02222111, 0x00041111, 0x00441114, 0x04111140, 0x41111440 },
+    { 0x11111400, 0x11111400, 0x11111000, 0x11111000, 0x11140000, 0x24400000, 0x44000000, 0x00000000 },
+    { 0x44400044, 0x44444004, 0x44444404, 0x44444444, 0x44144224, 0x44144442, 0x44444244, 0x44444444 },
+    { 0x44444444, 0x44444244, 0x44444413, 0x14444411, 0x11114110, 0x11111001, 0x11111111, 0x11001111 },
+    { 0x11100111, 0x41111111, 0x11144444, 0x11111400, 0x11111000, 0x44111140, 0x04411114, 0x00441111 },
+    { 0x00041111, 0x00001111, 0x00000111, 0x00004411, 0x00000041, 0x00000004, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x40000000, 0x44000000, 0x22000000, 0x44400000, 0x44400000, 0x22400000 },
+    { 0x00000000, 0x00000000, 0x10000000, 0x14400000, 0x11400000, 0x11400000, 0x11400000, 0x11400000 },
+    { 0x14000000, 0x40000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x40000000, 0x40000000 },
+    { 0x14000000, 0x11400000, 0x11100000, 0x11140000, 0x11124000, 0x44424400, 0x00022444, 0x00000000 },
 };
 
 /* Ball: white with a soft shadow (2) and a dark outline (3) so it reads
@@ -192,30 +133,10 @@ static const u16 pal_ball[16] = {
 
 void sprites_data_init(void)
 {
-    /* STAND: the 4 base quadrants. */
-    VDP_loadTileData(tile_tl, TILE_PLAYER_STAND + 0, 1, DMA);
-    VDP_loadTileData(tile_bl, TILE_PLAYER_STAND + 1, 1, DMA);
-    VDP_loadTileData(tile_tr, TILE_PLAYER_STAND + 2, 1, DMA);
-    VDP_loadTileData(tile_br, TILE_PLAYER_STAND + 3, 1, DMA);
-
-    /* RUN: same head/torso/left-leg, new lifted right leg. */
-    VDP_loadTileData(tile_tl,     TILE_PLAYER_RUN + 0, 1, DMA);
-    VDP_loadTileData(tile_bl,     TILE_PLAYER_RUN + 1, 1, DMA);
-    VDP_loadTileData(tile_tr,     TILE_PLAYER_RUN + 2, 1, DMA);
-    VDP_loadTileData(tile_br_run, TILE_PLAYER_RUN + 3, 1, DMA);
-
-    /* THROW: same everything, new extended right arm. */
-    VDP_loadTileData(tile_tl,        TILE_PLAYER_THROW + 0, 1, DMA);
-    VDP_loadTileData(tile_bl,        TILE_PLAYER_THROW + 1, 1, DMA);
-    VDP_loadTileData(tile_tr_throw,  TILE_PLAYER_THROW + 2, 1, DMA);
-    VDP_loadTileData(tile_br,        TILE_PLAYER_THROW + 3, 1, DMA);
-
-    /* CATCH: new extended left arm + the throw pose's right arm, for a
-     * symmetrical arms-open stance. */
-    VDP_loadTileData(tile_tl_catch, TILE_PLAYER_CATCH + 0, 1, DMA);
-    VDP_loadTileData(tile_bl,       TILE_PLAYER_CATCH + 1, 1, DMA);
-    VDP_loadTileData(tile_tr_throw, TILE_PLAYER_CATCH + 2, 1, DMA);
-    VDP_loadTileData(tile_br,       TILE_PLAYER_CATCH + 3, 1, DMA);
+    /* STAND/RUN/THROW/CATCH all currently alias the same 16-tile block
+     * (see the comment above tile_player_stand) - one upload covers
+     * all 4 pose constants since they're the same tile index. */
+    VDP_loadTileData(tile_player_stand[0], TILE_PLAYER_STAND, 16, DMA);
 
     VDP_loadTileData(tile_ball,        TILE_BALL,        1, DMA);
     VDP_loadTileData(tile_ball_shadow, TILE_BALL_SHADOW,  1, DMA);
