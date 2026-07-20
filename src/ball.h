@@ -1,6 +1,12 @@
 /*
  * ball.h - The dodgeball entity: a lerp-based flight between two points
- * (thrower -> target) plus simple "held" states.
+ * (thrower -> target), a parabolic height arc layered on top so it
+ * visibly lifts off the ground mid-flight, plus simple "held" states.
+ *
+ * The ball uses TWO hardware sprite slots: spriteSlot for the ball
+ * itself (which moves up off its true y while airborne) and
+ * spriteSlot+1 for a shadow that stays on the ground track, giving a
+ * clear visual read on where the ball will land.
  */
 #ifndef _BALL_H_
 #define _BALL_H_

@@ -1,19 +1,24 @@
 #include "court_bg.h"
+#include "sprites_data.h"
 
 /* Reuses PAL0 (the font palette) for background art: font glyphs only
- * use index 0 (transparent) and 1 (white), so grass/line/stand colors
- * ride in the unused index 2-4 slots of the same palette line - no
- * extra palette budget needed on top of the 3 sprite lines. */
-#define TILE_GRASS_A   (TILE_USER_INDEX + 5)
-#define TILE_GRASS_B   (TILE_USER_INDEX + 6)
-#define TILE_LINE_L    (TILE_USER_INDEX + 7)
-#define TILE_LINE_R    (TILE_USER_INDEX + 8)
-#define TILE_LINE_H    (TILE_USER_INDEX + 9)
-#define TILE_STAND     (TILE_USER_INDEX + 10)
+ * use index 0 (transparent) and 1 (white), so grass/line/stand/accent
+ * colors ride in the unused index 2-6 slots of the same palette line -
+ * no extra palette budget needed on top of the 3 sprite lines. */
+#define TILE_GRASS_A   (TILE_COURT_BASE + 0)
+#define TILE_GRASS_B   (TILE_COURT_BASE + 1)
+#define TILE_LINE_L    (TILE_COURT_BASE + 2)
+#define TILE_LINE_R    (TILE_COURT_BASE + 3)
+#define TILE_LINE_H    (TILE_COURT_BASE + 4)
+#define TILE_STAND_A   (TILE_COURT_BASE + 5)
+#define TILE_STAND_B   (TILE_COURT_BASE + 6)
+#define TILE_ENDZONE   (TILE_COURT_BASE + 7)
 
 #define PITCH_TOP_ROW      3
 #define PITCH_BOTTOM_ROW   24
 #define HALFWAY_ROW        13
+#define ENDZONE_TOP_ROW     4    /* CPU serve line, just under the stand */
+#define ENDZONE_BOTTOM_ROW 21    /* player serve line (COURT_BOTTOM_Y / 8) */
 
 static const u32 tile_grass_a[8] = {
     0x22222222, 0x22222222, 0x22222222, 0x22222222,
@@ -40,9 +45,22 @@ static const u32 tile_line_h[8] = {
     0x22222222, 0x22222222, 0x22222222, 0x22222222
 };
 
-static const u32 tile_stand[8] = {
-    0x44444444, 0x44444444, 0x44444444, 0x44444444,
-    0x44444444, 0x44444444, 0x44444444, 0x44444444
+/* Stand: two subtly different tiles, alternated, so the crowd band
+ * reads as a textured stadium wall instead of a flat color block. */
+static const u32 tile_stand_a[8] = {
+    0x44444444, 0x44454444, 0x44444444, 0x44444544,
+    0x44444444, 0x44454444, 0x44444444, 0x44444544
+};
+
+static const u32 tile_stand_b[8] = {
+    0x44445444, 0x44444444, 0x45444444, 0x44444444,
+    0x44445444, 0x44444444, 0x45444444, 0x44444444
+};
+
+/* End-zone accent stripe marking each side's serve line. */
+static const u32 tile_endzone[8] = {
+    0x66666666, 0x66666666, 0x22222222, 0x22222222,
+    0x22222222, 0x22222222, 0x22222222, 0x22222222
 };
 
 void court_bg_init(void)
@@ -52,14 +70,18 @@ void court_bg_init(void)
     VDP_loadTileData(tile_line_l,  TILE_LINE_L,  1, DMA);
     VDP_loadTileData(tile_line_r,  TILE_LINE_R,  1, DMA);
     VDP_loadTileData(tile_line_h,  TILE_LINE_H,  1, DMA);
-    VDP_loadTileData(tile_stand,   TILE_STAND,   1, DMA);
+    VDP_loadTileData(tile_stand_a, TILE_STAND_A, 1, DMA);
+    VDP_loadTileData(tile_stand_b, TILE_STAND_B, 1, DMA);
+    VDP_loadTileData(tile_endzone, TILE_ENDZONE, 1, DMA);
 
-    /* Light green / dark green / dark navy stand, added into the font's
-     * PAL0 line at the unused index 2-4 slots. Index 0/1 (transparent
-     * black / white) are left alone so text keeps rendering correctly. */
-    PAL_setColor(0 * 16 + 2, RGB24_TO_VDPCOLOR(0x40B050)); /* grass light */
-    PAL_setColor(0 * 16 + 3, RGB24_TO_VDPCOLOR(0x309040)); /* grass dark  */
-    PAL_setColor(0 * 16 + 4, RGB24_TO_VDPCOLOR(0x182848)); /* stand navy  */
+    /* Added into the font's PAL0 line at the unused index 2-6 slots.
+     * Index 0/1 (transparent black / white) are left alone so text
+     * keeps rendering correctly. */
+    PAL_setColor(0 * 16 + 2, RGB24_TO_VDPCOLOR(0x40B050)); /* grass light  */
+    PAL_setColor(0 * 16 + 3, RGB24_TO_VDPCOLOR(0x309040)); /* grass dark   */
+    PAL_setColor(0 * 16 + 4, RGB24_TO_VDPCOLOR(0x182848)); /* stand navy   */
+    PAL_setColor(0 * 16 + 5, RGB24_TO_VDPCOLOR(0x384870)); /* stand fleck  */
+    PAL_setColor(0 * 16 + 6, RGB24_TO_VDPCOLOR(0xE8C020)); /* endzone gold */
 }
 
 void court_bg_draw(void)
@@ -70,8 +92,9 @@ void court_bg_draw(void)
     {
         if (row < PITCH_TOP_ROW || row > PITCH_BOTTOM_ROW)
         {
+            u16 standTile = (row & 1) ? TILE_STAND_B : TILE_STAND_A;
             for (col = 0; col < 40; col++)
-                VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_STAND), col, row);
+                VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, standTile), col, row);
             continue;
         }
 
@@ -87,6 +110,11 @@ void court_bg_draw(void)
         {
             for (col = leftCol; col <= rightCol; col++)
                 VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_LINE_H), col, row);
+        }
+        else if (row == ENDZONE_TOP_ROW || row == ENDZONE_BOTTOM_ROW)
+        {
+            for (col = leftCol; col <= rightCol; col++)
+                VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_ENDZONE), col, row);
         }
         else
         {

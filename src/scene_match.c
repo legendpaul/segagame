@@ -127,6 +127,8 @@ static void go_round_end(u8 winnerIsA)
 
 void scene_match_update(void)
 {
+    bool cpuMoved = FALSE;
+
     input_mgr_update();
 
     switch (state)
@@ -153,6 +155,7 @@ void scene_match_update(void)
             if (input_pressed(BUTTON_A))
             {
                 sound_mgr_throw();
+                player_setPose(&playerA, POSE_THROW, 12);
                 ball_startThrow(&ball, playerA.x, playerB.y + 4, BALL_FLYING_TO_B);
                 state = MS_FLY_TO_B;
             }
@@ -166,6 +169,7 @@ void scene_match_update(void)
             {
                 s16 targetX = ai_pickTargetX(playerA.x);
                 sound_mgr_throw();
+                player_setPose(&playerB, POSE_THROW, 12);
                 ball_startThrow(&ball, targetX, playerA.y - 4, BALL_FLYING_TO_A);
                 state = MS_FLY_TO_A;
             }
@@ -177,8 +181,8 @@ void scene_match_update(void)
             player_moveHuman(&playerA);
 
             /* CPU tries to get under the incoming ball */
-            if (playerB.x < ball.targetX) playerB.x += PLAYER_SPEED;
-            else if (playerB.x > ball.targetX) playerB.x -= PLAYER_SPEED;
+            if (playerB.x < ball.targetX) { playerB.x += PLAYER_SPEED; cpuMoved = TRUE; }
+            else if (playerB.x > ball.targetX) { playerB.x -= PLAYER_SPEED; cpuMoved = TRUE; }
 
             if (ball_update(&ball))
             {
@@ -187,6 +191,7 @@ void scene_match_update(void)
                 if (inRange && ai_willCatch())
                 {
                     sound_mgr_catch();
+                    player_setPose(&playerB, POSE_CATCH, 10);
                     ball_init(&ball, SLOT_BALL, playerB.x, playerB.y + 16, BALL_HELD_B);
                     state = MS_CPU_HOLD;
                     aiDelay = ai_pickThrowDelay();
@@ -221,6 +226,7 @@ void scene_match_update(void)
                 if (caught)
                 {
                     sound_mgr_catch();
+                    player_setPose(&playerA, POSE_CATCH, 10);
                     ball_init(&ball, SLOT_BALL, playerA.x, playerA.y - 8, BALL_HELD_A);
                     state = MS_PLAYER_HOLD;
                 }
@@ -260,6 +266,10 @@ void scene_match_update(void)
             break;
         }
     }
+
+    /* Keeps the CPU's run cycle animating while it chases the ball, and
+     * lets any transient throw/catch pose time back out to standing. */
+    player_tickAnim(&playerB, cpuMoved);
 
     player_draw(&playerA);
     player_draw(&playerB);

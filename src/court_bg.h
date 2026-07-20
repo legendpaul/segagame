@@ -2,8 +2,9 @@
  * court_bg.h - Green pitch background for BG_B: striped grass, a
  * tapered perspective sideline (narrower at the top of the screen,
  * wider at the bottom) to suggest an elevated camera angle, a halfway
- * line, and a dark stand band top/bottom. Text (score, menus) stays on
- * BG_A untouched.
+ * line, gold end-zone accent stripes at the two baselines, and a
+ * textured (not flat) crowd/stand band top and bottom. Text (score,
+ * menus) stays on BG_A untouched.
  */
 #ifndef _COURT_BG_H_
 #define _COURT_BG_H_

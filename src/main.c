@@ -10,6 +10,7 @@
 #include "sprites_data.h"
 #include "court_bg.h"
 #include "sound_mgr.h"
+#include "music_mgr.h"
 #include "scene_menu.h"
 #include "scene_match.h"
 #include "scene_gameover.h"
@@ -67,6 +68,7 @@ int main(bool hardReset)
 
         VDP_updateSprites(80, DMA);
         sound_mgr_update();
+        music_mgr_update();
         SYS_doVBlankProcess();
     }
 

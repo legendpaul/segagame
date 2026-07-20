@@ -1,26 +1,37 @@
 /*
  * sprites_data.h - Hand-authored tile art for player and ball sprites,
- * plus the palettes used to recolor the same shape per team.
+ * plus the palettes used to recolor the same shapes per team.
  *
  * No image assets / resource compiler needed: tiles are plain 8x8 4bpp
  * nibble-packed arrays, uploaded straight to VRAM at boot.
  *
- * Players are now a 2x2 tile block (16x16px) sharing ONE tile set: only
- * the palette differs, so both the human's and CPU's court sprite use
- * TILE_PLAYER, just recolored per the team actually selected on the menu
- * (see sprites_data_apply_teams). Previously each side had a hardcoded
- * color regardless of chosen team - that mismatch was the "scoring looks
- * broken" bug: the HUD named the right winner, but the sprite on court
- * never matched the team name.
+ * A Genesis 2x2 hardware sprite always reads 4 CONSECUTIVE VRAM tiles
+ * (TL,BL,TR,BR) starting at one base index - you cannot mix quadrants
+ * from different tile blocks at runtime. So each player *pose* (stand,
+ * run, throw, catch) gets its own full 4-tile block; poses that share
+ * most of a standing player's shape just re-upload the same source
+ * array into a different quadrant slot, only 3 quadrants are genuinely
+ * new art (run legs, throw arm, catch arm - see sprites_data.c). The
+ * mirrored run frame is free: it's the same block shown with hardware
+ * hflip, since a front-facing "one leg forward" pose flips into "other
+ * leg forward" and gives a proper 2-frame gait for one extra tile.
  */
 #ifndef _SPRITES_DATA_H_
 #define _SPRITES_DATA_H_
 
 #include "genesis.h"
 
-/* Tile indices (relative to TILE_USER_INDEX) */
-#define TILE_PLAYER         (TILE_USER_INDEX + 0)   /* 4 consecutive tiles, 2x2 */
-#define TILE_BALL           (TILE_USER_INDEX + 4)   /* 1 tile */
+/* Player pose tile blocks - each is 4 consecutive tiles (2x2, 16x16px) */
+#define TILE_PLAYER_STAND   (TILE_USER_INDEX + 0)
+#define TILE_PLAYER_RUN     (TILE_USER_INDEX + 4)
+#define TILE_PLAYER_THROW   (TILE_USER_INDEX + 8)
+#define TILE_PLAYER_CATCH   (TILE_USER_INDEX + 12)
+
+#define TILE_BALL           (TILE_USER_INDEX + 16)
+#define TILE_BALL_SHADOW    (TILE_USER_INDEX + 17)
+
+/* First tile index free for court_bg.c to use */
+#define TILE_COURT_BASE     (TILE_USER_INDEX + 18)
 
 /* Palette lines: PAL0 is used by the system font + pitch background,
  * so sprites use 1-3. PAL1/PAL2 are *slots*, not fixed teams - which
