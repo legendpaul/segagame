@@ -344,6 +344,30 @@ scratch, plus changes to `src/player.h/.c`, `src/ai_mgr.h/.c`, `src/game_state.h
   passes, etc.) - a reasonable scope match for what a hand-coded AI can do reliably, but not
   as sophisticated as a real 3-a-side defensive AI would be.
 
+### Minnka boot splash (2026-07-20)
+
+Direct instruction: "it needs everything... my minnka loading screen." Added a new scene shown
+once before the menu, built from a real user-supplied source image
+(`C:\Users\minnk\OneDrive\Desktop\cropped-minnka5-768x334.png`, committed as
+`assets/minnka_logo.png`), not hand-drawn.
+
+- **Real image pipeline**: crop -> LANCZOS resize to a 30x11 tile grid (240x88px) -> Floyd-
+  Steinberg dithered median-cut quantization to a 15-color palette + reserved black index 0.
+  Cells were then deduplicated into a unique tile atlas instead of dumped 1:1 - 177 of the 330
+  possible 8x8 cells turned out unique, the rest (mostly flat black margin) collapse onto a
+  shared tile, so this is a real background-tile compression pass, not a naive grid dump.
+  Lives in `src/logo_data.h/.c` (`tile_logo[177]`, `logo_tilemap[11][30]`, `pal_logo[16]`).
+- **New scene**: `src/scene_boot.h/.c` (`GS_BOOT`, first entry in the `GameScene` enum and the
+  game's actual initial scene now, ahead of `GS_MENU`). Draws the logo onto BG_A, holds for
+  ~2.5s (150 frames), then fades out and hands off to the menu - skippable early with Start so
+  it never blocks someone who just wants to play.
+- **Build fix**: `logo_data.h` initially included `court_bg.h` for `TILE_COURT_BASE`, but that
+  constant actually lives in `sprites_data.h` - fixed the include, rebuilt clean.
+- **Verified live in Fusion**, not just compiled: relaunched Fusion and screenshotted within
+  the boot window - confirmed the "minnka" wordmark renders legibly alongside the blue smoke/
+  flame art on a black background, and confirmed the scene auto-advances cleanly into the
+  existing menu screen (correct palette, no corrupted tilemap) after ~2.5s.
+
 ---
 
 ## 📝 Design Decisions

@@ -29,7 +29,8 @@
 
 /* --- Scene management --- */
 typedef enum {
-    GS_MENU = 0,
+    GS_BOOT = 0,
+    GS_MENU,
     GS_MATCH,
     GS_GAMEOVER
 } GameScene;

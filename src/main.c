@@ -11,6 +11,7 @@
 #include "court_bg.h"
 #include "sound_mgr.h"
 #include "music_mgr.h"
+#include "scene_boot.h"
 #include "scene_menu.h"
 #include "scene_match.h"
 #include "scene_gameover.h"
@@ -38,7 +39,7 @@ int main(bool hardReset)
     sound_mgr_init();
     music_mgr_init();
 
-    gCurrentScene = GS_MENU;
+    gCurrentScene = GS_BOOT;
     gTeamAIndex = 0;
     gTeamBIndex = 1;
     gScoreA = 0;
@@ -52,6 +53,7 @@ int main(bool hardReset)
 
             switch (gCurrentScene)
             {
+                case GS_BOOT:     scene_boot_enter();     break;
                 case GS_MENU:     scene_menu_enter();     break;
                 case GS_MATCH:    scene_match_enter();    break;
                 case GS_GAMEOVER: scene_gameover_enter(); break;
@@ -62,6 +64,7 @@ int main(bool hardReset)
 
         switch (gCurrentScene)
         {
+            case GS_BOOT:     scene_boot_update();     break;
             case GS_MENU:     scene_menu_update();     break;
             case GS_MATCH:    scene_match_update();    break;
             case GS_GAMEOVER: scene_gameover_update(); break;
