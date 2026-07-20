@@ -8,6 +8,7 @@
 #include "genesis.h"
 #include "game_state.h"
 #include "sprites_data.h"
+#include "court_bg.h"
 #include "sound_mgr.h"
 #include "scene_menu.h"
 #include "scene_match.h"
@@ -32,6 +33,7 @@ int main(bool hardReset)
     VDP_setTextPlane(VDP_BG_A);
 
     sprites_data_init();
+    court_bg_init();
     sound_mgr_init();
 
     gCurrentScene = GS_MENU;

@@ -3,6 +3,7 @@
 #include "teams.h"
 #include "input_mgr.h"
 #include "sound_mgr.h"
+#include "court_bg.h"
 
 static void draw_teams(void)
 {
@@ -23,6 +24,7 @@ void scene_menu_enter(void)
     VDP_clearPlane(VDP_BG_B, TRUE);
     VDP_setTextPalette(PAL0);
     VDP_clearTextArea(0, 0, 40, 28);
+    court_bg_draw();
 
     VDP_drawText("MEGA DODGEBALL", 13, 6);
     VDP_drawText("------------------------------", 4, 8);

@@ -31,14 +31,36 @@
 | Ball entity           | ✅ Done         | `src/ball.c` |
 | Collision manager     | ✅ Done         | catch/hit resolution inline in `scene_match.c` |
 | AI manager            | ✅ Done         | `src/ai_mgr.c` |
-| Graphics assets       | ✅ Done         | hand-authored tiles in `src/sprites_data.c` (no external image pipeline) |
+| Graphics assets       | ✅ Done         | hand-authored tiles in `src/sprites_data.c` + pitch in `src/court_bg.c` (no external image pipeline) |
+| Court background      | ✅ Done         | `src/court_bg.c` - striped green pitch on BG_B, tapered sideline for an elevated/perspective camera feel, stand bands |
+| Team colors           | ✅ Done         | `sprites_data_apply_teams()` recolors the shared player sprite per the team actually picked, instead of a fixed color per side |
 | Music & SFX           | ✅ Done (SFX)   | PSG sound effects in `src/sound_mgr.c`; no music track yet |
 | Test Mode framework   | 🔲 Not started | deferred - shipped gameplay took priority; see Open Questions |
 
 Builds clean with SGDK (`build.bat`) to a real, checksummed `out/rom.bin`. Verified live in
 the Fusion emulator: boot (TMSS splash), menu + team select, full match (movement, throw,
-catch, hits, scoring, round reset, game over) all confirmed working. Not yet tested on real
-Mega Drive hardware.
+catch, hits, scoring, round reset, game over) all confirmed working, including a full match
+played to completion (score incremented correctly every round, lives reset each round, serve
+alternated to the losing side, and the game-over screen showed the correct winner and final
+score). Not yet tested on real Mega Drive hardware.
+
+### Graphics note (2026-07-20)
+
+Player sprites are now a 16x16 2x2-tile block (up from 8x16) sharing one tile set, recolored
+per team via `sprites_data_apply_teams(gTeamAIndex, gTeamBIndex)`. Previously both sides used
+a hardcoded color regardless of the team you picked on the menu (human always red, CPU always
+blue) - that mismatch between the HUD's team names and the on-court sprite colors is what read
+as "the scoring looks broken": the final score screen would correctly declare e.g. "GOLD TIGERS
+WINS" but no gold sprite had ever appeared on screen. The scoring/lives/round logic itself was
+verified correct via a full live match in Fusion before this fix - the bug was purely cosmetic.
+
+A true photorealistic pre-rendered isometric look (like FIFA International Soccer's SGI-rendered
+sprites) isn't achievable hand-authoring pixel arrays in SGDK. What's implemented instead: a
+green striped pitch (`src/court_bg.c`, on BG_B) with sideline boundary tiles that taper - narrower
+near the top of the screen, wider near the bottom - to suggest an elevated camera angle, plus a
+halfway line and stadium-band top/bottom borders. This is the same "elevated pseudo-isometric,
+upgraded pixel art" approach used by 16-bit sports titles like Sensible Soccer / Kick Off, scoped
+to what a hand-authored SGDK tile pipeline can realistically deliver.
 
 ---
 

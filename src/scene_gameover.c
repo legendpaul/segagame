@@ -4,6 +4,7 @@
 #include "teams.h"
 #include "input_mgr.h"
 #include "sound_mgr.h"
+#include "court_bg.h"
 
 void scene_gameover_enter(void)
 {
@@ -12,6 +13,7 @@ void scene_gameover_enter(void)
     VDP_clearPlane(VDP_BG_B, TRUE);
     VDP_setTextPalette(PAL0);
     VDP_clearTextArea(0, 0, 40, 28);
+    court_bg_draw();
 
     bool aWon = gScoreA > gScoreB;
     const char *winner = aWon ? teamNames[gTeamAIndex] : teamNames[gTeamBIndex];

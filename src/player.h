@@ -1,6 +1,7 @@
 /*
  * player.h - A court-side entity (human or CPU side), rendered as one
- * 8x16 hardware sprite (two stacked 8x8 tiles: TILE_PLAYER_TOP/BOTTOM).
+ * 16x16 hardware sprite (a 2x2 block of TILE_PLAYER tiles), recolored
+ * per team via its "pal" palette slot.
  */
 #ifndef _PLAYER_H_
 #define _PLAYER_H_

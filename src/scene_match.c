@@ -8,6 +8,7 @@
 #include "ai_mgr.h"
 #include "sound_mgr.h"
 #include "sprites_data.h"
+#include "court_bg.h"
 
 #define SLOT_PLAYER 0
 #define SLOT_CPU    1
@@ -88,8 +89,13 @@ void scene_match_enter(void)
     /* VDP_clearPlane alone can leave stale text tiles behind on a scene
      * change; explicitly clearing the text area guarantees a clean slate. */
     VDP_clearTextArea(0, 0, 40, 28);
+    court_bg_draw();
 
-    VDP_drawText("----------------------------------------", 0, 12);
+    /* Recolor the shared player tile art to the teams actually picked on
+     * the menu - without this both sides always rendered in the same
+     * hardcoded colors no matter which team you chose, which is what
+     * made the final score look wrong/"broken" against the HUD. */
+    sprites_data_apply_teams(gTeamAIndex, gTeamBIndex);
 
     player_init(&playerA, SCREEN_W / 2, COURT_BOTTOM_Y, SLOT_PLAYER, PAL_TEAM_A, START_LIVES);
     player_init(&playerB, SCREEN_W / 2, COURT_TOP_Y, SLOT_CPU, PAL_TEAM_B, START_LIVES);
@@ -132,7 +138,6 @@ void scene_match_update(void)
             else
             {
                 VDP_clearTextLine(12);
-                VDP_drawText("----------------------------------------", 0, 12);
                 if (server == 0) state = MS_PLAYER_HOLD;
                 else { state = MS_CPU_HOLD; aiDelay = ai_pickThrowDelay(); }
             }
@@ -250,7 +255,6 @@ void scene_match_update(void)
                 }
 
                 VDP_clearTextLine(12);
-                VDP_drawText("----------------------------------------", 0, 12);
                 start_round();
             }
             break;
