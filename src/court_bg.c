@@ -7,12 +7,13 @@
  * no extra palette budget needed on top of the 3 sprite lines. */
 #define TILE_GRASS_A   (TILE_COURT_BASE + 0)
 #define TILE_GRASS_B   (TILE_COURT_BASE + 1)
-#define TILE_LINE_L    (TILE_COURT_BASE + 2)
-#define TILE_LINE_R    (TILE_COURT_BASE + 3)
-#define TILE_LINE_H    (TILE_COURT_BASE + 4)
-#define TILE_STAND_A   (TILE_COURT_BASE + 5)
-#define TILE_STAND_B   (TILE_COURT_BASE + 6)
-#define TILE_ENDZONE   (TILE_COURT_BASE + 7)
+#define TILE_GRASS_M   (TILE_COURT_BASE + 2)
+#define TILE_LINE_L    (TILE_COURT_BASE + 3)
+#define TILE_LINE_R    (TILE_COURT_BASE + 4)
+#define TILE_LINE_H    (TILE_COURT_BASE + 5)
+#define TILE_STAND_A   (TILE_COURT_BASE + 6)
+#define TILE_STAND_B   (TILE_COURT_BASE + 7)
+#define TILE_ENDZONE   (TILE_COURT_BASE + 8)
 
 #define PITCH_TOP_ROW      3
 #define PITCH_BOTTOM_ROW   24
@@ -28,6 +29,14 @@ static const u32 tile_grass_a[8] = {
 static const u32 tile_grass_b[8] = {
     0x33333333, 0x33333333, 0x33333333, 0x33333333,
     0x33333333, 0x33333333, 0x33333333, 0x33333333
+};
+
+/* Mid-tone between grass A and B, used as a transition band so the
+ * mown-stripe pattern reads as a smooth gradient instead of an abrupt
+ * light/dark flip. */
+static const u32 tile_grass_m[8] = {
+    0x77777777, 0x77777777, 0x77777777, 0x77777777,
+    0x77777777, 0x77777777, 0x77777777, 0x77777777
 };
 
 static const u32 tile_line_l[8] = {
@@ -89,12 +98,14 @@ static void restore_colors(void)
     PAL_setColor(0 * 16 + 4, RGB24_TO_VDPCOLOR(0x182848));  /* stand navy   */
     PAL_setColor(0 * 16 + 5, RGB24_TO_VDPCOLOR(0x384870));  /* stand fleck  */
     PAL_setColor(0 * 16 + 6, RGB24_TO_VDPCOLOR(0xE8C020));  /* endzone gold */
+    PAL_setColor(0 * 16 + 7, RGB24_TO_VDPCOLOR(0x38A048));  /* grass mid (A/B blend) */
 }
 
 void court_bg_init(void)
 {
     VDP_loadTileData(tile_grass_a, TILE_GRASS_A, 1, DMA);
     VDP_loadTileData(tile_grass_b, TILE_GRASS_B, 1, DMA);
+    VDP_loadTileData(tile_grass_m, TILE_GRASS_M, 1, DMA);
     VDP_loadTileData(tile_line_l,  TILE_LINE_L,  1, DMA);
     VDP_loadTileData(tile_line_r,  TILE_LINE_R,  1, DMA);
     VDP_loadTileData(tile_line_h,  TILE_LINE_H,  1, DMA);
@@ -122,7 +133,14 @@ void court_bg_draw(void)
         }
 
         u16 dt = row - PITCH_TOP_ROW;
-        u16 grassTile = (dt & 2) ? TILE_GRASS_B : TILE_GRASS_A;
+        /* Light -> mid -> dark -> mid -> repeat, 3 rows per band, so the
+         * mown-stripe pattern reads as a smooth gradient rather than an
+         * abrupt 2-tone flip (closer to the smoother look of the Sega CD
+         * FIFA re-release versus the grainier original cart version). */
+        u16 band = (dt / 3) % 4;
+        u16 grassTile = (band == 0) ? TILE_GRASS_A
+                       : (band == 2) ? TILE_GRASS_B
+                       : TILE_GRASS_M;
         u16 leftCol  = 6 - (dt * 4) / (PITCH_BOTTOM_ROW - PITCH_TOP_ROW);
         u16 rightCol = 33 + (dt * 4) / (PITCH_BOTTOM_ROW - PITCH_TOP_ROW);
 

@@ -123,6 +123,23 @@ static const u32 tile_ball_shadow[8] = {
     0x00000000
 };
 
+/* Small single-tile player (see TILE_PLAYER_SMALL) - a compact 8x8
+ * humanoid using the same color plan (1=kit, 2=skin, 3=white, 4=dark)
+ * so it can share a team's normal palette. The torso keeps a 1px dark
+ * outline on its left/right edges (like the ball's outline) so a
+ * green-kit team doesn't disappear against the green pitch - kit color
+ * alone isn't reliable contrast against a fixed-color background. */
+static const u32 tile_player_small[8] = {
+    0x00444400,
+    0x00422400,
+    0x04111140,
+    0x41111114,
+    0x41111114,
+    0x04211240,
+    0x04211240,
+    0x44000044
+};
+
 /* Per-team kit palettes - index 1 is the only thing that changes;
  * skin/shorts/trim (2,3,4) stay identical across teams. Order matches
  * teamNames[] in teams.c: Red Raptors, Blue Hawks, Green Vipers, Gold
@@ -189,6 +206,7 @@ void sprites_data_init(void)
 
     VDP_loadTileData(tile_ball,        TILE_BALL,        1, DMA);
     VDP_loadTileData(tile_ball_shadow, TILE_BALL_SHADOW,  1, DMA);
+    VDP_loadTileData(tile_player_small, TILE_PLAYER_SMALL, 1, DMA);
 
     PAL_setPalette(PAL_BALL, pal_ball, DMA);
 }

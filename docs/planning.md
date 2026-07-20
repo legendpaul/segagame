@@ -128,6 +128,27 @@ chip with PSG reserved purely for SFX.
   re-applying court/font/ball colors every time a scene is entered instead of only at boot -
   caught and fixed before shipping, verified live in Fusion afterward.
 
+### Reference pass: looked at FIFA International Soccer (Sega CD) (2026-07-20)
+
+Researched the actual Sega CD release rather than guessing. Its real differences from the
+Genesis cart: opening FMV of 1990 World Cup highlights, better-quality title/menu music (real
+instruments via redbook CD audio), and cleaner/less grainy grass - gameplay and camera were
+otherwise unchanged from the cart version. FMV and CD audio are off the table on a cartridge ROM
+(no CD drive, no video decode hardware), but two things were genuinely portable:
+
+- **Perspective depth** (`src/player.c`, `src/sprites_data.c`): the far (CPU) side now renders as
+  a dedicated small 8x8 sprite instead of the 16x16 one, so it visibly reads smaller/further away
+  than the near (human) side - the classic elevated-camera depth cue, faked without hardware
+  sprite scaling (Genesis doesn't have any) by hand-authoring a second, smaller tile. Paired with
+  the existing tapered sidelines it reinforces the same perspective illusion consistently. Trade-
+  off: the small sprite has no pose animation (always the same tiny tile) - a reasonable trade
+  since at that scale individual pose frames were already close to imperceptible.
+  Bug caught during this: a green-kit team's CPU sprite nearly disappeared against the green
+  pitch (kit color alone isn't reliable contrast against a fixed-color background). Fixed by
+  adding a 1px dark outline around the small sprite's torso, same treatment as the ball.
+- **Smoother grass** (`src/court_bg.c`): added a third, mid-tone grass color so the mown-stripe
+  pattern gradates light->mid->dark->mid instead of flipping abruptly between two tones.
+
 ---
 
 ## 📝 Design Decisions

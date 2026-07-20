@@ -26,6 +26,7 @@ typedef struct {
     u8  poseTimer;    /* frames left before a transient pose (throw/catch) reverts */
     u8  animFrame;    /* 0/1 - drives the run cycle's mirrored second frame */
     u8  animCounter;  /* frame counter that paces the run cycle */
+    u8  small;        /* TRUE = render as the tiny far-side sprite (no poses) */
 } Player;
 
 void player_init(Player *p, s16 startX, s16 y, u8 spriteSlot, u8 pal, u8 lives);

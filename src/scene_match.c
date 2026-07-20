@@ -99,6 +99,11 @@ void scene_match_enter(void)
 
     player_init(&playerA, SCREEN_W / 2, COURT_BOTTOM_Y, SLOT_PLAYER, PAL_TEAM_A, START_LIVES);
     player_init(&playerB, SCREEN_W / 2, COURT_TOP_Y, SLOT_CPU, PAL_TEAM_B, START_LIVES);
+    /* Far side reads smaller than the near side - the perspective depth
+     * cue elevated-camera sports games (FIFA International Soccer
+     * included) use, faked here with a dedicated tiny sprite since
+     * Genesis has no hardware sprite scaling. */
+    playerB.small = TRUE;
 
     server = 0;
     start_round();

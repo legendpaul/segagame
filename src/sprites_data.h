@@ -30,8 +30,17 @@
 #define TILE_BALL           (TILE_USER_INDEX + 16)
 #define TILE_BALL_SHADOW    (TILE_USER_INDEX + 17)
 
+/* A single small 8x8 sprite (no pose variants) used only for the far
+ * (CPU) side. Genesis sprites can't be hardware-scaled, so this fakes
+ * the "far player reads smaller than the near player" depth cue real
+ * elevated-camera sports games (FIFA International Soccer included)
+ * rely on, by hand-authoring a separate tiny tile instead of scaling
+ * the 16x16 one. Paired with court_bg.c's tapered sidelines for a
+ * consistent perspective illusion. */
+#define TILE_PLAYER_SMALL   (TILE_USER_INDEX + 18)
+
 /* First tile index free for court_bg.c to use */
-#define TILE_COURT_BASE     (TILE_USER_INDEX + 18)
+#define TILE_COURT_BASE     (TILE_USER_INDEX + 19)
 
 /* Palette lines: PAL0 is used by the system font + pitch background,
  * so sprites use 1-3. PAL1/PAL2 are *slots*, not fixed teams - which

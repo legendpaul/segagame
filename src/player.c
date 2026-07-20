@@ -16,6 +16,7 @@ void player_init(Player *p, s16 startX, s16 y, u8 spriteSlot, u8 pal, u8 lives)
     p->poseTimer = 0;
     p->animFrame = 0;
     p->animCounter = 0;
+    p->small = FALSE;
 }
 
 void player_moveHuman(Player *p)
@@ -66,6 +67,20 @@ void player_draw(Player *p)
     /* Hardware sprites form a linked list starting at slot 0; a sprite
      * whose slot isn't reachable via some other sprite's "link" is never
      * rendered. We keep a fixed chain: slot N links to slot N+1. */
+    if (p->small)
+    {
+        /* Genesis sprites can't be hardware-scaled, so the far/CPU
+         * side's "further away, therefore smaller" look is faked with
+         * a dedicated tiny 8x8 tile instead of the 16x16 pose set - no
+         * per-pose animation at this scale, just the depth cue. +8 on Y
+         * roughly aligns its "feet" with where the 16x16 sprite's feet
+         * would have been, rather than anchoring from the same top-left. */
+        VDP_setSpriteFull(p->spriteSlot, p->x, p->y + 8, SPRITE_SIZE(1, 1),
+                           TILE_ATTR_FULL(p->pal, 0, FALSE, FALSE, TILE_PLAYER_SMALL),
+                           p->spriteSlot + 1);
+        return;
+    }
+
     u16 base = TILE_PLAYER_STAND;
     bool flip = FALSE;
 
