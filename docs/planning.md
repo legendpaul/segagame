@@ -268,6 +268,41 @@ gap, not resolution.
   jersey shading (not a flat color block), and different teams show coherent recolored
   shading rather than a single swapped patch.
 
+### Fourth sprite pass: real research into current AI pixel-art tooling (2026-07-20)
+
+Directly asked to research the actual current state of the art for AI sprite generation
+rather than keep tuning a hand-rolled pipeline around a general-purpose model. Did that via
+web search rather than guessing from memory, and it changed the approach:
+
+- All 3 previous passes fed vanilla Stable Diffusion 1.5 - a general photoreal-leaning model
+  with no pixel-art-specific training - through hand-written downsample/classify scripts to
+  fake a pixel-art look. Research turned up **Pixel-Art-XL** (`nerijs/pixel-art-xl`), a LoRA
+  trained specifically so SDXL outputs clean, authentic pixel art natively - a real,
+  well-known model (600+ likes on Hugging Face), not a guess.
+- With the user's explicit go-ahead first (this meant downloading ~7.4GB - the SDXL 1.0 base
+  checkpoint, the Pixel-Art-XL LoRA, and a fixed VAE - into the local ComfyUI install), set
+  this up for real and generated through the same ComfyUI REST API used throughout this
+  project.
+- The model card's own tip mattered and was followed exactly: "downscale 8x with nearest
+  neighbor to get pixel-perfect images." At native 1024x1024 the output still looks like fat,
+  slightly-aliased blocks; only the 8x-reduced 128x128 grid is the actual pixel-art the model
+  intended. Skipping that step and downsampling straight from 1024x1024 to the 32x32 hardware
+  grid reintroduces exactly the same blur/noise problem earlier passes were fighting.
+- That 128x128 grid was cropped to the character's real bounding box - **padded to a square
+  first, not stretched**, so squeezing it into the 32x32 hardware sprite doesn't distort the
+  proportions - then run through the same flood-fill background removal + median-cut 14-color
+  quantization + hue-preserving team recolor pipeline built in the previous pass.
+- Verified live in Fusion: clean render, no VRAM/tile corruption, coherent per-team
+  recoloring, and the underlying source art is visibly higher quality (actual pixel-art
+  training, not a repurposed photoreal model).
+
+**Honest limitation, stated plainly**: this is a real, meaningful upgrade in source-art
+quality, not a fix for every remaining gap. Still true: all 4 poses share one 32x32 block (no
+distinct throw/catch art), the court/ball/HUD are untouched by this pass, and the 32x32
+hardware sprite ceiling still caps how much detail can show on screen regardless of source
+quality - sprite budget and color count were the real bottlenecks, and both are now used
+properly.
+
 ---
 
 ## 📝 Design Decisions

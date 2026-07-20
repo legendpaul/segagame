@@ -2,60 +2,59 @@
 #include "teams.h"
 
 /* 8x8, 4bpp, one u32 per row (8 pixels x 4 bits, MSB = leftmost pixel).
- * Color plan for the player sprite - 14 real colors now (index 0 stays
- * transparent), not the old flat 4-color plan:
- *   1  = skin (fixed, all teams)          4  = hair highlight (fixed)
- *   5,8,11 = hair/shoe shading (fixed)    13,14 = outline/shadow (fixed)
- *   2,3,6,7,9,10,12 = the jersey "kit ramp" - these 7 indices are what
- *   sprites_data_apply_teams() actually recolors per team.
+ * Color plan for the player sprite - 14 real colors (index 0 stays
+ * transparent):
+ *   1,3,4,8,9,10,11 = fixed skin/hair/outline tones, identical every team
+ *   2,5,6,7,12,13,14 = the jersey "kit ramp" - hue-rotated per team by
+ *   sprites_data_apply_teams().
  *
  * tile_player_stand[16][8] is a full 4x4 hardware sprite block (32x32px
  * - the actual max single-sprite size the Genesis VDP supports), tiles
  * in column-major hardware order (col0 top-to-bottom 4 tiles, then
  * col1, col2, col3).
  *
- * Third pass at this sprite, and the fix that actually mattered: the
- * previous two passes were readable but flat/noisy, because the whole
- * pipeline only ever used 4 flat colors total for the entire player -
- * real 16-bit sports sprites (the "EA Sports on Genesis" bar this was
- * being measured against) use most of their 16-color palette budget for
- * proper light/mid/dark shading, not one flat tone per body part. This
- * pass:
- *   1. Re-processed the same ComfyUI-generated reference through a
- *      cleaner pipeline: flood-fill background removal (instead of a
- *      flat brightness threshold, so light highlights ON the character
- *      don't get eaten as background), average-color downsample to a
- *      true 32x32 grid (instead of nearest/mode-pooled classification,
- *      which produced speckled noise), then an adaptive 14-color
- *      palette extracted directly from the source art via median-cut
- *      quantization - so the actual light/mid/dark jersey tones the AI
- *      generated survive, instead of being crushed into one flat index.
- *   2. Team recoloring now hue-rotates the whole 7-color jersey ramp
- *      (preserving each shade's original lightness, boosting low-
- *      saturation shades to a 0.42 floor so every team's kit reads
- *      clearly) instead of swapping one flat index - this is the same
- *      technique real sports games use for team-color swaps: the
- *      shading structure carries over, only the hue changes.
- * Honest limitation, unchanged from the previous pass: all 4 poses
- * (stand/run/throw/catch) still share this one block - see
- * sprites_data_init() and docs/planning.md. */
+ * Fourth pass at this sprite. The first three passes all fed vanilla
+ * Stable Diffusion 1.5 (a general-purpose photoreal-leaning model, not
+ * a pixel-art model) through hand-written downsample/classify scripts -
+ * real research (not guessing) into what actually produces clean pixel
+ * art turned up Pixel-Art-XL (nerijs/pixel-art-xl), a LoRA trained
+ * specifically to make SDXL output authentic, pixel-perfect art
+ * natively. Downloaded locally (SDXL base + the LoRA + a fixed VAE,
+ * ~7.4GB, with explicit go-ahead first) and generated through
+ * ComfyUI's API the same way as before. The model card's own tip -
+ * "downscale 8x with nearest neighbor to get the pixel-perfect grid" -
+ * matters: at native 1024x1024 output the model still draws in fat,
+ * aliased blocks; only after that 8x reduction (to 128x128) does the
+ * *actual* pixel-art grid the model intended appear, clean edges and
+ * all. That 128x128 grid was then cropped to the character's true
+ * bounding box (not stretched - the crop was padded to square first so
+ * downsampling to the 32x32 hardware grid doesn't squash the
+ * proportions), and run through the same flood-fill-background-removal
+ * + median-cut 14-color quantization pipeline as the previous pass.
+ * Team recoloring still hue-rotates the 7-color jersey ramp while
+ * preserving each shade's lightness (same technique real sports games
+ * use for team swaps), baked into pal_team_red/blue/green/gold[16]
+ * below.
+ * Honest limitation, unchanged: all 4 poses (stand/run/throw/catch)
+ * still share this one block - see sprites_data_init() and
+ * docs/planning.md. */
 static const u32 tile_player_stand[16][8] = {
     { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
-    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x000000dd, 0x00000bca, 0x0000bc76 },
-    { 0x0000da63, 0x0000da33, 0x00000ccc, 0x00000090, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
-    { 0x0000000c, 0x000000cc, 0x000000cc, 0x00000eda, 0x00000b96, 0x0000e844, 0x009db844, 0x0dee4458 },
-    { 0x0000000d, 0x000000ee, 0x000000ee, 0x000000ee, 0x00000000, 0x00000004, 0x00000001, 0x000000b1 },
-    { 0x000000e5, 0x000000ee, 0x00000022, 0x00000022, 0xea633321, 0xa6711112, 0x63911112, 0x33911112 },
-    { 0x29dbbb73, 0x28bb93cc, 0x21252777, 0x21112a7a, 0x00b93776, 0x00bc666e, 0x0ec737dd, 0xda7669d0 },
-    { 0xc663ae00, 0x7333ae00, 0x73337000, 0x33337000, 0x767eb000, 0x58be0000, 0x8be00000, 0xd0000000 },
-    { 0xeebb00ed, 0x848ed00e, 0x84458de8, 0x84448bb4, 0x45984114, 0x459844e5, 0x4448b1e8, 0x44448bed },
-    { 0x44444be5, 0x884445db, 0xee845e92, 0x19deed21, 0x126aa321, 0x33333113, 0x33223333, 0x33111333 },
-    { 0x33311333, 0xccc63667, 0x377ceede, 0x6777cd00, 0x63667c00, 0xea636ad0, 0xdd9767cc, 0x00dc7677 },
-    { 0x000da636, 0x000b7333, 0x00007733, 0x0000bc73, 0x000000e7, 0x0000000d, 0x00000000, 0x00000000 },
-    { 0x00000000, 0xb0000000, 0x8b000000, 0x8b000000, 0x41000000, 0x8ee00000, 0x8be00000, 0x55d00000 },
-    { 0x40000000, 0x90000000, 0x7b000000, 0x6ab00000, 0x3ad00000, 0x3ad00000, 0x3ad00000, 0x3ad00000 },
-    { 0x7d000000, 0x9d000000, 0xb0000000, 0x00000000, 0x00000000, 0x00000000, 0xd0000000, 0xcb000000 },
-    { 0x7cb00000, 0x6ac00000, 0x367b0000, 0x767db000, 0xa754e000, 0xed84edb0, 0xbb444bed, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x0000000b, 0x0000000e },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000005, 0x00000005, 0x00000000 },
+    { 0x000000b0, 0x000baabb, 0x000a88a8, 0x00ba8888, 0x00b88888, 0x0ba88888, 0x00b88831, 0x00a88813 },
+    { 0x00baa311, 0x00baa411, 0x00eeba94, 0x0dccd414, 0xec7c7d44, 0xbdcd76cc, 0x94edc664, 0x445dcc65 },
+    { 0xa319cc76, 0x0934cccc, 0x00a9cccc, 0x000edccc, 0x000eedee, 0x000ec6cd, 0x000ec7c7, 0x0000e7d2 },
+    { 0x0000a142, 0x00009345, 0x0000eee2, 0x00000ee2, 0x005599e5, 0x555555e5, 0x55555d55, 0x00555555 },
+    { 0x00000000, 0xa0000000, 0x8a900000, 0x888b0000, 0x88ab0000, 0x888b0000, 0x34aa0000, 0x13ab0000 },
+    { 0x11900000, 0x11400000, 0x49ee0000, 0xbdccd000, 0xd7ccd119, 0x66dc414b, 0x66ee99b0, 0x6ce00000 },
+    { 0x7ce00000, 0xccd00000, 0xccd00000, 0xddcd0000, 0xe765d000, 0xd755d000, 0x7e314000, 0x27411900 },
+    { 0x22543ee0, 0x22259eb0, 0x22222e9e, 0x22222d5e, 0x555522de, 0x55555555, 0x55555555, 0x55555500 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x50000000, 0x50000000, 0x00000000 },
 };
 
 /* Ball: white with a soft shadow (2) and a dark outline (3) so it reads
@@ -87,53 +86,53 @@ static const u32 tile_ball_shadow[8] = {
 
 /* Small single-tile player (see TILE_PLAYER_SMALL) - a compact 8x8
  * humanoid, remapped onto the new 14-color plan so it shares a team's
- * real palette instead of the old separate 4-color one: 3=kit (jersey
- * ramp), 1=skin (fixed), 2=highlight (kit ramp), 14=dark outline
- * (fixed). Keeps a 1px dark outline on its torso edges (like the
- * ball's) so a light-kit team doesn't disappear against the pitch. */
+ * real palette instead of a separate one: 6=kit (jersey ramp), 1=skin
+ * (fixed), 2=highlight (kit ramp), 14=dark outline (fixed). Keeps a
+ * 1px dark outline on its torso edges (like the ball's) so a
+ * light-kit team doesn't disappear against the pitch. */
 static const u32 tile_player_small[8] = {
     0x00eeee00,
     0x00e11e00,
-    0x0e333340,
-    0xe3333334,
-    0xe3333334,
-    0x0e322340,
-    0x0e322340,
+    0x0e6666e0,
+    0xe666666e,
+    0xe666666e,
+    0x0e1661e0,
+    0x0e1661e0,
     0xee0000ee
 };
 
-/* Per-team jersey palettes. Indices 2,3,6,7,9,10,12 are the "kit ramp"
+/* Per-team jersey palettes. Indices 2,5,6,7,12,13,14 are the "kit ramp"
  * - hue-rotated per team while preserving each shade's original
  * lightness (a real color-preserving recolor, not a single flat-color
- * swap), boosted to a minimum 0.42 saturation so the team color always
+ * swap), boosted to a minimum 0.45 saturation so the team color always
  * reads clearly even where the source art's shading was almost gray.
- * Indices 1,4,5,8,11,13,14 are fixed skin/hair/outline tones, identical
+ * Indices 1,3,4,8,9,10,11 are fixed skin/hair/outline tones, identical
  * across every team. Order matches teamNames[] in teams.c: Red
  * Raptors, Blue Hawks, Green Vipers, Gold Tigers. */
 #define P(rgb24) RGB24_TO_VDPCOLOR(rgb24)
 
 static const u16 pal_team_red[16] = {
-    0x0000, P(0xE3BEA0), P(0xCE878D), P(0xD1616A), P(0xEC6907), P(0xAA642F),
-    P(0xC04B55), P(0x96343C), P(0x7D3D0C), P(0x582428), P(0x772229),
-    P(0x201C19), P(0x480F14), P(0x0E0F0F), P(0x030303)
+    0x0000, P(0xE1A48E), P(0xCF8288), P(0xD2775A), P(0xBA7061), P(0xB8464F),
+    P(0xA84048), P(0x9F3C44), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0x95363E), P(0x732C32), P(0x4E1D21)
 };
 
 static const u16 pal_team_blue[16] = {
-    0x0000, P(0xE3BEA0), P(0x87A5CE), P(0x6190D1), P(0xEC6907), P(0xAA642F),
-    P(0x4B7CC0), P(0x345D96), P(0x7D3D0C), P(0x243A58), P(0x224577),
-    P(0x201C19), P(0x0F2748), P(0x0E0F0F), P(0x030303)
+    0x0000, P(0xE1A48E), P(0x82A2CF), P(0xD2775A), P(0xBA7061), P(0x4675B8),
+    P(0x406BA8), P(0x3C659F), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0x365E95), P(0x2C4A73), P(0x1D314E)
 };
 
 static const u16 pal_team_green[16] = {
-    0x0000, P(0xE3BEA0), P(0x87CE9F), P(0x61D186), P(0xEC6907), P(0xAA642F),
-    P(0x4BC072), P(0x349655), P(0x7D3D0C), P(0x245835), P(0x22773E),
-    P(0x201C19), P(0x0F4822), P(0x0E0F0F), P(0x030303)
+    0x0000, P(0xE1A48E), P(0x82CF9C), P(0xD2775A), P(0xBA7061), P(0x46B86C),
+    P(0x40A863), P(0x3C9F5D), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0x369556), P(0x2C7344), P(0x1D4E2D)
 };
 
 static const u16 pal_team_gold[16] = {
-    0x0000, P(0xE3BEA0), P(0xCEBC87), P(0xD1B561), P(0xEC6907), P(0xAA642F),
-    P(0xC0A34B), P(0x967E34), P(0x7D3D0C), P(0x584B24), P(0x776222),
-    P(0x201C19), P(0x483A0F), P(0x0E0F0F), P(0x030303)
+    0x0000, P(0xE1A48E), P(0xCFBC82), P(0xD2775A), P(0xBA7061), P(0xB89C46),
+    P(0xA88E40), P(0x9F863C), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0x957D36), P(0x73612C), P(0x4E421D)
 };
 
 static const u16 * const pal_teams[NUM_TEAMS] = {
