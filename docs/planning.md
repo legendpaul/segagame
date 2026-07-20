@@ -22,18 +22,23 @@
 
 | Component             | Status         | Notes |
 | --------------------- | -------------- | ----- |
-| Game loop             | 🔲 Not started |       |
-| Scene: Menu           | 🔲 Not started |       |
-| Scene: Match          | 🔲 Not started |       |
-| Scene: Gameover       | 🔲 Not started |       |
-| Input manager         | 🔲 Not started |       |
-| Player entity         | 🔲 Not started |       |
-| Ball entity           | 🔲 Not started |       |
-| Collision manager     | 🔲 Not started |       |
-| AI manager            | 🔲 Not started |       |
-| Graphics assets       | 🔲 Not started |       |
-| Music & SFX           | 🔲 Not started |       |
-| Test Mode framework   | 🔲 Not started | Core to all development |
+| Game loop             | ✅ Done         | `src/main.c`, scene dispatcher |
+| Scene: Menu           | ✅ Done         | `src/scene_menu.c` - team select |
+| Scene: Match          | ✅ Done         | `src/scene_match.c` - full throw/catch/score loop |
+| Scene: Gameover       | ✅ Done         | `src/scene_gameover.c` |
+| Input manager         | ✅ Done         | `src/input_mgr.c` |
+| Player entity         | ✅ Done         | `src/player.c` |
+| Ball entity           | ✅ Done         | `src/ball.c` |
+| Collision manager     | ✅ Done         | catch/hit resolution inline in `scene_match.c` |
+| AI manager            | ✅ Done         | `src/ai_mgr.c` |
+| Graphics assets       | ✅ Done         | hand-authored tiles in `src/sprites_data.c` (no external image pipeline) |
+| Music & SFX           | ✅ Done (SFX)   | PSG sound effects in `src/sound_mgr.c`; no music track yet |
+| Test Mode framework   | 🔲 Not started | deferred - shipped gameplay took priority; see Open Questions |
+
+Builds clean with SGDK (`build.bat`) to a real, checksummed `out/rom.bin`. Verified live in
+the Fusion emulator: boot (TMSS splash), menu + team select, full match (movement, throw,
+catch, hits, scoring, round reset, game over) all confirmed working. Not yet tested on real
+Mega Drive hardware.
 
 ---
 

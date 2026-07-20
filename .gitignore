@@ -1,0 +1,5 @@
+# SGDK build output - regenerate with build.bat
+out/
+
+# Auto-copied by the SGDK build from C:\SGDK\src\boot\sega.s - not authored here
+src/boot/sega.s
