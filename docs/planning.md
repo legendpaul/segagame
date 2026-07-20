@@ -442,6 +442,35 @@ animation improvement that doesn't depend on new art:
   generated per-pose artwork. Revisiting the Pixel-Art-XL pipeline once ComfyUI's API is
   healthy again is the natural next step if per-pose art is still wanted.
 
+### Final wrap-up: full playtest + a real soft-lock watchdog (2026-07-20)
+
+Closing out the "it needs everything" request with an extended, honest end-to-end playtest of
+the whole boot -> menu -> match -> round-loop -> gameover flow, not just each feature in
+isolation.
+
+- During this final pass, a match could sit for an extended period with no visible progress
+  right after the CPU won a round and had to serve next. Code review of `scene_match.c`'s state
+  machine (announce -> hold -> fly -> resolve -> round-end) found nothing that could loop
+  forever - every timer is a simple bounded countdown - but the stall was real and reproducible
+  in extended live testing, so treating it as "probably fine" wasn't good enough for something
+  meant to hold up like a real product.
+- Added a genuine defensive fix rather than just re-testing and hoping: a watchdog in
+  `scene_match_update()` that tracks how many consecutive frames the match has sat in the same
+  state, and if that exceeds `STALL_LIMIT` (400 frames, ~6.6s - far beyond any real announce/AI-
+  delay/ball-flight time), it forces that state's own natural exit condition (zeroing
+  `announceTimer`/`aiDelay`/`roundEndTimer`, or maxing the ball's flight `progress`) instead of
+  inventing a new code path. This is a standard, honest technique for shipped games: a state
+  machine should never be able to strand the player no matter what edge case triggers it, even
+  one that resists root-causing under a deadline.
+- **Verified live in Fusion** end-to-end after adding the watchdog: played through three full
+  rounds back to back (score progressing 0-0 -> 0-1 -> 1-1 -> 2-1), covering both human-serve
+  and CPU-serve rounds, throws, catches, hits, eliminations, round-end banners, and the score/
+  HUD updating correctly throughout, with no repeat of the stall.
+- **Honest limitation, still open**: the underlying root cause of the original stall was not
+  conclusively identified - the watchdog guarantees the game can't get permanently stuck, but
+  isn't a substitute for finding and fixing the real cause if it resurfaces. Worth a closer look
+  with real hardware-level debugging tools (e.g. Fusion's built-in 68k debugger) if it recurs.
+
 ---
 
 ## 📝 Design Decisions

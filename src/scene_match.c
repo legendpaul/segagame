@@ -42,6 +42,19 @@ static u8  roundWinnerIsA;
 
 static u8  flashTimer;      /* frames left in the current impact flash, 0 = none */
 
+/* Safety watchdog: if the match state hasn't changed for an
+ * unreasonably long time (STALL_LIMIT frames), something has gone
+ * wrong - force the current state's natural timer/condition to
+ * complete rather than let a real player get soft-locked waiting on
+ * the CPU forever. Discovered during extended live playtesting: the
+ * CPU-serve path could sit indefinitely with no visible cause found
+ * on code review, so this is a defensive net on top of, not a
+ * replacement for, actually finding that root cause later. */
+#define STALL_LIMIT   400   /* ~6.6s at 60fps - well beyond any real delay */
+static MatchState lastState;
+static u16 stallCounter;
+static bool stallTrackerInit;
+
 /* --- small helpers -------------------------------------------------- */
 
 /* Whites-out the team whose player the ball just reached, for a couple
@@ -191,6 +204,7 @@ void scene_match_enter(void)
     sprites_data_apply_teams(gTeamAIndex, gTeamBIndex);
 
     flashTimer = 0;
+    stallTrackerInit = FALSE;
     server = 0;
     start_round();
 }
@@ -325,6 +339,31 @@ void scene_match_update(void)
      * you reposition a teammate while another exchange is in flight. */
     if (!teamA[activeA].eliminated)
         player_moveHuman(&teamA[activeA]);
+
+    /* Watchdog: force whatever this state is waiting on to complete if
+     * it's gone on far longer than any real delay ever should. */
+    if (!stallTrackerInit) { stallTrackerInit = TRUE; lastState = state; stallCounter = 0; }
+    if (state == lastState)
+    {
+        if (++stallCounter > STALL_LIMIT)
+        {
+            switch (state)
+            {
+                case MS_ANNOUNCE:  announceTimer = 0; break;
+                case MS_B_HOLD:    aiDelay = 0; break;
+                case MS_FLY_TO_B:
+                case MS_FLY_TO_A:  ball.progress = 255; break;
+                case MS_ROUND_END: roundEndTimer = 0; break;
+                default: break;
+            }
+            stallCounter = 0;
+        }
+    }
+    else
+    {
+        lastState = state;
+        stallCounter = 0;
+    }
 
     switch (state)
     {
