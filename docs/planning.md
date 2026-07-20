@@ -368,6 +368,27 @@ once before the menu, built from a real user-supplied source image
   flame art on a black background, and confirmed the scene auto-advances cleanly into the
   existing menu screen (correct palette, no corrupted tilemap) after ~2.5s.
 
+### Real title/menu screen: a lineup, not a text list (2026-07-20)
+
+Direct instruction: "it needs everything... a better title screen." The old menu
+(`src/scene_menu.c`) was pure text on the pitch background - no sprites, no motion. Rewrote it
+to actually use the same hardware-sprite art the match uses.
+
+- **Hero sprites**: the real 32x32 player art now stands on both sides of the menu, recolored
+  live via the existing `sprites_data_apply_teams()` to whichever team is actually selected and
+  its real opponent - proven by switching teams live in Fusion and watching both sprites
+  recolor (RED RAPTORS/GREEN VIPERS -> BLUE HAWKS/GOLD TIGERS) instantly.
+- **Bouncing ball**: a real per-frame triangle-wave bounce between the two heroes (no floating
+  point, just an integer distance-from-midpoint calc) instead of a static decoration.
+- **Idle bob**: both heroes nudge 1px on a slow cycle so the lineup doesn't read as a frozen
+  screenshot.
+- **Blinking "START TO PLAY"**: toggles on a timer, only touching the text plane on the frames
+  it actually changes state (not redrawn every frame).
+- **"TEAM A VS TEAM B" banner** replaces the old stacked "YOUR TEAM:" / "OPPONENT:" lines - a
+  clearer head-to-head presentation.
+- **Verified live in Fusion**: confirmed the hero sprites, ball bounce, blink cycle, and team-
+  color recolor on LEFT/RIGHT input all work correctly, not just that it compiles.
+
 ---
 
 ## 📝 Design Decisions
