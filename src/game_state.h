@@ -24,8 +24,8 @@
 #define AI_REACTION_MIN     20      /* frames CPU waits before throwing */
 #define AI_REACTION_VAR     30
 
-#define START_LIVES         3
-#define WIN_SCORE           3
+#define TEAM_SIZE           3       /* real dodgeball squad size per side */
+#define WIN_SCORE           3       /* rounds (full-team eliminations) to win the match */
 
 /* --- Scene management --- */
 typedef enum {

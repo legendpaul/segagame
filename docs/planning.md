@@ -303,6 +303,47 @@ hardware sprite ceiling still caps how much detail can show on screen regardless
 quality - sprite budget and color count were the real bottlenecks, and both are now used
 properly.
 
+### Real 3-a-side elimination dodgeball (2026-07-20)
+
+Direct instruction: "it needs everything... real rules and 3 players per team." This was a
+full gameplay rearchitecture, not a tuning pass - `src/scene_match.c` was rewritten from
+scratch, plus changes to `src/player.h/.c`, `src/ai_mgr.h/.c`, `src/game_state.h`.
+
+- **Real dodgeball rules**: hit = eliminated (parked off-screen, un-targetable); catch = the
+  *thrower* is eliminated instead and the catching team's most-recently-eliminated player
+  returns to play (a real LIFO stack per team, `outStackA`/`outStackB`). A round ends when a
+  team hits zero in-play players; the losing team serves next round (unchanged incentive from
+  the original 1v1 design). First team to `WIN_SCORE` round wins takes the match.
+- **3 players per team**: `Player teamA[3]`/`teamB[3]` arrays replace the old single
+  `playerA`/`playerB`, placed across 3 lanes (`lane_x()`) on each baseline. `Player` gained an
+  `eliminated` flag (replacing the old 3-lives-per-player system entirely - lives didn't make
+  sense once elimination is the real rule) plus a remembered home lane position for when a
+  player returns to play.
+- **Switch-control** (chosen over full multi-select or fixed auto-control): the human directly
+  controls one teammate at a time (`activeA`), toggled with a new button (BUTTON_C) that skips
+  eliminated slots. The other 2 teammates run simple positioning AI - only whichever teammate
+  is actually the ball's target ("responder") moves to intercept; the rest hold their lane.
+  Only the player actually holding the ball can throw (`activeA == holderA` gate), and
+  control automatically follows the ball (catching a throw makes you the new active/holder) -
+  you can still manually switch to reposition someone else mid-play if you want to.
+  CPU's 3 players work the same way under the hood, just fully AI-driven: `ai_pickSlot()`
+  picks which in-play teammate/opponent a throw or return targets.
+- Sprite chain: teamA now uses hardware sprite slots 0-2, teamB 3-5, ball 6-7 - still one
+  fully consecutive VDP_setSpriteFull link chain, same hardware constraint as before, just
+  6 players instead of 2.
+- HUD changed from "LIVES" (per-player) to "IN" (team headcount) to match the new all-or-
+  nothing-per-player elimination model.
+- **Verified live in Fusion**, not just compiled: confirmed 3 players actually appear in 3
+  distinct lanes per side: confirmed the active player moves independently of teammates on
+  input; confirmed switch-control moves a different player after pressing the button;
+  confirmed a full automated exchange sequence (throw -> AI resolves catch/miss -> elimination
+  -> round-end detection -> score update -> "GREEN VIPERS WINS ROUND" -> round reset back to
+  3v3) played out correctly without a crash or stuck state.
+- **Honest limitation**: non-active teammates use a deliberately simple "only the ball's
+  actual target moves" AI rather than full tactical positioning (spreading out, anticipating
+  passes, etc.) - a reasonable scope match for what a hand-coded AI can do reliably, but not
+  as sophisticated as a real 3-a-side defensive AI would be.
+
 ---
 
 ## 📝 Design Decisions

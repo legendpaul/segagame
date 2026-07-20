@@ -24,3 +24,9 @@ bool ai_willCatch(void)
 {
     return ((random() % 100) < AI_CATCH_CHANCE) ? TRUE : FALSE;
 }
+
+u8 ai_pickSlot(u8 count)
+{
+    if (count <= 1) return 0;
+    return (u8)(random() % count);
+}

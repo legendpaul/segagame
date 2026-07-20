@@ -5,11 +5,16 @@
 
 #define RUN_FRAME_LEN   6   /* frames between run-cycle toggles */
 
-void player_init(Player *p, s16 startX, s16 y, u8 spriteSlot, u8 pal, u8 lives)
+#define OFFSCREEN_X   -100
+#define OFFSCREEN_Y   -100
+
+void player_init(Player *p, s16 startX, s16 y, u8 spriteSlot, u8 pal)
 {
     p->x = startX;
     p->y = y;
-    p->lives = lives;
+    p->homeX = startX;
+    p->homeY = y;
+    p->eliminated = FALSE;
     p->spriteSlot = spriteSlot;
     p->pal = pal;
     p->pose = POSE_STAND;
@@ -17,6 +22,22 @@ void player_init(Player *p, s16 startX, s16 y, u8 spriteSlot, u8 pal, u8 lives)
     p->animFrame = 0;
     p->animCounter = 0;
     p->small = FALSE;
+}
+
+void player_eliminate(Player *p)
+{
+    p->eliminated = TRUE;
+    p->x = OFFSCREEN_X;
+    p->y = OFFSCREEN_Y;
+}
+
+void player_restore(Player *p)
+{
+    p->eliminated = FALSE;
+    p->x = p->homeX;
+    p->y = p->homeY;
+    p->pose = POSE_STAND;
+    p->poseTimer = 0;
 }
 
 void player_moveHuman(Player *p)
