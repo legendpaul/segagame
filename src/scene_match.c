@@ -256,6 +256,7 @@ void scene_match_update(void)
             {
                 if ((gScoreA >= WIN_SCORE) || (gScoreB >= WIN_SCORE))
                 {
+                    PAL_fadeOutAll(20, FALSE);
                     gCurrentScene = GS_GAMEOVER;
                     return;
                 }

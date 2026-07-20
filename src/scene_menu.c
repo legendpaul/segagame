@@ -3,7 +3,6 @@
 #include "teams.h"
 #include "input_mgr.h"
 #include "sound_mgr.h"
-#include "music_mgr.h"
 #include "court_bg.h"
 
 static void draw_teams(void)
@@ -34,8 +33,6 @@ void scene_menu_enter(void)
 
     VDP_drawText("<  >  CHANGE TEAM", 11, 19);
     VDP_drawText("START TO PLAY", 13, 21);
-
-    music_mgr_start();
 }
 
 void scene_menu_update(void)
@@ -60,7 +57,9 @@ void scene_menu_update(void)
         gScoreA = 0;
         gScoreB = 0;
         sound_mgr_blip();
-        music_mgr_stop();
+        /* Fade to black rather than hard-cutting straight into the
+         * match - cheap scene-transition polish. */
+        PAL_fadeOutAll(20, FALSE);
         gCurrentScene = GS_MATCH;
     }
 }

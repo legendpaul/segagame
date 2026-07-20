@@ -195,6 +195,11 @@ void sprites_data_init(void)
 
 void sprites_data_apply_teams(u8 teamAIndex, u8 teamBIndex)
 {
+    /* Also re-applied here (not just at boot): PAL_fadeOutAll() during
+     * scene transitions blackens every palette line including the
+     * ball's, and this is the one place reliably called every time we
+     * enter a match. */
+    PAL_setPalette(PAL_BALL, pal_ball, DMA);
     PAL_setPalette(PAL_TEAM_A, pal_teams[teamAIndex], DMA);
     PAL_setPalette(PAL_TEAM_B, pal_teams[teamBIndex], DMA);
 }

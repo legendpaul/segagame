@@ -63,6 +63,34 @@ static const u32 tile_endzone[8] = {
     0x22222222, 0x22222222, 0x22222222, 0x22222222
 };
 
+static void restore_colors(void)
+{
+    /* PAL_fadeOutAll() (used for scene transitions - see scene_menu.c /
+     * scene_match.c / scene_gameover.c) blackens every color in all 4
+     * palette lines, including ones that are otherwise only ever set
+     * once. Team colors get reapplied every match via
+     * sprites_data_apply_teams(), but PAL0's font white and this
+     * court's own colors were only ever set at boot - after the first
+     * fade they stayed black forever. Re-applying them on every
+     * court_bg_draw() (which every scene already calls on entry) fixes
+     * that instead of relying on a one-time init. */
+    /* SGDK's built-in font actually renders its "lit" pixels using
+     * color index 15 (its glyph tileset was authored that way, with
+     * the default boot palette - palette_grey - deliberately filling
+     * indices 8-15 with the same white so index 15 reads white
+     * regardless of the index 1-7 grey ramp). Index 1 is NOT the font
+     * color, despite how that might look from VDP_setTextPalette's
+     * name - only index 0 (transparent) and 15 (glyph white) actually
+     * matter for text. */
+    PAL_setColor(0 * 16 + 0,  0x0000);                       /* transparent/black */
+    PAL_setColor(0 * 16 + 15, RGB24_TO_VDPCOLOR(0xF8F8F8));  /* font glyph white */
+    PAL_setColor(0 * 16 + 2, RGB24_TO_VDPCOLOR(0x40B050));  /* grass light  */
+    PAL_setColor(0 * 16 + 3, RGB24_TO_VDPCOLOR(0x309040));  /* grass dark   */
+    PAL_setColor(0 * 16 + 4, RGB24_TO_VDPCOLOR(0x182848));  /* stand navy   */
+    PAL_setColor(0 * 16 + 5, RGB24_TO_VDPCOLOR(0x384870));  /* stand fleck  */
+    PAL_setColor(0 * 16 + 6, RGB24_TO_VDPCOLOR(0xE8C020));  /* endzone gold */
+}
+
 void court_bg_init(void)
 {
     VDP_loadTileData(tile_grass_a, TILE_GRASS_A, 1, DMA);
@@ -74,19 +102,14 @@ void court_bg_init(void)
     VDP_loadTileData(tile_stand_b, TILE_STAND_B, 1, DMA);
     VDP_loadTileData(tile_endzone, TILE_ENDZONE, 1, DMA);
 
-    /* Added into the font's PAL0 line at the unused index 2-6 slots.
-     * Index 0/1 (transparent black / white) are left alone so text
-     * keeps rendering correctly. */
-    PAL_setColor(0 * 16 + 2, RGB24_TO_VDPCOLOR(0x40B050)); /* grass light  */
-    PAL_setColor(0 * 16 + 3, RGB24_TO_VDPCOLOR(0x309040)); /* grass dark   */
-    PAL_setColor(0 * 16 + 4, RGB24_TO_VDPCOLOR(0x182848)); /* stand navy   */
-    PAL_setColor(0 * 16 + 5, RGB24_TO_VDPCOLOR(0x384870)); /* stand fleck  */
-    PAL_setColor(0 * 16 + 6, RGB24_TO_VDPCOLOR(0xE8C020)); /* endzone gold */
+    restore_colors();
 }
 
 void court_bg_draw(void)
 {
     u16 row, col;
+
+    restore_colors();
 
     for (row = 0; row < 28; row++)
     {

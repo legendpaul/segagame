@@ -1,20 +1,21 @@
 /*
- * music_mgr.h - A small looping PSG melody for the menu screen.
+ * music_mgr.h - A short looping FM melody + bass line, playing
+ * continuously through the menu, match, and game-over screens (real
+ * 1990s Genesis games score through the YM2612 FM chip and keep PSG
+ * free for SFX - this follows the same split).
  *
- * Honest limitation: real multi-channel background music on Genesis
- * goes through the YM2612 FM chip via SGDK's XGM driver, authored with
- * a tracker tool - not something hand-written as raw data in a text
- * session. This is a monophonic PSG jingle (one melodic voice, reusing
- * sound_mgr's existing envelope-decay channel so it fades naturally
- * note-to-note) - real music, just not a full soundtrack.
+ * Honest limitation: this is one hand-built FM instrument voice
+ * playing a short hand-written phrase, not a composed multi-
+ * instrument soundtrack - authoring that normally means a tracker
+ * tool (DefleMask/Furnace) exporting to SGDK's XGM driver, which
+ * isn't available in this environment.
  */
 #ifndef _MUSIC_MGR_H_
 #define _MUSIC_MGR_H_
 
 #include "genesis.h"
 
-void music_mgr_start(void);   /* call when entering the menu */
-void music_mgr_stop(void);    /* call when leaving the menu */
-void music_mgr_update(void);  /* call once per frame, harmless if stopped */
+void music_mgr_init(void);    /* call once at boot */
+void music_mgr_update(void);  /* call once per frame */
 
 #endif /* _MUSIC_MGR_H_ */

@@ -36,6 +36,7 @@ int main(bool hardReset)
     sprites_data_init();
     court_bg_init();
     sound_mgr_init();
+    music_mgr_init();
 
     gCurrentScene = GS_MENU;
     gTeamAIndex = 0;

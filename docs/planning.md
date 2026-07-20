@@ -93,6 +93,41 @@ the fidelity of a modern 2D game (the Genesis' 4-tile-per-sprite VRAM layout mak
 frame a real cost). What's here now is close to the ceiling of what a hand-authored SGDK project
 can deliver without image/audio tooling this session doesn't have access to.
 
+### "AAA for the 1990s" pass (2026-07-20)
+
+Re-scoped to the actual bar: best-in-class Genesis titles (NHL 94, Sonic 2/3), not modern AAA -
+which is fair, since the single biggest gap left after the previous pass was that "music" meant a
+PSG jingle only on the menu, and every real Genesis game of that era scores through the YM2612 FM
+chip with PSG reserved purely for SFX.
+
+- **Real FM music** (`src/fm_synth.c`, `src/music_mgr.c`): hand-programmed YM2612 registers
+  directly via SGDK's `YM2612_writeReg()` - algorithm/feedback, per-operator envelopes, note
+  frequency - for a 2-voice (melody + bass) instrument patch, playing a short looping phrase
+  continuously through the menu, match, and game-over screens. This is a real FM voice, not a PSG
+  beep, and it frees PSG entirely back to SFX-only, matching how actual Genesis games split the
+  two chips. Deliberately used algorithm 7 (all 4 operators as carriers, no modulation chain) -
+  the safest choice for hand-programming without a tracker, since a mistake in one operator can't
+  silence the whole voice the way it could in a modulator-heavy algorithm.
+  Honest limitation: this is one hand-built instrument playing a short hand-written phrase, not a
+  composed multi-instrument soundtrack - that's normally authored with a tracker (DefleMask/
+  Furnace) exporting to SGDK's XGM driver, which isn't available in this environment.
+  Verification note: I confirmed this compiles clean, runs every frame without hanging/crashing
+  the system (extensively play-tested after), and hand-checked every register value against the
+  YM2612's documented map. I could not capture literal audio playback to listen to it in this
+  environment (Fusion's WAV-log feature didn't produce a file despite several attempts) - so
+  audibility itself is unverified by me; it should be confirmed by ear when run.
+- **Scene fade transitions**: `PAL_fadeOutAll()` on every scene change (menu->match, match->
+  game-over, game-over->menu) instead of hard cuts.
+- **Bug found and fixed during this pass**: the fade blackens all 4 palette lines, but the court's
+  colors, the ball's palette, and (critically) the font's actual glyph color were each only ever
+  set once at boot - after the first fade they stayed black forever, breaking all on-screen text
+  and the pitch's colors from the second scene onward. Root cause required checking SGDK's actual
+  source: `VDP_setTextPalette()` only selects which palette line text uses, it doesn't set colors;
+  the font glyphs render with color index **15**, not index 1, with the default boot palette
+  (`palette_grey`) deliberately filling indices 8-15 with white for exactly that reason. Fixed by
+  re-applying court/font/ball colors every time a scene is entered instead of only at boot -
+  caught and fixed before shipping, verified live in Fusion afterward.
+
 ---
 
 ## 📝 Design Decisions

@@ -1,47 +1,61 @@
 #include "music_mgr.h"
-#include "sound_mgr.h"
+#include "fm_synth.h"
 
-/* Reuses the SCORE sfx channel - it's silent while browsing the menu
- * (score sfx only ever plays on the game-over screen), so the melody
- * doesn't fight with the menu's own move/select blips on SFX_CH_UI. */
-#define MUSIC_CH    SFX_CH_SCORE
-#define NOTE_LEN    20   /* frames per note (~0.33s at 60fps) */
+#define FM_CH_MELODY   0
+#define FM_CH_BASS     1
 
-/* A short major arpeggio loop: C4 E4 G4 C5 G4 E4 D4 G3 */
-static const u16 notes[] = { 262, 330, 392, 523, 392, 330, 294, 196 };
-#define NUM_NOTES   (sizeof(notes) / sizeof(notes[0]))
+#define MELODY_NOTE_LEN   24   /* frames per melody note (~0.4s at 60fps) */
+#define BASS_NOTE_LEN     (MELODY_NOTE_LEN * 2)
 
-static u8   noteIndex;
-static u16  noteTimer;
-static bool playing;
+/* Simple I-vi-IV-V-ish loop: melody outlines a C major arpeggio and
+ * back down, bass holds root notes underneath at half the rate. Both
+ * arrays are timed to complete a full loop together (8 * 24 == 4 * 48). */
+static const struct { u8 note; u8 octave; } melody[] = {
+    { NOTE_C, 4 }, { NOTE_E, 4 }, { NOTE_G, 4 }, { NOTE_E, 4 },
+    { NOTE_F, 4 }, { NOTE_A, 4 }, { NOTE_G, 4 }, { NOTE_E, 4 },
+};
+#define MELODY_LEN  (sizeof(melody) / sizeof(melody[0]))
 
-void music_mgr_start(void)
+static const struct { u8 note; u8 octave; } bass[] = {
+    { NOTE_C, 3 }, { NOTE_C, 3 }, { NOTE_F, 3 }, { NOTE_G, 3 },
+};
+#define BASS_LEN  (sizeof(bass) / sizeof(bass[0]))
+
+static u8  melodyIndex, bassIndex;
+static u16 melodyTimer, bassTimer;
+
+void music_mgr_init(void)
 {
-    noteIndex = 0;
-    noteTimer = 0;
-    playing = TRUE;
-}
+    fm_synth_initChannel(FM_CH_MELODY);
+    fm_synth_initChannel(FM_CH_BASS);
 
-void music_mgr_stop(void)
-{
-    playing = FALSE;
+    melodyIndex = 0;
+    bassIndex = 0;
+    melodyTimer = 0;
+    bassTimer = 0;
 }
 
 void music_mgr_update(void)
 {
-    if (!playing) return;
-
-    if (noteTimer == 0)
+    if (melodyTimer == 0)
     {
-        /* decayStep 1 = a slow, soft fade (versus the punchier SFX
-         * decay steps), so each note rings out gently like a pluck
-         * instead of a sharp beep. */
-        sound_mgr_play(MUSIC_CH, notes[noteIndex], 1);
-        noteIndex = (noteIndex + 1) % NUM_NOTES;
-        noteTimer = NOTE_LEN;
+        fm_synth_noteOn(FM_CH_MELODY, melody[melodyIndex].note, melody[melodyIndex].octave);
+        melodyIndex = (melodyIndex + 1) % MELODY_LEN;
+        melodyTimer = MELODY_NOTE_LEN;
     }
     else
     {
-        noteTimer--;
+        melodyTimer--;
+    }
+
+    if (bassTimer == 0)
+    {
+        fm_synth_noteOn(FM_CH_BASS, bass[bassIndex].note, bass[bassIndex].octave);
+        bassIndex = (bassIndex + 1) % BASS_LEN;
+        bassTimer = BASS_NOTE_LEN;
+    }
+    else
+    {
+        bassTimer--;
     }
 }
