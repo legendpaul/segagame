@@ -389,6 +389,27 @@ to actually use the same hardware-sprite art the match uses.
 - **Verified live in Fusion**: confirmed the hero sprites, ball bounce, blink cycle, and team-
   color recolor on LEFT/RIGHT input all work correctly, not just that it compiles.
 
+### Pitch polish: center ring + atmospheric depth (2026-07-20)
+
+Direct instruction: "it needs everything... better pitch." Two small, honest additions to
+`src/court_bg.c` on top of the existing taper/diagonal-stripe work from an earlier pass.
+
+- **Center-court ring**: one new background tile (`tile_circle`, a filled gold marker) reused
+  at 8 points around the halfway spot in an octagon layout. This is explicitly an octagon
+  approximation, not a true circle - the 8x8 background tile grid is too coarse for a smooth
+  curve at this scale, and the code/comments say so rather than overselling it.
+- **Atmospheric-perspective darkening**: the two pitch rows closest to the far (CPU) baseline
+  never use the lightest grass stripe, so the far end of the pitch reads very slightly hazier
+  than the near end - a cheap, real depth cue, not just a flat-shaded field regardless of
+  distance.
+- **Tile budget bookkeeping**: adding `TILE_CIRCLE` at `TILE_COURT_BASE + 9` pushed
+  `TILE_LOGO_BASE` (in `logo_data.h`) from `+9` to `+10` to avoid the two tile ranges
+  colliding - background tiles don't have the sprite hardware's "consecutive block"
+  restriction, but they still each need their own unique index.
+- **Verified live in Fusion**: confirmed the ring renders correctly on both the menu and the
+  match pitch, and confirmed the match HUD/lineup/gameplay still render correctly on top of
+  the updated background (no regression from the tile-index shift).
+
 ---
 
 ## 📝 Design Decisions

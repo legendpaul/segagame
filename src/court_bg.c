@@ -14,6 +14,7 @@
 #define TILE_STAND_A   (TILE_COURT_BASE + 6)
 #define TILE_STAND_B   (TILE_COURT_BASE + 7)
 #define TILE_ENDZONE   (TILE_COURT_BASE + 8)
+#define TILE_CIRCLE    (TILE_COURT_BASE + 9)
 
 #define PITCH_TOP_ROW      3
 #define PITCH_BOTTOM_ROW   24
@@ -72,6 +73,16 @@ static const u32 tile_endzone[8] = {
     0x22222222, 0x22222222, 0x22222222, 0x22222222
 };
 
+/* A single filled gold marker, reused at 8 points around the halfway
+ * line to approximate a center-court ring (a real octagon, not a true
+ * circle - the tile grid is too coarse for a smooth curve, so this is
+ * an honest low-res approximation rather than a claim of a real
+ * circle). */
+static const u32 tile_circle[8] = {
+    0x22222222, 0x22666622, 0x26666662, 0x26666662,
+    0x26666662, 0x26666662, 0x22666622, 0x22222222
+};
+
 static void restore_colors(void)
 {
     /* PAL_fadeOutAll() (used for scene transitions - see scene_menu.c /
@@ -112,6 +123,7 @@ void court_bg_init(void)
     VDP_loadTileData(tile_stand_a, TILE_STAND_A, 1, DMA);
     VDP_loadTileData(tile_stand_b, TILE_STAND_B, 1, DMA);
     VDP_loadTileData(tile_endzone, TILE_ENDZONE, 1, DMA);
+    VDP_loadTileData(tile_circle,  TILE_CIRCLE,  1, DMA);
 
     restore_colors();
 }
@@ -154,6 +166,12 @@ void court_bg_draw(void)
             u16 grassTile = (band == 0) ? TILE_GRASS_A
                            : (band == 2) ? TILE_GRASS_B
                            : TILE_GRASS_M;
+            /* Cheap atmospheric-perspective cue: the two rows closest to
+             * the far baseline never use the lightest stripe, so the
+             * far end of the pitch reads very slightly darker/hazier
+             * than the near end - real elevated-camera sports games
+             * fade distant turf the same way. */
+            if (dt < 2 && grassTile == TILE_GRASS_A) grassTile = TILE_GRASS_M;
             VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, grassTile), col, row);
         }
 
@@ -172,5 +190,20 @@ void court_bg_draw(void)
             VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_LINE_L), leftCol, row);
             VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_LINE_R), rightCol, row);
         }
+    }
+
+    /* Center-court ring: 8 marker tiles around the halfway spot, drawn
+     * as a final pass so they sit on top of the halfway line instead of
+     * being overwritten by it. Octagon points, not a true circle - see
+     * the honest note on tile_circle above. */
+    {
+        u16 cx = 19;   /* pitch centerline column */
+        u16 cy = HALFWAY_ROW;
+        s8 dx[8] = {  0,  3,  4,  3,  0, -3, -4, -3 };
+        s8 dy[8] = { -2, -1,  0,  1,  2,  1,  0, -1 };
+        u8 i;
+        for (i = 0; i < 8; i++)
+            VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_CIRCLE),
+                              cx + dx[i], cy + dy[i]);
     }
 }

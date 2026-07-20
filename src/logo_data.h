@@ -15,7 +15,7 @@
 #include "genesis.h"
 #include "sprites_data.h"
 
-#define TILE_LOGO_BASE   (TILE_COURT_BASE + 9)
+#define TILE_LOGO_BASE   (TILE_COURT_BASE + 10)
 
 #define LOGO_TILES_W     30
 #define LOGO_TILES_H     11
