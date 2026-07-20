@@ -235,6 +235,39 @@ down", is a stronger perspective cue - so:
 
 Verified live in Fusion - the pitch now visibly reads as an angled/elevated camera view.
 
+### Third sprite pass: real shading instead of 4 flat colors (2026-07-20)
+
+Called out again, correctly: still not close to an EA Sports Genesis title. The 32x32
+resolution fix in the previous pass was necessary but not sufficient - the whole player
+sprite was still built from only 4 flat colors total (transparent/kit/skin/dark), which is
+closer to the *original* hand-authored art's budget than to what real 16-bit sports sprites
+actually use. NHL 94/FIFA/Madden-era Genesis sprites spend most of their 16-color palette on
+proper light/mid/dark shading, not one flat tone per body part - that was the real remaining
+gap, not resolution.
+
+- Reprocessed the same ComfyUI-generated reference through a materially better pipeline:
+  flood-fill background removal (starting from the image border, so light highlights ON the
+  character - like the jersey's shine - don't get eaten as "background" the way a flat
+  brightness cutoff does), true averaged downsampling to a 32x32 grid (averaging real color
+  values per output cell, not nearest/mode-pooling a pre-classified noisy map, which is what
+  caused the speckled look in the previous pass), then an adaptive 14-color palette pulled
+  directly from the source art via median-cut quantization - so the AI's own light/mid/dark
+  jersey tones survive instead of getting crushed into one flat index.
+- Team recoloring is no longer "swap one flat index." 7 of the 14 colors form the jersey's
+  shading ramp; `sprites_data_apply_teams()` conceptually hue-rotates that whole ramp per team
+  while preserving each shade's original lightness (computed offline in HSL and baked into
+  `pal_team_red/blue/green/gold[16]` in `src/sprites_data.c`), with a saturation floor so even
+  a near-gray highlight shade still reads as a real team color. The other 7 colors (skin,
+  hair, outline) are fixed and identical across all 4 teams. This is the same approach real
+  sports games use for team-color swaps - the shading structure carries over, only the hue
+  changes - rather than one team-tinted patch on an otherwise flat sprite.
+- `src/sprites_data.c`'s small far-side sprite (`tile_player_small`) was remapped onto the
+  same 14-color plan so it shares the real per-team palette instead of a separate hardcoded
+  one.
+- Verified live in Fusion across teams: renders cleanly, visibly shows real light/dark
+  jersey shading (not a flat color block), and different teams show coherent recolored
+  shading rather than a single swapped patch.
+
 ---
 
 ## 📝 Design Decisions
