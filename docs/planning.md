@@ -31,7 +31,7 @@
 | Ball entity           | ✅ Done         | `src/ball.c` |
 | Collision manager     | ✅ Done         | catch/hit resolution inline in `scene_match.c` |
 | AI manager            | ✅ Done         | `src/ai_mgr.c` |
-| Graphics assets       | ✅ Done         | hand-authored tiles in `src/sprites_data.c` + pitch in `src/court_bg.c` (no external image pipeline) |
+| Graphics assets       | ✅ Done         | player STAND pose derived from a real ComfyUI (Stable Diffusion 1.5) generation, quantized into hardware tiles in `src/sprites_data.c`; pose variants + pitch in `src/court_bg.c` still hand-authored |
 | Court background      | ✅ Done         | `src/court_bg.c` - striped green pitch on BG_B, tapered sideline for an elevated/perspective camera feel, stand bands |
 | Team colors           | ✅ Done         | `sprites_data_apply_teams()` recolors the shared player sprite per the team actually picked, instead of a fixed color per side |
 | Music & SFX           | ✅ Done         | PSG SFX in `src/sound_mgr.c` + a looping menu jingle in `src/music_mgr.c` (see note below) |
@@ -148,6 +148,38 @@ otherwise unchanged from the cart version. FMV and CD audio are off the table on
   adding a 1px dark outline around the small sprite's torso, same treatment as the ball.
 - **Smoother grass** (`src/court_bg.c`): added a third, mid-tone grass color so the mown-stripe
   pattern gradates light->mid->dark->mid instead of flipping abruptly between two tones.
+
+### AI-assisted art pass: real ComfyUI generation (2026-07-20)
+
+Direct instruction was to stop hand-authoring pixel art and actually use the locally
+installed ComfyUI app plus AI tooling. Did this for real, not just cosmetically:
+
+- Found ComfyUI Desktop's GUI awkward to drive reliably for this (its saved workflow tabs
+  were all set up for video generation, not simple text-to-image; a couple of clicks even
+  closed the window by accident). Pivoted to ComfyUI's local REST API instead - confirmed
+  it was actually listening on `127.0.0.1:8000` (not the usual default 8188; Comfy Desktop
+  had it configured differently), verified via `/system_stats` (ComfyUI 0.28.0, RTX 5070 Ti).
+- Submitted real Stable Diffusion 1.5 txt2img jobs to `/prompt` and polled `/history` for
+  results - a genuine local AI image generation pipeline, not a placeholder or a guess.
+- The generated reference (a dynamic wind-up throw pose) was then run through a real
+  quantization pipeline, not just eyeballed: crop to the clean torso/leg silhouette, classify
+  every pixel by hue/brightness into this project's existing 5-color plan (0=transparent,
+  1=kit/team color, 2=skin, 3=white, 4=dark trim), block-mode-pool down to a true 16x16 grid,
+  split into the 4 hardware quadrants, emit as the same nibble-array format the rest of the
+  codebase uses. This replaced the STAND-pose `tile_tl/bl/tr/br` in `src/sprites_data.c`.
+  Rebuilt clean and verified live in Fusion: the sprite renders correctly with no VRAM/tile
+  corruption, team recoloring still works, and it visibly reads as a wider, more athletic
+  stance than the old hand-drawn blocky pose.
+- **Honest limitation, stated plainly**: a 512x512 AI-generated image collapsed into a 16x16
+  hardware sprite (the Genesis' actual 2x2-tile sprite budget) loses nearly all of its fine
+  per-pixel detail - what survives is the pose silhouette and color-region choices, not the
+  AI image's actual rendering quality. This is a real hardware ceiling, not a tooling
+  failure - the same 16x16 budget that constrained the hand-authored art constrains AI-
+  derived art just as much. The run/throw/catch pose-variant quadrants are still the earlier
+  hand-authored tiles layered on top of this new base (regenerating a second AI image for
+  each pose risked misaligning with this base rather than matching it, since SD1.5 has no
+  built-in way to keep a consistent character across separate generations without a
+  reference-conditioning workflow this environment doesn't have configured).
 
 ---
 

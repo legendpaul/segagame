@@ -13,48 +13,61 @@
  * the body (see the loadTileData calls in sprites_data_init) - only 3
  * quadrants below are genuinely new art for the run/throw/catch poses. */
 
+/* Base STAND quadrants below are AI-generated art, not hand-authored:
+ * produced via a local ComfyUI (Stable Diffusion 1.5) txt2img run - a
+ * "16-bit pixel art dodgeball player, wind-up throw pose" reference
+ * image - then run through a real quantization pipeline (crop to the
+ * clean torso/leg silhouette, classify every pixel into this same
+ * 5-color plan by hue/brightness, block-mode-pool down to a true 16x16
+ * grid, split into the 4 hardware quadrants) rather than resizing/
+ * guessing. Honest limitation: a 512x512 AI image collapsed into a
+ * 16x16 hardware sprite necessarily loses almost all of its fine
+ * detail - what actually survives is the pose silhouette (a wide,
+ * athletic lunging stance) and color-region choices, not per-pixel
+ * fidelity. The pose-variant quadrants below (run/throw/catch) are
+ * still the earlier hand-authored art layered on top of this new base. */
 static const u32 tile_tl[8] = {
-    0x00000044,
-    0x00000422,
-    0x00000222,
-    0x00000022,
-    0x00000002,
-    0x00001111,
-    0x00221111,
-    0x00221111
+    0x44111144,
+    0x11111111,
+    0x11222111,
+    0x14222111,
+    0x14222111,
+    0x44414111,
+    0x22211111,
+    0x02211111
 };
 
 static const u32 tile_bl[8] = {
-    0x00221111,
-    0x00000333,
-    0x00000333,
-    0x00000330,
-    0x00000220,
-    0x00000220,
-    0x00000440,
-    0x00004440
+    0x04111441,
+    0x41114004,
+    0x11140000,
+    0x11140000,
+    0x11100000,
+    0x11100000,
+    0x14000000,
+    0x40000000
 };
 
 static const u32 tile_tr[8] = {
-    0x44000000,
-    0x24000000,
-    0x22200000,
-    0x22000000,
-    0x20000000,
-    0x11110000,
-    0x11112200,
-    0x11112200
+    0x44411000,
+    0x44111400,
+    0x11001400,
+    0x01111400,
+    0x01111400,
+    0x11111000,
+    0x14440000,
+    0x14000000
 };
 
 static const u32 tile_br[8] = {
-    0x11112200,
-    0x33300000,
-    0x33300000,
-    0x03300000,
-    0x02200000,
-    0x02200000,
-    0x04400000,
-    0x04440000
+    0x11400000,
+    0x11114000,
+    0x41111400,
+    0x01111100,
+    0x00111140,
+    0x00411144,
+    0x00044444,
+    0x00000044
 };
 
 /* RUN pose: right leg lifted mid-stride (bottom-right only - the
