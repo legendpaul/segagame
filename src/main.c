@@ -9,6 +9,7 @@
 #include "game_state.h"
 #include "sprites_data.h"
 #include "court_bg.h"
+#include "flag_data.h"
 #include "sound_mgr.h"
 #include "music_mgr.h"
 #include "scene_boot.h"
@@ -36,6 +37,7 @@ int main(bool hardReset)
 
     sprites_data_init();
     court_bg_init();
+    flag_data_init();
     sound_mgr_init();
     music_mgr_init();
 

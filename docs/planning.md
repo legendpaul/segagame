@@ -675,6 +675,33 @@ than applying another surface polish pass to the flat two-row layout.
   movement input remained unreliable in this automation environment, so the new four-direction
   input path was compile-verified and inspected but not claimed as a completed live key-hold test.
 
+### Ten ranked national teams + boxed flag selector (2026-07-21)
+
+Direct user correction: remove the fictional animal/color teams, use ten top footballing
+countries, and make team selection a flag UI with a box around the current choice.
+
+- Replaced the four-name roster with the official 20 July 2026 FIFA men's ranking top ten, in
+  order: Spain, Argentina, France, England, Brazil, Morocco, Portugal, Belgium, Netherlands and
+  Mexico. `NUM_TEAMS` is now 10; the next-ranked country (wrapping after Mexico) is the default
+  rival, so every selection remains a real national matchup.
+- Expanded the player palette map to ten entries with national primary-kit families: Spain red,
+  Argentina sky blue, France blue, England white, Brazil gold, Morocco maroon, Portugal green,
+  Belgium red, Netherlands orange and Mexico green. Shared sprite geometry and fixed skin/hair
+  slots remain unchanged.
+- Added ten hand-authored 16x8 Genesis flags in ranking order. The reproducible generator is
+  `tools/build_flag_tiles.py`, emitted VDP data is `src/flag_tiles.inc`, and the magnified QA
+  artifact is `assets/national_flags_preview.png`.
+- Added `flag_data.c/.h`: flag tiles live after the 177-tile boot logo, use PAL0's previously
+  unused indices 8-14, and draw on a clean navy panel. A white 1px hardware-tile frame surrounds
+  exactly the active flag. The full grid is redrawn on selection, so the previous border cannot
+  leave tile artifacts.
+- Rebuilt menu navigation as a 5x2 grid: LEFT/RIGHT wrap within a row, UP/DOWN switches rows,
+  and START launches the selected country versus the next-ranked rival. Selected/rival names,
+  hero kit palettes and the fixed 8x8 menu ball update from the same indices.
+- **Verified live in Fusion** after a warning-free build: all ten flags render in two rows;
+  Spain starts with a visible white box; labels read `TEAM SPAIN VS ARGENTINA`; the two heroes
+  render in red and sky-blue national palettes; no flag/boot-logo/court VRAM corruption appears.
+
 ---
 
 ## 📝 Design Decisions

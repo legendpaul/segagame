@@ -200,7 +200,7 @@ static const u16 pal_logo[16] = {
 
 void logo_data_draw(void)
 {
-    VDP_loadTileData(tile_logo[0], TILE_LOGO_BASE, 177, DMA);
+    VDP_loadTileData(tile_logo[0], TILE_LOGO_BASE, LOGO_TILE_COUNT, DMA);
     PAL_setPalette(PAL0, pal_logo, DMA);
 
     u16 offX = (40 - LOGO_TILES_W) / 2;

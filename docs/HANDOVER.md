@@ -64,7 +64,8 @@ src/
   sound_mgr.c / music_mgr.c / fm_synth.c  - audio (real YM2612 FM synth, not PSG beeps)
   sprites_data.c / .h        - ALL tile art (player poses, ball, marker) + per-team palettes
   court_bg.c                  - court/pitch background tiles
-  teams.c                      - team roster/color data
+  teams.c                      - 10 national teams in current FIFA ranking order
+  flag_data.c / .h             - 5x2 flag selector, selection box, PAL0 flag colors
   logo_data.c / .h               - boot splash tile data
   game_state.h                    - global state shared across scenes
 
@@ -89,6 +90,8 @@ docs/
   TILE_PLAYER_FAR_CATCH +93   (9 tiles)
   TILE_MARKER          +102   (1 tile — controlled-player arrow)
   TILE_COURT_BASE      +103   (court_bg.c takes over from here)
+  TILE_LOGO_BASE       +113   (177 boot-logo tiles)
+  TILE_FLAG_BASE       +290   (panel/box + 20 flag tiles)
   ```
   A Genesis hardware sprite reads N×M **consecutive** VRAM tiles in column-major order (col0
   top-to-bottom, then col1...) starting at one base index — you cannot mix tiles from different

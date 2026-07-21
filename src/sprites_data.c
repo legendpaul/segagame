@@ -229,8 +229,9 @@ static const u32 tile_marker[8] = {
  * swap), boosted to a minimum 0.45 saturation so the team color always
  * reads clearly even where the source art's shading was almost gray.
  * Indices 1,3,4,8,9,10,11 are fixed skin/hair/outline tones, identical
- * across every team. Order matches teamNames[] in teams.c: Red
- * Raptors, Blue Hawks, Green Vipers, Gold Tigers. */
+ * across every team. pal_teams[] maps these ramps onto the ten national
+ * sides in FIFA ranking order; countries with the same primary kit hue
+ * may deliberately share a ramp. */
 #define P(rgb24) RGB24_TO_VDPCOLOR(rgb24)
 
 static const u16 pal_team_red[16] = {
@@ -257,8 +258,47 @@ static const u16 pal_team_gold[16] = {
     P(0x6A2822), P(0x957D36), P(0x73612C), P(0x4E421D)
 };
 
+static const u16 pal_team_lightblue[16] = {
+    0x0000, P(0xE1A48E), P(0xC8E8F0), P(0xD2775A), P(0xBA7061), P(0x82C8E0),
+    P(0x68B4D4), P(0x50A0C4), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0x3C8CB4), P(0x2C6C94), P(0x1C4868)
+};
+
+static const u16 pal_team_white[16] = {
+    0x0000, P(0xE1A48E), P(0xFFFFFF), P(0xD2775A), P(0xBA7061), P(0xE8E8E8),
+    P(0xC8CCD0), P(0xA8ACB0), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0x888C90), P(0x606468), P(0x383C40)
+};
+
+static const u16 pal_team_maroon[16] = {
+    0x0000, P(0xE1A48E), P(0xD98A92), P(0xD2775A), P(0xBA7061), P(0xB83A48),
+    P(0x9C303C), P(0x842834), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0x70202C), P(0x541820), P(0x380F18)
+};
+
+static const u16 pal_team_orange[16] = {
+    0x0000, P(0xE1A48E), P(0xFFD090), P(0xD2775A), P(0xBA7061), P(0xF09030),
+    P(0xD87820), P(0xBC6018), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0x984810), P(0x743408), P(0x482000)
+};
+
+static const u16 pal_team_belgium[16] = {
+    0x0000, P(0xE1A48E), P(0xF08A8A), P(0xD2775A), P(0xBA7061), P(0xD83038),
+    P(0xBC2028), P(0xA01820), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0x801018), P(0x600810), P(0x380008)
+};
+
 static const u16 * const pal_teams[NUM_TEAMS] = {
-    pal_team_red, pal_team_blue, pal_team_green, pal_team_gold
+    pal_team_red,       /* Spain */
+    pal_team_lightblue, /* Argentina */
+    pal_team_blue,      /* France */
+    pal_team_white,     /* England */
+    pal_team_gold,      /* Brazil */
+    pal_team_maroon,    /* Morocco */
+    pal_team_green,     /* Portugal */
+    pal_team_belgium,   /* Belgium */
+    pal_team_orange,    /* Netherlands */
+    pal_team_green      /* Mexico */
 };
 
 static const u16 pal_ball[16] = {

@@ -1,11 +1,10 @@
 /*
  * scene_menu.c - Team-select / title screen.
  *
- * Redesigned from a plain text menu into a real "lineup" screen: the
- * actual player sprite (the same AI-derived 32x32 art used in-match)
- * stands on each side in the currently-selected team's real colors, a
- * ball bounces between them, and the prompt line blinks - all real
- * hardware-sprite/animation work, not just a static text screen.
+ * National-team selector: ten ranked countries appear as a 5x2 flag
+ * grid with a hardware-tile selection frame. The actual player sprite
+ * stands below in the selected national kit against the next-ranked
+ * opponent, with a bouncing ball between them.
  */
 #include "genesis.h"
 #include "scene_menu.h"
@@ -14,6 +13,7 @@
 #include "input_mgr.h"
 #include "sound_mgr.h"
 #include "court_bg.h"
+#include "flag_data.h"
 #include "sprites_data.h"
 #include "player.h"
 
@@ -21,12 +21,12 @@
 #define SLOT_HERO_B   1
 #define SLOT_BALL     2
 
-#define HERO_Y        130
+#define HERO_Y        150
 #define HERO_A_X       80
 #define HERO_B_X      240
 
 #define BALL_BASE_X   160
-#define BALL_BASE_Y   130
+#define BALL_BASE_Y   142
 #define BALL_BOUNCE_PERIOD  40   /* frames per bounce cycle */
 #define BALL_BOUNCE_HEIGHT  18
 
@@ -45,17 +45,19 @@ static u16 ballCounter;
 
 static u8 opponent_index(void)
 {
-    return (gTeamAIndex + 2) % NUM_TEAMS;
+    return (gTeamAIndex + 1) % NUM_TEAMS;
 }
 
 static void draw_teams(void)
 {
     u8 oppIndex = opponent_index();
 
-    VDP_clearTileMapRect(VDP_BG_A, 0, 10, 40, 1);
-    VDP_drawTextFill(teamNames[gTeamAIndex], 2, 10, 12);
-    VDP_drawText("VS", 19, 10);
-    VDP_drawTextFill(teamNames[oppIndex], 26, 10, 12);
+    flag_data_draw_grid(gTeamAIndex);
+
+    VDP_drawText("TEAM", 1, 13);
+    VDP_drawTextFill(teamNames[gTeamAIndex], 6, 13, 11);
+    VDP_drawText("VS", 19, 13);
+    VDP_drawTextFill(teamNames[oppIndex], 23, 13, 11);
 
     /* Recolor the shared hero sprites to whatever's actually picked,
      * instead of the fixed colors the old text-only menu never needed
@@ -72,7 +74,7 @@ static void draw_ball(void)
     u16 dist = (phase < half) ? phase : (BALL_BOUNCE_PERIOD - phase);
     s16 y = BALL_BASE_Y - (dist * BALL_BOUNCE_HEIGHT) / half;
 
-    VDP_setSpriteFull(SLOT_BALL, BALL_BASE_X, y, SPRITE_SIZE(2, 2),
+    VDP_setSpriteFull(SLOT_BALL, BALL_BASE_X, y, SPRITE_SIZE(1, 1),
                        TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL),
                        0);
 }
@@ -95,11 +97,11 @@ void scene_menu_enter(void)
 
     draw_teams();
 
-    VDP_drawText("<  >  CHANGE TEAM", 11, 23);
+    VDP_drawText("D-PAD SELECT   START PLAY", 7, 23);
 
     blinkCounter = 0;
     startVisible = TRUE;
-    VDP_drawText("START TO PLAY", 13, 25);
+    VDP_drawText("TOP 10 NATIONAL TEAMS", 9, 25);
 
     bobCounter = 0;
     bobOffset = 0;
@@ -117,7 +119,7 @@ void scene_menu_update(void)
     {
         blinkCounter = 0;
         startVisible = TRUE;
-        VDP_drawText("START TO PLAY", 13, 25);
+        VDP_drawText("TOP 10 NATIONAL TEAMS", 9, 25);
     }
 
     /* Subtle idle "breathing" bob on both heroes so the lineup doesn't
@@ -132,13 +134,21 @@ void scene_menu_update(void)
 
     if (input_pressed(BUTTON_LEFT))
     {
-        gTeamAIndex = (gTeamAIndex + NUM_TEAMS - 1) % NUM_TEAMS;
+        u8 rowBase = (gTeamAIndex / 5) * 5;
+        gTeamAIndex = rowBase + ((gTeamAIndex + 4) % 5);
         draw_teams();
         sound_mgr_blip();
     }
     else if (input_pressed(BUTTON_RIGHT))
     {
-        gTeamAIndex = (gTeamAIndex + 1) % NUM_TEAMS;
+        u8 rowBase = (gTeamAIndex / 5) * 5;
+        gTeamAIndex = rowBase + ((gTeamAIndex + 1) % 5);
+        draw_teams();
+        sound_mgr_blip();
+    }
+    else if (input_pressed(BUTTON_UP) || input_pressed(BUTTON_DOWN))
+    {
+        gTeamAIndex = (gTeamAIndex + 5) % NUM_TEAMS;
         draw_teams();
         sound_mgr_blip();
     }

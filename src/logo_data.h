@@ -16,6 +16,7 @@
 #include "sprites_data.h"
 
 #define TILE_LOGO_BASE   (TILE_COURT_BASE + 10)
+#define LOGO_TILE_COUNT  177
 
 #define LOGO_TILES_W     30
 #define LOGO_TILES_H     11
