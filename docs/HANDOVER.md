@@ -83,9 +83,9 @@ docs/
   TILE_PLAYER_RUN     +48   (16 tiles)
   TILE_BALL           +64   (1 tile, 8x8)
   TILE_BALL_SHADOW    +65   (1 tile)
-  TILE_PLAYER_SMALL   +66   (1 tile — the far/CPU-side depth-cue sprite)
-  TILE_MARKER         +67   (1 tile — controlled-player arrow, added this session)
-  TILE_COURT_BASE     +68   (court_bg.c takes over from here)
+  TILE_PLAYER_FAR     +66   (9 tiles, 3x3 — readable far/CPU-side depth cue)
+  TILE_MARKER         +75   (1 tile — controlled-player arrow)
+  TILE_COURT_BASE     +76   (court_bg.c takes over from here)
   ```
   A Genesis hardware sprite reads N×M **consecutive** VRAM tiles in column-major order (col0
   top-to-bottom, then col1...) starting at one base index — you cannot mix tiles from different
@@ -122,9 +122,9 @@ docs/
   now uses its own real art (`TILE_PLAYER_RUN`) instead of aliasing STAND+hflip — that was a
   placeholder fixed this session, see §5.
 
-- **Far-side (CPU) depth cue**: `TILE_PLAYER_SMALL` is a single hand-authored 8x8 tile (not a
-  scaled-down version of the big sprite — Genesis has no hardware sprite scaling) used only for
-  the far side, paired with `court_bg.c`'s tapered sidelines for a perspective illusion.
+- **Far-side (CPU) depth cue**: `TILE_PLAYER_FAR` is a separately encoded 24x24 reduction of
+  STAND (Genesis has no hardware sprite scaling), used only for the far side and paired with
+  `court_bg.c`'s tapered sidelines. It replaced the illegible old 8x8 figure on 2026-07-21.
 
 ---
 
@@ -349,12 +349,12 @@ This is the actual, current punch list — ranked by the source that produced it
 working top-to-bottom within each source, or picking whichever single item best matches what
 you're asked to do.
 
-### From ChatGPT's live-screenshot critique (2026-07-21), only item 4 done so far:
+### From ChatGPT's live-screenshot critique (2026-07-21), items 1 and 4 done so far:
 
-1. **Scale up player sprites for legibility** — target ~24×24 or 24×28px (still within the
-   32×32 hardware sprite budget), tighten court framing, reclaim ~8px from the HUD strip, put
-   team color across large fabric areas (shirt/shorts) rather than tiny highlights. Flagged as
-   the single biggest issue — players currently read as ~8-10px dark marks at a glance.
+1. ~~Scale up player sprites for legibility~~ — **done 2026-07-21**. Near-side pose art already
+   occupied the full 32px height; the real problem was the CPU side's 8x8 depth cue. It is now
+   a separately encoded, palette-preserving 24x24 figure, with the CPU baseline moved down so
+   it sits wholly below the HUD. Verified from a fresh Fusion match screenshot and pixel crop.
 2. **Redesign court geometry** — the current stepped/striped shapes and thick black horizontal
    strip read like debug/corrupted tilemap graphics, not sidelines. Replace with: one closed
    outer boundary, one obvious centre line, 2-3 floor shades, consistent perspective (a clean

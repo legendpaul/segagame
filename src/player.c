@@ -90,14 +90,12 @@ void player_draw(Player *p)
      * rendered. We keep a fixed chain: slot N links to slot N+1. */
     if (p->small)
     {
-        /* Genesis sprites can't be hardware-scaled, so the far/CPU
-         * side's "further away, therefore smaller" look is faked with
-         * a dedicated tiny 8x8 tile instead of the 16x16 pose set - no
-         * per-pose animation at this scale, just the depth cue. +8 on Y
-         * roughly aligns its "feet" with where the 16x16 sprite's feet
-         * would have been, rather than anchoring from the same top-left. */
-        VDP_setSpriteFull(p->spriteSlot, p->x, p->y + 8, SPRITE_SIZE(1, 1),
-                           TILE_ATTR_FULL(p->pal, 0, FALSE, FALSE, TILE_PLAYER_SMALL),
+        /* The far side uses a separately authored 24x24 reduction: big
+         * enough to preserve pose/team readability while remaining a
+         * distinct depth step from the near side's 32x32 art. Offsets
+         * preserve the same visual center and feet baseline. */
+        VDP_setSpriteFull(p->spriteSlot, p->x - 4, p->y - 8, SPRITE_SIZE(3, 3),
+                           TILE_ATTR_FULL(p->pal, 0, FALSE, FALSE, TILE_PLAYER_FAR),
                            p->spriteSlot + 1);
         return;
     }

@@ -183,36 +183,23 @@ static const u32 tile_ball_shadow[8] = {
     0x00000000
 };
 
-/* Small single-tile player (see TILE_PLAYER_SMALL) - a compact 8x8
- * humanoid, remapped onto the new 14-color plan so it shares a team's
- * real palette instead of a separate one: 6=kit (jersey ramp), 1=skin
- * (fixed), 15=dark outline.
- *
- * Bug found via a live screenshot review (Qwen flagged "Green Vipers'
- * sprites are nearly invisible against the court", independently
- * confirmed by zooming the actual capture): the outline used to be
- * index 14, which this comment used to claim was "fixed" - it isn't.
- * Per the palette layout above, 14 is part of the hue-rotated kit ramp
- * (2,5,6,7,12,13,14), so for Green Vipers it resolves to
- * pal_team_green[14] = 0x1D4E2D, a dark GREEN - which blends straight
- * into the pitch's own dark grass shading stripe. Every other team's
- * index 14 happens to land on a non-green dark shade, which is why
- * this only ever showed up for one team.
- *
- * Fixed by using index 15 instead: every pal_team_*[16] array only
- * initializes 15 of its 16 entries, so index 15 is implicitly zero
- * (VDP color 0x0000 = pure black) for every team already, with no
- * hue-rotation possible - a genuinely fixed, maximum-contrast outline
- * against the pitch regardless of which team is playing. */
-static const u32 tile_player_small[8] = {
-    0x00ffff00,
-    0x00f11f00,
-    0x0f6666f0,
-    0xf666666f,
-    0xf666666f,
-    0x0f1661f0,
-    0x0f1661f0,
-    0xff0000ff
+/* Far-side player (see TILE_PLAYER_FAR): a 24x24 reduction of the real
+ * STAND art, sharing the complete 14-color team palette. The old 8x8
+ * single-tile figure made the CPU team functionally unreadable at the
+ * emulator's normal display size. Since the VDP cannot scale sprites,
+ * this is separately encoded: crop the indexed STAND art, reduce it
+ * with nearest-neighbour sampling, bottom-align it in a 24x24 canvas,
+ * then store the nine tiles in hardware column-major order. */
+static const u32 tile_player_far[9][8] = {
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x0000000b, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x000000ec, 0x000000bd, 0x00000b94, 0x000000a3, 0x00000009, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000555, 0x00000555 },
+    { 0x000b0000, 0x0aaba000, 0x088a8a90, 0xb88888ab, 0xa888888b, 0xb88334aa, 0xba311190, 0xba411140 },
+    { 0xeba949ee, 0x77d4d7cc, 0xc76c66dc, 0xec6666ee, 0x1cc77ce0, 0x3cccccd0, 0xacccccd0, 0x0edee765 },
+    { 0x0c6cd755, 0x0c7c7e31, 0x0a142254, 0x09342225, 0x0eee2222, 0x599e5555, 0x555e5555, 0x55d55555 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x11900000, 0x14b00000, 0x9b000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0xee000000, 0xeb000000, 0xe9e00000, 0x2de00000, 0x55500000, 0x55500000 },
 };
 
 /* Controlled-player marker (see TILE_MARKER) - a small downward arrow,
@@ -284,7 +271,7 @@ void sprites_data_init(void)
 
     VDP_loadTileData(tile_ball,        TILE_BALL,        1, DMA);
     VDP_loadTileData(tile_ball_shadow, TILE_BALL_SHADOW,  1, DMA);
-    VDP_loadTileData(tile_player_small, TILE_PLAYER_SMALL, 1, DMA);
+    VDP_loadTileData(tile_player_far[0], TILE_PLAYER_FAR, 9, DMA);
     VDP_loadTileData(tile_marker, TILE_MARKER, 1, DMA);
 
     PAL_setPalette(PAL_BALL, pal_ball, DMA);

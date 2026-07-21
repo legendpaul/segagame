@@ -13,7 +13,7 @@
 #define SCREEN_W            320
 #define SCREEN_H            224
 
-#define COURT_TOP_Y         24      /* CPU baseline (row player sprite Y) */
+#define COURT_TOP_Y         40      /* CPU baseline; keeps 24px far art below the HUD */
 #define COURT_BOTTOM_Y       168     /* Player baseline */
 #define COURT_LEFT_X        16
 #define COURT_RIGHT_X        296

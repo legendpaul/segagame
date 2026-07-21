@@ -14,9 +14,9 @@
  * one base index - you cannot mix tiles from different blocks at
  * runtime, so the full 16-tile block is uploaded as one unit.
  *
- * STAND/RUN share one AI-derived 32x32 block (run reuses it with hflip
- * for a cheap side-to-side sway). THROW and CATCH each now get their OWN
- * genuinely distinct 32x32 block too - separate Pixel-Art-XL generations
+ * STAND, RUN, THROW and CATCH each have their own AI-derived 32x32 block.
+ * RUN mirrors its dedicated stride pose for a cheap second phase, while
+ * THROW and CATCH use separate Pixel-Art-XL generations
  * (a real wind-up reach and a real diving/leaping grab), run through the
  * same flood-fill/crop/pad/quantize pipeline as the stand pose. Fixing
  * a ComfyUI request-encoding bug (PowerShell was writing a UTF-8 BOM
@@ -47,14 +47,10 @@
 #define TILE_BALL           (TILE_USER_INDEX + 64)
 #define TILE_BALL_SHADOW    (TILE_USER_INDEX + 65)
 
-/* A single small 8x8 sprite (no pose variants) used only for the far
- * (CPU) side. Genesis sprites can't be hardware-scaled, so this fakes
- * the "far player reads smaller than the near player" depth cue real
- * elevated-camera sports games (FIFA International Soccer included)
- * rely on, by hand-authoring a separate tiny tile instead of scaling
- * the 16x16 one. Paired with court_bg.c's tapered sidelines for a
- * consistent perspective illusion. */
-#define TILE_PLAYER_SMALL   (TILE_USER_INDEX + 66)
+/* Dedicated 24x24 (3x3 tile) far-side size. Genesis sprites cannot be
+ * hardware-scaled, so this is a separately encoded reduction of the
+ * real STAND artwork rather than a runtime transform. */
+#define TILE_PLAYER_FAR     (TILE_USER_INDEX + 66)
 
 /* Small downward-pointing arrow drawn above whichever player the human
  * currently controls. Added after ChatGPT's screenshot critique flagged
@@ -62,10 +58,10 @@
  * cheapest fix on their list (one 8x8 tile, no new art pipeline). Uses
  * PAL_BALL (white/grey/black) rather than a team palette line so it
  * reads the same regardless of which team color is active. */
-#define TILE_MARKER         (TILE_USER_INDEX + 67)
+#define TILE_MARKER         (TILE_USER_INDEX + 75)
 
 /* First tile index free for court_bg.c to use */
-#define TILE_COURT_BASE     (TILE_USER_INDEX + 68)
+#define TILE_COURT_BASE     (TILE_USER_INDEX + 76)
 
 /* Palette lines: PAL0 is used by the system font + pitch background,
  * so sprites use 1-3. PAL1/PAL2 are *slots*, not fixed teams - which

@@ -559,6 +559,81 @@ functionally invisible against the pitch specifically for Green Vipers.
   gap rather than a game-code issue), and the static match frame doesn't move on its own to show
   it. Worth a quick manual keyboard check next time the ROM is open.
 
+### Controlled-player marker + real external AI critique (2026-07-21)
+
+Got a genuine external critique this time: attached a live gameplay screenshot to ChatGPT
+(logged-in web session, driven via the Claude-in-Chrome MCP extension) and asked for concrete,
+hardware-aware feedback rather than generic polish suggestions. After a ~2m35s reasoning pass it
+gave a specific, prioritized list. Headline finding: **the players are the least readable thing
+on screen, and there's no way to tell which one you control.**
+
+- Implemented the cheapest item from that list: a small white arrow (`TILE_MARKER`, 8x8,
+  outlined for contrast against any background) drawn above whichever `teamA` slot is
+  `activeA`. Uses `PAL_BALL` rather than a team palette line so it never gets hue-rotated.
+- `sprites_data.h`/`.c`: new `TILE_MARKER` tile inserted after `TILE_PLAYER_SMALL`;
+  `TILE_COURT_BASE` shifts up by 1 accordingly.
+- `scene_match.c`: new `SLOT_MARKER` (8) and `draw_control_marker()`, called each frame right
+  after `ball_draw()`.
+- `ball.c`: the ball's hardware sprite link chain used to terminate at the shadow (link=0).
+  It now links shadow -> marker (`spriteSlot+2`) so the marker is reachable from the chain
+  root, and the marker itself is the new terminator.
+- **Verified live in Fusion**: clean rebuild, loaded via `FusionAutomator`, entered a match, and
+  pixel-cropped a fresh screenshot to directly confirm the arrow renders correctly above the
+  active player - not just "looks right" from a distance.
+
+**Full critique received but not yet implemented** (kept here as the prioritized backlog):
+
+1. Player sprites read as ~8-10px dark marks at native/emulator-window resolution - bump to
+   roughly 24x24 or 24x28px (still inside the 32x32 hardware sprite), tighten court framing,
+   reclaim ~8px from the HUD, put team color across large areas (shirt/shorts) not tiny
+   highlights.
+2. Court geometry (the stepped/striped shapes, thick black horizontal strip) reads like debug
+   or corrupted tilemap graphics rather than sidelines/boundaries - replace with one closed
+   outer boundary, one obvious centre line, 2-3 floor shades, and a consistent perspective.
+3. Depth cues: add a small shadow under every player (not just the ball) and Y-sort; avoid many
+   intermediate sizes, two hand-authored sizes (near/far) is enough.
+4. **Done above** - controlled-player marker.
+5. Ball needs visually distinct ground/held/thrown/arcing states (a thrown ball needs a landing
+   shadow/marker since the angled court makes height hard to judge); avoid long trails.
+6. Throw/catch readability: hold the wind-up pose 8-12 frames, exaggerate the throwing arm,
+   add 2 frames of hit-stop + 4-6px knockback + palette-flash (the flash mechanism already
+   exists via `sprites_data_flash_team`) on a successful hit.
+7. Simplify the HUD to a single ~16px strip; use small icons for remaining players instead of
+   separate "IN 3" text.
+8. The 3-per-side teams currently read as flat lines - stagger into loose movement lanes for
+   target selection and trajectory readability, and give the ball carrier a visibly different
+   stance/speed.
+
+This list, plus the still-open Qwen-sourced items from the previous pass (squash/stretch frame
+variants, throw anticipation/follow-through, landing/pivot dust particles, per-player dynamic
+shadow scaling), is the active graphics backlog. See `docs/HANDOVER.md` for full session
+continuity notes, tooling gotchas, and exact next steps.
+
+### Readable 24x24 far-side player art (2026-07-21)
+
+Implemented the top item from the live-screenshot critique: the CPU-side cast no longer uses
+the extreme 8x8 depth cue that reduced each player to a tiny dark mark.
+
+- Measured the indexed pose blocks before editing. The near-side STAND/THROW/CATCH/RUN art
+  already spans 31-32 pixels vertically inside its 32x32 hardware allocation; the apparent
+  scale problem was the separate one-tile far-side figure, not unused space in the main poses.
+- Replaced `TILE_PLAYER_SMALL` with `TILE_PLAYER_FAR`, a real 24x24 (3x3 tile) second authored
+  size. It is derived from the indexed STAND artwork by cropping, aspect-preserving nearest-
+  neighbour reduction and bottom alignment, then encoded as nine consecutive tiles in Genesis
+  column-major sprite order. It keeps the complete team palette, so jersey, skin, hair and
+  outline survive instead of collapsing into a few pixels.
+- Shifted `TILE_MARKER` from `+67` to `+75` and `TILE_COURT_BASE` from `+68` to `+76`, updated
+  the nine-tile VRAM upload, and changed far-side drawing from `SPRITE_SIZE(1,1)` to
+  `SPRITE_SIZE(3,3)`.
+- The first real match capture found an integration issue code inspection would have missed:
+  preserving the old 8x8 figure's feet baseline made the taller replacement grow upward into
+  the HUD. Moved `COURT_TOP_Y` from 24 to 40 so all 24 pixels sit inside the playing field while
+  held-ball and throw targeting continue to use the same player anchor.
+- **Verified live in Fusion** after a clean, warning-free rebuild: loaded the new ROM, entered a
+  match, captured the actual emulator window, and inspected a pixel crop of all three Green
+  Vipers. Every far player is wholly below the HUD and clearly shows the team-colored kit,
+  head, arms and separated legs. No VRAM/tile corruption appeared after the shifted ranges.
+
 ---
 
 ## 📝 Design Decisions
@@ -601,4 +676,3 @@ functionally invisible against the pitch specifically for Green Vipers.
 ---
 
 🎮 *Let’s build a great Mega Drive game — together — and test it thoroughly every step of the way!*
-
