@@ -52,7 +52,7 @@ static void draw_teams(void)
 {
     u8 oppIndex = opponent_index();
 
-    VDP_clearTextLine(10);
+    VDP_clearTileMapRect(VDP_BG_A, 0, 10, 40, 1);
     VDP_drawTextFill(teamNames[gTeamAIndex], 2, 10, 12);
     VDP_drawText("VS", 19, 10);
     VDP_drawTextFill(teamNames[oppIndex], 26, 10, 12);
@@ -110,14 +110,14 @@ void scene_menu_update(void)
 {
     input_mgr_update();
 
-    /* Blinking "press start" prompt - only touches the text plane when
-     * it actually flips state, not every frame. */
+    /* Keep the prompt persistent. Clearing a text row writes opaque
+     * font-space tiles on this SGDK setup and used to flash a thick
+     * black bar across the isometric court. */
     if (++blinkCounter >= BLINK_PERIOD)
     {
         blinkCounter = 0;
-        startVisible = !startVisible;
-        if (startVisible) VDP_drawText("START TO PLAY", 13, 25);
-        else VDP_clearTextLine(25);
+        startVisible = TRUE;
+        VDP_drawText("START TO PLAY", 13, 25);
     }
 
     /* Subtle idle "breathing" bob on both heroes so the lineup doesn't

@@ -38,6 +38,8 @@ void player_eliminate(Player *p);
 /* Brings an eliminated player back into play at their home lane. */
 void player_restore(Player *p);
 void player_moveHuman(Player *p);
+/* Keeps a player inside their half of the projected isometric court. */
+void player_clampToCourt(Player *p);
 /* Advances the run-cycle animation and, once any transient pose (throw/
  * catch) has timed out, settles back to running or standing based on
  * "isMoving". Called every frame for both the human and the CPU side. */

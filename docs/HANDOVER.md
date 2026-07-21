@@ -83,9 +83,12 @@ docs/
   TILE_PLAYER_RUN     +48   (16 tiles)
   TILE_BALL           +64   (1 tile, 8x8)
   TILE_BALL_SHADOW    +65   (1 tile)
-  TILE_PLAYER_FAR     +66   (9 tiles, 3x3 — readable far/CPU-side depth cue)
-  TILE_MARKER         +75   (1 tile — controlled-player arrow)
-  TILE_COURT_BASE     +76   (court_bg.c takes over from here)
+  TILE_PLAYER_FAR_STAND +66   (9 tiles, 3x3)
+  TILE_PLAYER_FAR_RUN   +75   (9 tiles)
+  TILE_PLAYER_FAR_THROW +84   (9 tiles)
+  TILE_PLAYER_FAR_CATCH +93   (9 tiles)
+  TILE_MARKER          +102   (1 tile — controlled-player arrow)
+  TILE_COURT_BASE      +103   (court_bg.c takes over from here)
   ```
   A Genesis hardware sprite reads N×M **consecutive** VRAM tiles in column-major order (col0
   top-to-bottom, then col1...) starting at one base index — you cannot mix tiles from different
@@ -111,7 +114,8 @@ docs/
 - **Sprite hardware link chain** (`scene_match.c`): Genesis hardware sprites form a linked list
   starting at slot 0; each `VDP_setSpriteFull()` call's last argument is the *next* slot in the
   chain, not sprite data. Current chain: `SLOT_TEAM_A=0` (slots 0,1,2) → `SLOT_TEAM_B=3` (slots
-  3,4,5) → `SLOT_BALL=6` (ball at 6, shadow at 7) → `SLOT_MARKER=8` (terminates, link=0). If you
+  3,4,5) → `SLOT_BALL=6` (ball at 6, shadow at 7) → `SLOT_MARKER=8` → player shadows in
+  slots 9-14 (slot 14 terminates, link=0). If you
   add another persistent on-screen sprite, you must extend this chain (see how `ball.c`'s
   shadow was changed from `link=0` to `link=b->spriteSlot+2` this session to make room for the
   marker) — a sprite not reachable via the chain from slot 0 is simply never rendered, with no
@@ -122,9 +126,9 @@ docs/
   now uses its own real art (`TILE_PLAYER_RUN`) instead of aliasing STAND+hflip — that was a
   placeholder fixed this session, see §5.
 
-- **Far-side (CPU) depth cue**: `TILE_PLAYER_FAR` is a separately encoded 24x24 reduction of
-  STAND (Genesis has no hardware sprite scaling), used only for the far side and paired with
-  `court_bg.c`'s tapered sidelines. It replaced the illegible old 8x8 figure on 2026-07-21.
+- **Far-side (CPU) depth cue**: four `TILE_PLAYER_FAR_*` blocks are separately encoded 24x24
+  versions of all poses (Genesis has no hardware sprite scaling), so the far side keeps RUN,
+  THROW and CATCH animation rather than collapsing to one standing silhouette.
 
 ---
 
@@ -355,13 +359,11 @@ you're asked to do.
    occupied the full 32px height; the real problem was the CPU side's 8x8 depth cue. It is now
    a separately encoded, palette-preserving 24x24 figure, with the CPU baseline moved down so
    it sits wholly below the HUD. Verified from a fresh Fusion match screenshot and pixel crop.
-2. **Redesign court geometry** — the current stepped/striped shapes and thick black horizontal
-   strip read like debug/corrupted tilemap graphics, not sidelines. Replace with: one closed
-   outer boundary, one obvious centre line, 2-3 floor shades, consistent perspective (a clean
-   trapezoid with converging lines, or no perspective at all).
-3. **Depth cues without hardware scaling**: add a small shadow under every player (currently
-   only the ball has one), Y-sort players/ball/shadows. If depth-scaling players, author just
-   two hand-drawn sizes (near/far), not many intermediates.
+2. ~~Redesign court geometry~~ — **done 2026-07-21** from a user-supplied reference. The court,
+   player lanes and movement now share one `depth = y - x/4` projection, with three diagonal
+   white boundaries and three broad floor shades. The opaque midcourt text strip was removed.
+3. **Depth cues without hardware scaling**: player shadows and two authored sizes (32px near,
+   24px far, all four poses) are **done**. True per-frame Y sorting remains open.
 4. ~~Controlled-player marker~~ — **done**, `a2ec287`.
 5. **Distinct ball states** — ground/held/thrown/arcing should look visually different (a
    thrown ball needs a projected landing shadow/marker since the angled court makes height hard
@@ -371,8 +373,8 @@ you're asked to do.
    (the flash mechanism already exists — `sprites_data_flash_team()`) on a successful hit.
 7. **Simplify the HUD** to a single ~16px strip; small icons for remaining-player count instead
    of "IN 3" text.
-8. **Player spacing/AI**: the 3-per-side teams currently read as a flat line. Stagger into loose
-   movement lanes (better target selection, trajectory readability, avoids full sprite overlap).
+8. **Player spacing/AI**: diagonal staggered depth lanes are **done**. A dedicated slower ball-
+   carrier movement speed remains open.
    Ball carrier should have a visibly different stance and ideally move slightly slower.
 
 ### Carried over from an earlier Qwen critique (see `planning.md`'s earlier dated sections):

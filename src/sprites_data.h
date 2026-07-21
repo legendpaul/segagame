@@ -50,7 +50,10 @@
 /* Dedicated 24x24 (3x3 tile) far-side size. Genesis sprites cannot be
  * hardware-scaled, so this is a separately encoded reduction of the
  * real STAND artwork rather than a runtime transform. */
-#define TILE_PLAYER_FAR     (TILE_USER_INDEX + 66)
+#define TILE_PLAYER_FAR_STAND (TILE_USER_INDEX + 66)
+#define TILE_PLAYER_FAR_RUN   (TILE_USER_INDEX + 75)
+#define TILE_PLAYER_FAR_THROW (TILE_USER_INDEX + 84)
+#define TILE_PLAYER_FAR_CATCH (TILE_USER_INDEX + 93)
 
 /* Small downward-pointing arrow drawn above whichever player the human
  * currently controls. Added after ChatGPT's screenshot critique flagged
@@ -58,10 +61,10 @@
  * cheapest fix on their list (one 8x8 tile, no new art pipeline). Uses
  * PAL_BALL (white/grey/black) rather than a team palette line so it
  * reads the same regardless of which team color is active. */
-#define TILE_MARKER         (TILE_USER_INDEX + 75)
+#define TILE_MARKER         (TILE_USER_INDEX + 102)
 
 /* First tile index free for court_bg.c to use */
-#define TILE_COURT_BASE     (TILE_USER_INDEX + 76)
+#define TILE_COURT_BASE     (TILE_USER_INDEX + 103)
 
 /* Palette lines: PAL0 is used by the system font + pitch background,
  * so sprites use 1-3. PAL1/PAL2 are *slots*, not fixed teams - which

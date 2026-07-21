@@ -13,14 +13,20 @@
 #define SCREEN_W            320
 #define SCREEN_H            224
 
-#define COURT_TOP_Y         40      /* CPU baseline; keeps 24px far art below the HUD */
-#define COURT_BOTTOM_Y       168     /* Player baseline */
-#define COURT_LEFT_X        16
-#define COURT_RIGHT_X        296
+/* Isometric screen-space court. A player's depth is y - x/4; moving
+ * along either diagonal axis changes both screen coordinates. */
+#define COURT_FAR_DEPTH      24
+#define COURT_NEAR_DEPTH     144
+#define COURT_CENTER_DEPTH   84
+#define TEAM_B_DEPTH         52
+#define TEAM_A_DEPTH         116
+#define COURT_LEFT_X         8
+#define COURT_RIGHT_X        304
 
 /* --- Gameplay tuning --- */
 #define PLAYER_SPEED        2       /* px per frame */
 #define CATCH_WINDOW_X      16      /* horizontal alignment needed to catch */
+#define CATCH_WINDOW_Y      12      /* screen-depth alignment needed to catch */
 #define AI_REACTION_MIN     20      /* frames CPU waits before throwing */
 #define AI_REACTION_VAR     30
 

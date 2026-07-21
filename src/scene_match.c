@@ -14,6 +14,7 @@
 #define SLOT_TEAM_B   3    /* teamB uses sprite slots 3,4,5 */
 #define SLOT_BALL     6    /* ball uses slots 6 (ball) and 7 (shadow) */
 #define SLOT_MARKER   8    /* controlled-player arrow (see draw_control_marker) */
+#define SLOT_SHADOWS  9    /* six grounded player shadows use slots 9..14 */
 
 typedef enum {
     MS_ANNOUNCE = 0,
@@ -97,7 +98,23 @@ static void draw_control_marker(void)
     Player *p = &teamA[activeA];
     VDP_setSpriteFull(SLOT_MARKER, p->x + 4, p->y - 26, SPRITE_SIZE(1, 1),
                        TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_MARKER),
-                       0);
+                       SLOT_SHADOWS);
+}
+
+static void draw_player_shadows(void)
+{
+    u8 i;
+    for (i = 0; i < TEAM_SIZE; i++)
+    {
+        u8 slotA = SLOT_SHADOWS + i;
+        u8 slotB = SLOT_SHADOWS + TEAM_SIZE + i;
+        VDP_setSpriteFull(slotA, teamA[i].x + 4, teamA[i].y + 10, SPRITE_SIZE(1, 1),
+                           TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL_SHADOW),
+                           slotA + 1);
+        VDP_setSpriteFull(slotB, teamB[i].x + 4, teamB[i].y + 10, SPRITE_SIZE(1, 1),
+                           TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL_SHADOW),
+                           (i == TEAM_SIZE - 1) ? 0 : (slotB + 1));
+    }
 }
 
 static s16 lane_x(u8 i)
@@ -155,11 +172,16 @@ static void return_one(Player team[], s8 outStack[], u8 *outCount)
     player_restore(&team[idx]);
 }
 
-static void reset_team(Player team[], u8 baseSlot, u8 pal, s16 y)
+static void reset_team(Player team[], u8 baseSlot, u8 pal, s16 baseDepth)
 {
+    static const s8 depthOffset[TEAM_SIZE] = { -8, 10, 0 };
     u8 i;
     for (i = 0; i < TEAM_SIZE; i++)
-        player_init(&team[i], lane_x(i), y, baseSlot + i, pal);
+    {
+        s16 x = lane_x(i);
+        s16 y = baseDepth + depthOffset[i] + (x >> 2);
+        player_init(&team[i], x, y, baseSlot + i, pal);
+    }
 }
 
 static void draw_hud(void)
@@ -183,13 +205,21 @@ static void draw_hud(void)
     VDP_drawTextFill(buf, 39, 2, 1);
 }
 
+/* SGDK's text-line clear writes opaque font-space tiles, which created
+ * the full-width black stripe that made the old court look corrupted.
+ * Clearing the plane's tilemap and restoring only the compact HUD makes
+ * the isometric BG_B court visible again everywhere else. */
+static void clear_playfield_text(void)
+{
+    VDP_clearPlane(VDP_BG_A, TRUE);
+    draw_hud();
+}
+
 static void begin_announce(void)
 {
-    const char *team = server ? teamNames[gTeamBIndex] : teamNames[gTeamAIndex];
-
-    VDP_clearTextLine(12);
-    VDP_drawTextFill(team, (40 - (strlen(team) + 7)) / 2, 12, strlen(team) + 7);
-    VDP_drawText("SERVES", (40 - (strlen(team) + 7)) / 2 + strlen(team) + 1, 12);
+    /* Keep state messaging out of the projected playfield. The old
+     * full-width text row broke the court into two flat halves. */
+    clear_playfield_text();
 
     announceTimer = 60;
     state = MS_ANNOUNCE;
@@ -197,19 +227,19 @@ static void begin_announce(void)
     if (server == 0)
     {
         holderA = activeA;
-        ball_init(&ball, SLOT_BALL, teamA[holderA].x, teamA[holderA].y - 8, BALL_HELD_A);
+        ball_init(&ball, SLOT_BALL, teamA[holderA].x + 9, teamA[holderA].y - 11, BALL_HELD_A);
     }
     else
     {
         holderB = first_in_play_from(teamB, ai_pickSlot(TEAM_SIZE));
-        ball_init(&ball, SLOT_BALL, teamB[holderB].x, teamB[holderB].y + 16, BALL_HELD_B);
+        ball_init(&ball, SLOT_BALL, teamB[holderB].x - 3, teamB[holderB].y - 8, BALL_HELD_B);
     }
 }
 
 static void start_round(void)
 {
-    reset_team(teamA, SLOT_TEAM_A, PAL_TEAM_A, COURT_BOTTOM_Y);
-    reset_team(teamB, SLOT_TEAM_B, PAL_TEAM_B, COURT_TOP_Y);
+    reset_team(teamA, SLOT_TEAM_A, PAL_TEAM_A, TEAM_A_DEPTH);
+    reset_team(teamB, SLOT_TEAM_B, PAL_TEAM_B, TEAM_B_DEPTH);
     teamB[0].small = TRUE; teamB[1].small = TRUE; teamB[2].small = TRUE;
 
     outCountA = 0;
@@ -254,10 +284,7 @@ static void go_round_end(u8 winnerIsA)
 
     draw_hud();
 
-    const char *team = winnerIsA ? teamNames[gTeamAIndex] : teamNames[gTeamBIndex];
-    VDP_clearTextLine(12);
-    VDP_drawTextFill(team, (40 - (strlen(team) + 7)) / 2, 12, strlen(team) + 7);
-    VDP_drawText("WINS ROUND", (40 - (strlen(team) + 7)) / 2 + strlen(team) + 1, 12);
+    clear_playfield_text();
 
     /* Losing team serves next, to keep matches competitive. */
     server = winnerIsA ? 1 : 0;
@@ -270,7 +297,8 @@ static void go_round_end(u8 winnerIsA)
  * responder is eliminated and team A keeps the ball. */
 static void resolve_throw_to_B(void)
 {
-    bool inRange = abs(teamB[responderB].x - ball.targetX) <= CATCH_WINDOW_X;
+    bool inRange = abs(teamB[responderB].x - ball.targetX) <= CATCH_WINDOW_X &&
+                   abs(teamB[responderB].y - ball.targetY) <= CATCH_WINDOW_Y;
     bool caught = inRange && ai_willCatch();
 
     trigger_flash(PAL_TEAM_B);
@@ -287,7 +315,7 @@ static void resolve_throw_to_B(void)
         holderB = responderB;
         activeA = first_in_play_from(teamA, activeA);
         draw_hud();
-        ball_init(&ball, SLOT_BALL, teamB[holderB].x, teamB[holderB].y + 16, BALL_HELD_B);
+        ball_init(&ball, SLOT_BALL, teamB[holderB].x - 3, teamB[holderB].y - 8, BALL_HELD_B);
         state = MS_B_HOLD;
         aiDelay = ai_pickThrowDelay();
     }
@@ -302,7 +330,7 @@ static void resolve_throw_to_B(void)
 
         holderA = first_in_play_from(teamA, holderA);
         activeA = holderA;
-        ball_init(&ball, SLOT_BALL, teamA[holderA].x, teamA[holderA].y - 8, BALL_HELD_A);
+        ball_init(&ball, SLOT_BALL, teamA[holderA].x + 9, teamA[holderA].y - 11, BALL_HELD_A);
         state = MS_A_HOLD;
     }
 }
@@ -314,7 +342,8 @@ static void resolve_throw_to_B(void)
 static void resolve_throw_to_A(void)
 {
     bool isHuman = (responderA == activeA);
-    bool inRange = abs(teamA[responderA].x - ball.targetX) <= CATCH_WINDOW_X;
+    bool inRange = abs(teamA[responderA].x - ball.targetX) <= CATCH_WINDOW_X &&
+                   abs(teamA[responderA].y - ball.targetY) <= CATCH_WINDOW_Y;
     bool caught = isHuman ? (inRange && input_held(BUTTON_A))
                            : (inRange && ai_willCatch());
 
@@ -332,7 +361,7 @@ static void resolve_throw_to_A(void)
         holderA = responderA;
         activeA = responderA;
         draw_hud();
-        ball_init(&ball, SLOT_BALL, teamA[holderA].x, teamA[holderA].y - 8, BALL_HELD_A);
+        ball_init(&ball, SLOT_BALL, teamA[holderA].x + 9, teamA[holderA].y - 11, BALL_HELD_A);
         state = MS_A_HOLD;
     }
     else
@@ -346,7 +375,7 @@ static void resolve_throw_to_A(void)
 
         if (responderA == activeA) activeA = first_in_play_from(teamA, activeA);
         holderB = first_in_play_from(teamB, holderB);
-        ball_init(&ball, SLOT_BALL, teamB[holderB].x, teamB[holderB].y + 16, BALL_HELD_B);
+        ball_init(&ball, SLOT_BALL, teamB[holderB].x - 3, teamB[holderB].y - 8, BALL_HELD_B);
         state = MS_B_HOLD;
         aiDelay = ai_pickThrowDelay();
     }
@@ -417,7 +446,7 @@ void scene_match_update(void)
             if (announceTimer > 0) announceTimer--;
             else
             {
-                VDP_clearTextLine(12);
+                clear_playfield_text();
                 if (server == 0) state = MS_A_HOLD;
                 else { state = MS_B_HOLD; aiDelay = ai_pickThrowDelay(); }
             }
@@ -426,8 +455,8 @@ void scene_match_update(void)
 
         case MS_A_HOLD:
         {
-            ball.x = teamA[holderA].x;
-            ball.y = teamA[holderA].y - 8;
+            ball.x = teamA[holderA].x + 9;
+            ball.y = teamA[holderA].y - 11;
 
             if (activeA == holderA && input_pressed(BUTTON_A))
             {
@@ -435,7 +464,8 @@ void scene_match_update(void)
 
                 sound_mgr_throw();
                 player_setPose(&teamA[holderA], POSE_THROW, 12);
-                ball_startThrow(&ball, teamA[holderA].x, teamB[responderB].y + 4, BALL_FLYING_TO_B);
+                ball_startThrow(&ball, teamB[responderB].x + 4,
+                                teamB[responderB].y - 3, BALL_FLYING_TO_B);
                 state = MS_FLY_TO_B;
             }
             break;
@@ -451,7 +481,7 @@ void scene_match_update(void)
 
                 sound_mgr_throw();
                 player_setPose(&teamB[holderB], POSE_THROW, 12);
-                ball_startThrow(&ball, targetX, teamA[responderA].y - 4, BALL_FLYING_TO_A);
+                ball_startThrow(&ball, targetX, teamA[responderA].y - 3, BALL_FLYING_TO_A);
                 state = MS_FLY_TO_A;
             }
             break;
@@ -462,6 +492,9 @@ void scene_match_update(void)
             /* Only the designated responder chases the ball. */
             if (teamB[responderB].x < ball.targetX) { teamB[responderB].x += PLAYER_SPEED; cpuMoved = TRUE; }
             else if (teamB[responderB].x > ball.targetX) { teamB[responderB].x -= PLAYER_SPEED; cpuMoved = TRUE; }
+            if (teamB[responderB].y < ball.targetY) { teamB[responderB].y++; cpuMoved = TRUE; }
+            else if (teamB[responderB].y > ball.targetY) { teamB[responderB].y--; cpuMoved = TRUE; }
+            player_clampToCourt(&teamB[responderB]);
 
             if (ball_update(&ball))
                 resolve_throw_to_B();
@@ -476,6 +509,9 @@ void scene_match_update(void)
             {
                 if (teamA[responderA].x < ball.targetX) teamA[responderA].x += PLAYER_SPEED;
                 else if (teamA[responderA].x > ball.targetX) teamA[responderA].x -= PLAYER_SPEED;
+                if (teamA[responderA].y < ball.targetY) teamA[responderA].y++;
+                else if (teamA[responderA].y > ball.targetY) teamA[responderA].y--;
+                player_clampToCourt(&teamA[responderA]);
             }
 
             if (ball_update(&ball))
@@ -495,7 +531,7 @@ void scene_match_update(void)
                     return;
                 }
 
-                VDP_clearTextLine(12);
+                clear_playfield_text();
                 start_round();
             }
             break;
@@ -507,7 +543,8 @@ void scene_match_update(void)
     for (i = 0; i < TEAM_SIZE; i++)
     {
         bool aMoving = (i == activeA) && !teamA[i].eliminated &&
-                       (input_held(BUTTON_LEFT) || input_held(BUTTON_RIGHT));
+                       (input_held(BUTTON_LEFT) || input_held(BUTTON_RIGHT) ||
+                        input_held(BUTTON_UP) || input_held(BUTTON_DOWN));
         player_tickAnim(&teamA[i], aMoving);
         player_draw(&teamA[i]);
 
@@ -518,4 +555,5 @@ void scene_match_update(void)
 
     ball_draw(&ball);
     draw_control_marker();
+    draw_player_shadows();
 }

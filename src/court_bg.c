@@ -1,5 +1,6 @@
 #include "court_bg.h"
 #include "sprites_data.h"
+#include "game_state.h"
 
 /* Reuses PAL0 (the font palette) for background art: font glyphs only
  * use index 0 (transparent) and 1 (white), so grass/line/stand/accent
@@ -8,13 +9,13 @@
 #define TILE_GRASS_A   (TILE_COURT_BASE + 0)
 #define TILE_GRASS_B   (TILE_COURT_BASE + 1)
 #define TILE_GRASS_M   (TILE_COURT_BASE + 2)
-#define TILE_LINE_L    (TILE_COURT_BASE + 3)
-#define TILE_LINE_R    (TILE_COURT_BASE + 4)
-#define TILE_LINE_H    (TILE_COURT_BASE + 5)
-#define TILE_STAND_A   (TILE_COURT_BASE + 6)
-#define TILE_STAND_B   (TILE_COURT_BASE + 7)
-#define TILE_ENDZONE   (TILE_COURT_BASE + 8)
-#define TILE_CIRCLE    (TILE_COURT_BASE + 9)
+#define TILE_EDGE_L    (TILE_COURT_BASE + 3)
+#define TILE_EDGE_R    (TILE_COURT_BASE + 4)
+#define TILE_ISO_0     (TILE_COURT_BASE + 5)
+#define TILE_ISO_2     (TILE_COURT_BASE + 6)
+#define TILE_ISO_4     (TILE_COURT_BASE + 7)
+#define TILE_ISO_6     (TILE_COURT_BASE + 8)
+#define TILE_HUD       (TILE_COURT_BASE + 9)
 
 #define PITCH_TOP_ROW      3
 #define PITCH_BOTTOM_ROW   24
@@ -51,26 +52,26 @@ static const u32 tile_line_r[8] = {
 };
 
 static const u32 tile_line_h[8] = {
-    0x11111111, 0x22222222, 0x22222222, 0x22222222,
+    0x11112222, 0x22221111, 0x22222222, 0x22222222,
     0x22222222, 0x22222222, 0x22222222, 0x22222222
 };
 
 /* Stand: two subtly different tiles, alternated, so the crowd band
  * reads as a textured stadium wall instead of a flat color block. */
 static const u32 tile_stand_a[8] = {
-    0x44444444, 0x44454444, 0x44444444, 0x44444544,
-    0x44444444, 0x44454444, 0x44444444, 0x44444544
+    0x22222222, 0x22222222, 0x11112222, 0x22221111,
+    0x22222222, 0x22222222, 0x22222222, 0x22222222
 };
 
 static const u32 tile_stand_b[8] = {
-    0x44445444, 0x44444444, 0x45444444, 0x44444444,
-    0x44445444, 0x44444444, 0x45444444, 0x44444444
+    0x22222222, 0x22222222, 0x22222222, 0x22222222,
+    0x11112222, 0x22221111, 0x22222222, 0x22222222
 };
 
 /* End-zone accent stripe marking each side's serve line. */
 static const u32 tile_endzone[8] = {
-    0x66666666, 0x66666666, 0x22222222, 0x22222222,
-    0x22222222, 0x22222222, 0x22222222, 0x22222222
+    0x22222222, 0x22222222, 0x22222222, 0x22222222,
+    0x22222222, 0x22222222, 0x11112222, 0x22221111
 };
 
 /* A single filled gold marker, reused at 8 points around the halfway
@@ -79,8 +80,8 @@ static const u32 tile_endzone[8] = {
  * an honest low-res approximation rather than a claim of a real
  * circle). */
 static const u32 tile_circle[8] = {
-    0x22222222, 0x22666622, 0x26666662, 0x26666662,
-    0x26666662, 0x26666662, 0x22666622, 0x22222222
+    0x44444444, 0x44444444, 0x44444444, 0x44444444,
+    0x44444444, 0x44444444, 0x44444444, 0x44444444
 };
 
 static void restore_colors(void)
@@ -103,6 +104,7 @@ static void restore_colors(void)
      * name - only index 0 (transparent) and 15 (glyph white) actually
      * matter for text. */
     PAL_setColor(0 * 16 + 0,  0x0000);                       /* transparent/black */
+    PAL_setColor(0 * 16 + 1, RGB24_TO_VDPCOLOR(0xF8F8F8));  /* court line white */
     PAL_setColor(0 * 16 + 15, RGB24_TO_VDPCOLOR(0xF8F8F8));  /* font glyph white */
     PAL_setColor(0 * 16 + 2, RGB24_TO_VDPCOLOR(0x40B050));  /* grass light  */
     PAL_setColor(0 * 16 + 3, RGB24_TO_VDPCOLOR(0x309040));  /* grass dark   */
@@ -117,18 +119,19 @@ void court_bg_init(void)
     VDP_loadTileData(tile_grass_a, TILE_GRASS_A, 1, DMA);
     VDP_loadTileData(tile_grass_b, TILE_GRASS_B, 1, DMA);
     VDP_loadTileData(tile_grass_m, TILE_GRASS_M, 1, DMA);
-    VDP_loadTileData(tile_line_l,  TILE_LINE_L,  1, DMA);
-    VDP_loadTileData(tile_line_r,  TILE_LINE_R,  1, DMA);
-    VDP_loadTileData(tile_line_h,  TILE_LINE_H,  1, DMA);
-    VDP_loadTileData(tile_stand_a, TILE_STAND_A, 1, DMA);
-    VDP_loadTileData(tile_stand_b, TILE_STAND_B, 1, DMA);
-    VDP_loadTileData(tile_endzone, TILE_ENDZONE, 1, DMA);
-    VDP_loadTileData(tile_circle,  TILE_CIRCLE,  1, DMA);
+    VDP_loadTileData(tile_line_l,  TILE_EDGE_L, 1, DMA);
+    VDP_loadTileData(tile_line_r,  TILE_EDGE_R, 1, DMA);
+    VDP_loadTileData(tile_line_h,  TILE_ISO_0,  1, DMA);
+    VDP_loadTileData(tile_stand_a, TILE_ISO_2,  1, DMA);
+    VDP_loadTileData(tile_stand_b, TILE_ISO_4,  1, DMA);
+    VDP_loadTileData(tile_endzone, TILE_ISO_6,  1, DMA);
+    VDP_loadTileData(tile_circle,  TILE_HUD,    1, DMA);
 
     restore_colors();
 }
 
-void court_bg_draw(void)
+#if 0 /* Superseded by the coherent diagonal projection below. */
+void court_bg_draw_legacy(void)
 {
     u16 row, col;
 
@@ -205,5 +208,78 @@ void court_bg_draw(void)
         for (i = 0; i < 8; i++)
             VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_CIRCLE),
                               cx + dx[i], cy + dy[i]);
+    }
+}
+#endif
+
+static void draw_iso_line(s16 intercept)
+{
+    u16 col;
+    for (col = 0; col < 40; col++)
+    {
+        s16 y = (s16)(col * 2) + intercept;
+        u16 tile;
+        if (y < 24 || y >= 224) continue;
+        switch (y & 7)
+        {
+            case 0: tile = TILE_ISO_0; break;
+            case 2: tile = TILE_ISO_2; break;
+            case 4: tile = TILE_ISO_4; break;
+            default: tile = TILE_ISO_6; break;
+        }
+        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, tile),
+                          col, (u16)y >> 3);
+    }
+}
+
+void court_bg_draw(void)
+{
+    u16 row, col;
+
+    restore_colors();
+
+    /* One coherent elevated/isometric projection. Floor shades follow
+     * depth (y - x/4), so every visual band shares the same vanishing
+     * direction as players and ball movement. */
+    for (row = 0; row < 28; row++)
+    {
+        for (col = 0; col < 40; col++)
+        {
+            u16 tile;
+            if (row < 3)
+            {
+                tile = TILE_HUD;
+            }
+            else
+            {
+                s16 depth = (s16)(row * 8 + 4) - (s16)(col * 2 + 1);
+                if (depth < COURT_FAR_DEPTH || depth > COURT_NEAR_DEPTH)
+                    tile = TILE_GRASS_B;
+                else if (depth < 64)
+                    tile = TILE_GRASS_M;
+                else if (depth < 108)
+                    tile = TILE_GRASS_A;
+                else
+                    tile = TILE_GRASS_M;
+            }
+            VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, tile), col, row);
+        }
+    }
+
+    /* Three parallel diagonal lines: closed far boundary, unmistakable
+     * centre line and closed near boundary. Their 1px stair pattern is
+     * authored inside each tile, not made from chunky whole-tile steps. */
+    draw_iso_line(COURT_FAR_DEPTH);
+    draw_iso_line(COURT_CENTER_DEPTH);
+    draw_iso_line(COURT_NEAR_DEPTH);
+
+    /* Closing sidelines converge toward the far-right vanishing point. */
+    for (row = 3; row < 28; row++)
+    {
+        u16 dt = row - 3;
+        u16 left = 8 - (dt * 8) / 24;
+        u16 right = 39 - (dt * 8) / 24;
+        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_EDGE_L), left, row);
+        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_EDGE_R), right, row);
     }
 }

@@ -40,6 +40,7 @@
  * generated the same way from prompts describing the actual action -
  * see the note above tile_player_throw for why they didn't exist until
  * this pass (a request-encoding bug, not a modeling one). */
+#if 0 /* Superseded by the coherent isometric sheet included below. */
 static const u32 tile_player_stand[16][8] = {
     { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
     { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x0000000b, 0x0000000e },
@@ -155,6 +156,9 @@ static const u32 tile_player_run[16][8] = {
     { 0x04130000, 0x00a00000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0xa0000000 },
     { 0xe0000000, 0xa0000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x90000000 },
 };
+#endif
+
+#include "player_isometric_tiles.inc"
 
 /* Ball: white with a soft shadow (2) and a dark outline (3) so it reads
  * clearly against the green pitch. */
@@ -183,6 +187,7 @@ static const u32 tile_ball_shadow[8] = {
     0x00000000
 };
 
+#if 0 /* Replaced by tile_iso_far from the generated isometric sheet. */
 /* Far-side player (see TILE_PLAYER_FAR): a 24x24 reduction of the real
  * STAND art, sharing the complete 14-color team palette. The old 8x8
  * single-tile figure made the CPU team functionally unreadable at the
@@ -201,6 +206,7 @@ static const u32 tile_player_far[9][8] = {
     { 0x00000000, 0x11900000, 0x14b00000, 0x9b000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
     { 0x00000000, 0x00000000, 0xee000000, 0xeb000000, 0xe9e00000, 0x2de00000, 0x55500000, 0x55500000 },
 };
+#endif
 
 /* Controlled-player marker (see TILE_MARKER) - a small downward arrow,
  * outlined in black (3) with a white fill (1) so it reads clearly
@@ -264,14 +270,17 @@ void sprites_data_init(void)
 {
     /* RUN reuses STAND's tiles (hflip only); THROW and CATCH are now
      * genuinely separate 16-tile blocks, each uploaded on its own. */
-    VDP_loadTileData(tile_player_stand[0], TILE_PLAYER_STAND, 16, DMA);
-    VDP_loadTileData(tile_player_throw[0], TILE_PLAYER_THROW, 16, DMA);
-    VDP_loadTileData(tile_player_catch[0], TILE_PLAYER_CATCH, 16, DMA);
-    VDP_loadTileData(tile_player_run[0],   TILE_PLAYER_RUN,   16, DMA);
+    VDP_loadTileData(tile_iso_stand[0], TILE_PLAYER_STAND, 16, DMA);
+    VDP_loadTileData(tile_iso_throw[0], TILE_PLAYER_THROW, 16, DMA);
+    VDP_loadTileData(tile_iso_catch[0], TILE_PLAYER_CATCH, 16, DMA);
+    VDP_loadTileData(tile_iso_run[0],   TILE_PLAYER_RUN,   16, DMA);
 
     VDP_loadTileData(tile_ball,        TILE_BALL,        1, DMA);
     VDP_loadTileData(tile_ball_shadow, TILE_BALL_SHADOW,  1, DMA);
-    VDP_loadTileData(tile_player_far[0], TILE_PLAYER_FAR, 9, DMA);
+    VDP_loadTileData(tile_iso_far_stand[0], TILE_PLAYER_FAR_STAND, 9, DMA);
+    VDP_loadTileData(tile_iso_far_run[0],   TILE_PLAYER_FAR_RUN,   9, DMA);
+    VDP_loadTileData(tile_iso_far_throw[0], TILE_PLAYER_FAR_THROW, 9, DMA);
+    VDP_loadTileData(tile_iso_far_catch[0], TILE_PLAYER_FAR_CATCH, 9, DMA);
     VDP_loadTileData(tile_marker, TILE_MARKER, 1, DMA);
 
     PAL_setPalette(PAL_BALL, pal_ball, DMA);

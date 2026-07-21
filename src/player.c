@@ -44,13 +44,34 @@ void player_moveHuman(Player *p)
 {
     bool moved = FALSE;
 
-    if (input_held(BUTTON_LEFT))  { p->x -= PLAYER_SPEED; moved = TRUE; }
-    if (input_held(BUTTON_RIGHT)) { p->x += PLAYER_SPEED; moved = TRUE; }
+    /* Both world axes project diagonally in the reference camera.
+     * This makes every d-pad direction change screen X and Y instead
+     * of sliding players along one flat horizontal baseline. */
+    if (input_held(BUTTON_LEFT))  { p->x -= 2; p->y -= 1; moved = TRUE; }
+    if (input_held(BUTTON_RIGHT)) { p->x += 2; p->y += 1; moved = TRUE; }
+    if (input_held(BUTTON_UP))    { p->x += 1; p->y -= 2; moved = TRUE; }
+    if (input_held(BUTTON_DOWN))  { p->x -= 1; p->y += 2; moved = TRUE; }
 
-    if (p->x < COURT_LEFT_X)  p->x = COURT_LEFT_X;
-    if (p->x > COURT_RIGHT_X) p->x = COURT_RIGHT_X;
+    player_clampToCourt(p);
 
     player_tickAnim(p, moved);
+}
+
+void player_clampToCourt(Player *p)
+{
+    s16 depth = p->y - (p->x >> 2);
+    s16 minDepth = p->small ? (COURT_FAR_DEPTH + 6) : (COURT_CENTER_DEPTH + 8);
+    s16 maxDepth = p->small ? (COURT_CENTER_DEPTH - 8) : (COURT_NEAR_DEPTH - 6);
+
+    if (depth < minDepth) p->y += minDepth - depth;
+    if (depth > maxDepth) p->y -= depth - maxDepth;
+
+    depth = p->y - (p->x >> 2);
+    /* The parallel sidelines drift left toward the near edge. */
+    s16 minX = 64 - ((depth - COURT_FAR_DEPTH) >> 1) + 8;
+    s16 maxX = 312 - ((depth - COURT_FAR_DEPTH) >> 1) - 8;
+    if (p->x < minX) p->x = minX;
+    if (p->x > maxX) p->x = maxX;
 }
 
 void player_tickAnim(Player *p, bool isMoving)
@@ -94,8 +115,26 @@ void player_draw(Player *p)
          * enough to preserve pose/team readability while remaining a
          * distinct depth step from the near side's 32x32 art. Offsets
          * preserve the same visual center and feet baseline. */
-        VDP_setSpriteFull(p->spriteSlot, p->x - 4, p->y - 8, SPRITE_SIZE(3, 3),
-                           TILE_ATTR_FULL(p->pal, 0, FALSE, FALSE, TILE_PLAYER_FAR),
+        u16 farBase = TILE_PLAYER_FAR_STAND;
+        bool farFlip = FALSE;
+        s16 farOffsetY = 0;
+        if (p->pose == POSE_RUN)
+        {
+            farBase = TILE_PLAYER_FAR_RUN;
+            farFlip = (p->animFrame != 0);
+        }
+        else if (p->pose == POSE_THROW)
+        {
+            farBase = TILE_PLAYER_FAR_THROW;
+            farOffsetY = -2;
+        }
+        else if (p->pose == POSE_CATCH)
+        {
+            farBase = TILE_PLAYER_FAR_CATCH;
+            farOffsetY = 1;
+        }
+        VDP_setSpriteFull(p->spriteSlot, p->x - 4, p->y - 8 + farOffsetY, SPRITE_SIZE(3, 3),
+                           TILE_ATTR_FULL(p->pal, 0, FALSE, farFlip, farBase),
                            p->spriteSlot + 1);
         return;
     }

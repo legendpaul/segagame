@@ -634,6 +634,47 @@ the extreme 8x8 depth cue that reduced each player to a tiny dark mark.
   Vipers. Every far player is wholly below the HUD and clearly shows the team-colored kit,
   head, arms and separated legs. No VRAM/tile corruption appeared after the shifted ranges.
 
+### User-reference isometric rebuild + coherent sprite sheet (2026-07-21)
+
+Direct user feedback included an actual late-16-bit sports-game screenshot and was explicit:
+the court, players and ball movement should share that elevated isometric view, and the current
+pixel quality was unacceptable. This pass changes the projection and artwork together rather
+than applying another surface polish pass to the flat two-row layout.
+
+- Generated a new four-pose player sheet with the built-in image-generation tool, using the
+  supplied screenshot strictly as camera/scale/pixel-density reference. The sheet has one
+  consistent three-quarter athlete across STAND/RUN/THROW/CATCH on chroma green. Both the raw
+  chroma source and validated alpha result live in `assets/player_isometric_sheet*.png`.
+- Added reproducible `tools/build_isometric_sprites.py`: finds the four pose components, fits
+  them into bottom-aligned 32x32 canvases, maps true reds only into the seven-slot team kit
+  ramp, maps skin/hair/shoes into fixed palette slots, removes baked-in white balls, emits VDP
+  column-major C data, produces four 24x24 far-side pose blocks, and writes a magnified QA
+  preview. Generated data lives in `src/player_isometric_tiles.inc`.
+- Replaced the old pose uploads with the coherent new sheet. The CPU team now has four real
+  24x24 pose blocks instead of one static far-side stand tile, so isometric depth no longer
+  removes throw/catch/run readability. Tile ranges after the ball now run from `+66` through
+  `+101`; marker/court move to `+102`/`+103`.
+- Rebuilt court geometry around one screen-space projection: `depth = y - x/4`. The far,
+  centre and near boundaries are parallel 1px diagonal lines with matching shallow-slope tile
+  phases; converging sidelines close the shape; three broad green depth shades replace noisy
+  mowing stripes and gold debug-like markers. Palette index 1 is explicitly restored to white,
+  fixing the formerly black boundary line.
+- Human d-pad movement now follows two diagonal screen axes (both X and Y change), with
+  projection-aware half-court clamping. All six starting positions use staggered depth lanes.
+  CPU responders chase both target coordinates. Throws target the defender's projected X/Y
+  location, so the existing parabolic ball arc and landing shadow travel diagonally across the
+  same court rather than straight between flat horizontal baselines. Catch resolution now
+  checks both X and Y distance.
+- Added six persistent player shadows in sprite slots 9-14 and extended the hardware link chain
+  through them. Removed playfield announcement rows and the menu prompt blink-clear because
+  SGDK's font-space clearing produced the thick opaque black bars visible in the old screenshot.
+- **Verified**: repeated warning-free SGDK builds; fresh ROM load and match entry in Fusion;
+  live capture confirms the generated team-colored sprites, 32px/24px depth sizes, staggered
+  diagonal formation, separate player shadows, uninterrupted three-shade court, white closed
+  boundaries, HUD, marker and held ball all render without VRAM corruption. Sustained injected
+  movement input remained unreliable in this automation environment, so the new four-direction
+  input path was compile-verified and inspected but not claimed as a completed live key-hold test.
+
 ---
 
 ## 📝 Design Decisions
