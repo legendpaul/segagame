@@ -726,6 +726,32 @@ increase the visual scale, and make the isometric pitch feel like a stadium.
   removed before the final build; normal flow remains studio splash -> title -> Team 1 -> Team 2
   -> match.
 
+### Lane throws, continuous hits and equal-size teams (2026-07-22)
+
+Direct gameplay correction: remove the "men versus midgets" scaling, improve animation/hit
+detection, map A/B/C to left/middle/right throws, add spin, replace the arrow with a coloured
+ground marker, and clean up the stadium.
+
+- Both match sides now use the same full 32x32 player art. The 24x24 assets remain available
+  for non-match depth use, but are no longer applied to the opposing team.
+- A targets the left opponent lane, B the middle and C the right. If a lane is eliminated the
+  nearest surviving lane is selected. C no longer cycles players; defence automatically gives
+  control to the player being targeted by the CPU.
+- Holding D-pad LEFT or RIGHT while pressing a throw button applies a mild signed curve. Ball
+  ground position bends up to 12px at mid-flight, returns exactly to the selected lane, and the
+  ball flips through visible rotation phases while its shadow stays on the landing track.
+- Added an eight-frame wind-up before release and an eight-frame impact pause with a dedicated
+  recoil pose, knockback, palette flash and screen shake before elimination.
+- Hit detection now checks a player-centred collision box every flight frame. Throws that do
+  not overlap a player at arrival are real misses and transfer possession without a phantom hit.
+- Replaced the overhead arrow with a 16x8 outlined ground star: yellow for the controlled player
+  without possession, red while holding the ball or winding up.
+- Rebuilt the stadium framing again after live screenshot review: compact far grandstand and
+  advertising/light rail over a full-width three-shade pitch, with the noisy side crowd walls
+  and blocky stepped pitch island removed.
+- Live Fusion QA confirmed equal 32x32 teams, the cleaner court, red possession star and the
+  readable throw/recoil pose. The normal splash/title/select flow was restored after QA.
+
 ---
 
 ## 📝 Design Decisions

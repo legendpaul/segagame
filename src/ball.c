@@ -10,17 +10,19 @@ void ball_init(Ball *b, u8 spriteSlot, s16 x, s16 y, BallState heldState)
     b->targetX = x;
     b->targetY = y;
     b->progress = 0;
+    b->spin = 0;
     b->state = heldState;
     b->spriteSlot = spriteSlot;
 }
 
-void ball_startThrow(Ball *b, s16 toX, s16 toY, BallState flightState)
+void ball_startThrow(Ball *b, s16 toX, s16 toY, BallState flightState, s8 spin)
 {
     b->startX = b->x;
     b->startY = b->y;
     b->targetX = toX;
     b->targetY = toY;
     b->progress = 0;
+    b->spin = spin;
     b->state = flightState;
 }
 
@@ -41,6 +43,15 @@ bool ball_update(Ball *b)
 
     b->x = b->startX + (s16)(((s32)(b->targetX - b->startX) * b->progress) / 255);
     b->y = b->startY + (s16)(((s32)(b->targetY - b->startY) * b->progress) / 255);
+
+    /* D-pad spin bends the ground track by up to 12px at mid-flight,
+     * returning exactly to the requested lane at the target. */
+    if (b->spin)
+    {
+        s32 t = b->progress;
+        s32 curve = (12L * 4L * t * (255 - t)) / (255L * 255L);
+        b->x += (s16)(curve * b->spin);
+    }
 
     return (b->progress >= 255) ? TRUE : FALSE;
 }
@@ -64,7 +75,7 @@ void ball_draw(Ball *b)
 
         /* Shadow stays on the true ground track - the read on where
          * the ball will actually land. Links on to spriteSlot+2, the
-         * controlled-player marker (see scene_match.c) - the shadow is
+         * controlled-player ground star (see scene_match.c) - the shadow is
          * no longer the last sprite in the chain. */
         VDP_setSpriteFull(b->spriteSlot + 1, b->x, b->y, SPRITE_SIZE(1, 1),
                            TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL_SHADOW),
@@ -79,9 +90,12 @@ void ball_draw(Ball *b)
                            b->spriteSlot + 2);
     }
 
-    /* The ball links to the shadow, which now links on to the marker
+    /* The ball links to the shadow, which now links on to the ground star
      * (see scene_match.c) so all three stay reachable from slot 0. */
     VDP_setSpriteFull(b->spriteSlot, b->x, drawY, SPRITE_SIZE(1, 1),
-                       TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL),
+                       TILE_ATTR_FULL(PAL_BALL, 0,
+                           inFlight && ((b->progress >> 4) & 1),
+                           inFlight && (((b->progress >> 3) & 1) ^ (b->spin < 0)),
+                           TILE_BALL),
                        b->spriteSlot + 1);
 }

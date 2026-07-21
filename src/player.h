@@ -13,7 +13,8 @@ typedef enum {
     POSE_STAND = 0,
     POSE_RUN,
     POSE_THROW,
-    POSE_CATCH
+    POSE_CATCH,
+    POSE_HIT
 } PlayerPose;
 
 typedef struct {

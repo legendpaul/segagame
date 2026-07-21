@@ -25,6 +25,7 @@ typedef struct {
     s16 startX, startY;
     s16 targetX, targetY;
     u16 progress;       /* 0..255 */
+    s8 spin;            /* -1 left curve, 0 straight, +1 right curve */
     BallState state;
     u8  spriteSlot;
 } Ball;
@@ -32,7 +33,7 @@ typedef struct {
 #define BALL_STEP   9   /* progress added per frame; ~28 frames per flight */
 
 void ball_init(Ball *b, u8 spriteSlot, s16 x, s16 y, BallState heldState);
-void ball_startThrow(Ball *b, s16 toX, s16 toY, BallState flightState);
+void ball_startThrow(Ball *b, s16 toX, s16 toY, BallState flightState, s8 spin);
 bool ball_update(Ball *b);   /* returns TRUE the frame it reaches its target */
 void ball_draw(Ball *b);
 

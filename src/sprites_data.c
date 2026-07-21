@@ -208,19 +208,19 @@ static const u32 tile_player_far[9][8] = {
 };
 #endif
 
-/* Controlled-player marker (see TILE_MARKER) - a small downward arrow,
- * outlined in black (3) with a white fill (1) so it reads clearly
- * against green court, red kit, or green kit alike. Drawn with PAL_BALL
- * rather than a team palette so it never gets hue-rotated. */
-static const u32 tile_marker[8] = {
-    0x00333300,
-    0x03111130,
-    0x03111130,
-    0x31111113,
-    0x03111130,
-    0x00311300,
-    0x00033000,
-    0x00000000
+/* Two-tile ground stars. Yellow identifies the controlled player; red
+ * replaces it while that player holds the ball. */
+static const u32 tile_marker_yellow[2][8] = {
+    { 0x00000003, 0x00000334, 0x00333444, 0x03444444,
+      0x33444444, 0x03444444, 0x00333444, 0x00000334 },
+    { 0x30000000, 0x43300000, 0x44433300, 0x44444430,
+      0x44444433, 0x44444430, 0x44433300, 0x43300000 }
+};
+static const u32 tile_marker_red[2][8] = {
+    { 0x00000003, 0x00000335, 0x00333555, 0x03555555,
+      0x33555555, 0x03555555, 0x00333555, 0x00000335 },
+    { 0x30000000, 0x53300000, 0x55533300, 0x55555530,
+      0x55555533, 0x55555530, 0x55533300, 0x53300000 }
 };
 
 /* Per-team jersey palettes. Indices 2,5,6,7,12,13,14 are the "kit ramp"
@@ -303,7 +303,8 @@ static const u16 * const pal_teams[NUM_TEAMS] = {
 
 static const u16 pal_ball[16] = {
     0x0000, P(0xF8F8F8), P(0x9098A0), P(0x101010),
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    P(0xF8D020), P(0xE82828), P(0xF08020), 0,
+    0, 0, 0, 0, 0, 0, 0, 0
 };
 
 void sprites_data_init(void)
@@ -321,7 +322,8 @@ void sprites_data_init(void)
     VDP_loadTileData(tile_iso_far_run[0],   TILE_PLAYER_FAR_RUN,   9, DMA);
     VDP_loadTileData(tile_iso_far_throw[0], TILE_PLAYER_FAR_THROW, 9, DMA);
     VDP_loadTileData(tile_iso_far_catch[0], TILE_PLAYER_FAR_CATCH, 9, DMA);
-    VDP_loadTileData(tile_marker, TILE_MARKER, 1, DMA);
+    VDP_loadTileData(tile_marker_yellow[0], TILE_MARKER_YELLOW, 2, DMA);
+    VDP_loadTileData(tile_marker_red[0], TILE_MARKER_RED, 2, DMA);
 
     PAL_setPalette(PAL_BALL, pal_ball, DMA);
 }

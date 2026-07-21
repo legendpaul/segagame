@@ -126,17 +126,6 @@ void court_bg_init(void)
     restore_colors();
 }
 
-static bool tile_is_on_court(u16 row, u16 col)
-{
-    s16 x = (s16)(col * 8 + 4);
-    s16 depth = (s16)(row * 8 + 4) - (s16)(col * 2 + 1);
-    s16 left, right;
-    if (depth < COURT_FAR_DEPTH || depth > COURT_NEAR_DEPTH) return FALSE;
-    left = 64 - ((depth - COURT_FAR_DEPTH) >> 1);
-    right = 312 - ((depth - COURT_FAR_DEPTH) >> 1);
-    return x >= left && x <= right;
-}
-
 static void draw_iso_line(s16 intercept)
 {
     u16 col;
@@ -144,7 +133,7 @@ static void draw_iso_line(s16 intercept)
     {
         s16 y = (s16)(col * 2) + intercept;
         u16 tile;
-        if (y < 40 || y >= 224) continue;
+        if (y < 56 || y >= 224) continue;
         switch (y & 7)
         {
             case 0: tile = TILE_ISO_0; break;
@@ -161,9 +150,12 @@ void court_bg_draw(void)
     u16 row, col;
     restore_colors();
 
+    /* Clean broadcast framing: compact grandstand across the far edge,
+     * one advertising/lighting rail, then uninterrupted full-width turf.
+     * The previous side crowd columns chopped the pitch into a jagged
+     * green island and looked more like walls than a stadium. */
     for (row = 0; row < 28; row++)
     {
-        s16 first = -1, last = -1;
         for (col = 0; col < 40; col++)
         {
             u16 tile;
@@ -173,25 +165,16 @@ void court_bg_draw(void)
                 tile = ((row + col) & 1) ? TILE_CROWD_A : TILE_CROWD_B;
             else if (row == 5)
                 tile = (col % 7 == 0) ? TILE_LIGHTS : TILE_WALL;
-            else if (tile_is_on_court(row, col))
+            else if (row == 6)
+                tile = TILE_TRACK;
+            else
             {
                 s16 depth = (s16)(row * 8 + 4) - (s16)(col * 2 + 1);
-                u16 band = (u16)((depth - COURT_FAR_DEPTH) / 24) % 3;
+                u16 band = (u16)((depth + 128) / 24) % 3;
                 tile = (band == 0) ? TILE_GRASS_M : (band == 1) ? TILE_GRASS_A : TILE_GRASS_B;
-                if (first < 0) first = (s16)col;
-                last = (s16)col;
             }
-            else
-                tile = (col < 3 || col > 36) ? (((row + col) & 1) ? TILE_CROWD_A : TILE_CROWD_B)
-                                             : TILE_TRACK;
 
             VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, tile), col, row);
-        }
-
-        if (first >= 0)
-        {
-            VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_EDGE_L), (u16)first, row);
-            VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_EDGE_R), (u16)last, row);
         }
     }
 

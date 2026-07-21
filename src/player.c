@@ -133,6 +133,12 @@ void player_draw(Player *p)
             farBase = TILE_PLAYER_FAR_CATCH;
             farOffsetY = 1;
         }
+        else if (p->pose == POSE_HIT)
+        {
+            farBase = TILE_PLAYER_FAR_CATCH;
+            farFlip = TRUE;
+            farOffsetY = 3;
+        }
         VDP_setSpriteFull(p->spriteSlot, p->x - 4, p->y - 8 + farOffsetY, SPRITE_SIZE(3, 3),
                            TILE_ATTR_FULL(p->pal, 0, FALSE, farFlip, farBase),
                            p->spriteSlot + 1);
@@ -168,6 +174,15 @@ void player_draw(Player *p)
     {
         base = TILE_PLAYER_CATCH;
         poseOffsetY = 2;
+    }
+    else if (p->pose == POSE_HIT)
+    {
+        /* Reuse the dynamic catch silhouette as a recoiling impact frame;
+         * mirroring and lowering it makes the hit read distinctly without
+         * spending another full 16-tile animation block. */
+        base = TILE_PLAYER_CATCH;
+        flip = TRUE;
+        poseOffsetY = 4;
     }
 
     VDP_setSpriteFull(p->spriteSlot, p->x - 8, p->y - 16 + poseOffsetY, SPRITE_SIZE(4, 4),

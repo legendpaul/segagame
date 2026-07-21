@@ -40,6 +40,8 @@ the ROM itself needs no further conversion.
 
 | Button       | Action                                  |
 | ------------ | ---------------------------------------- |
-| D-Pad Left/Right | Move along your baseline              |
-| A            | Throw (when holding the ball) / Catch (when timed against an incoming ball) |
+| D-Pad        | Move on court; hold Left/Right with a throw button to add spin |
+| A            | Throw to left lane / hold to catch an incoming ball |
+| B            | Throw to middle lane                    |
+| C            | Throw to right lane                     |
 | Start        | Confirm menu selection / begin match / return to menu after game over |

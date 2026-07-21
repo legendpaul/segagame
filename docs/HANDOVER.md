@@ -89,11 +89,12 @@ docs/
   TILE_PLAYER_FAR_RUN   +75   (9 tiles)
   TILE_PLAYER_FAR_THROW +84   (9 tiles)
   TILE_PLAYER_FAR_CATCH +93   (9 tiles)
-  TILE_MARKER          +102   (1 tile — controlled-player arrow)
-  TILE_COURT_BASE      +103   (court_bg.c takes over from here)
-  TILE_LOGO_BASE       +118   (177 boot-logo tiles)
-  TILE_FLAG_BASE       +295   (panel/boxes + 20 small + 80 large flag tiles)
-  TILE_TITLE_BASE      +400   (large title glyphs, football and backdrop)
+  TILE_MARKER_YELLOW   +102   (2 tiles — controlled-player ground star)
+  TILE_MARKER_RED      +104   (2 tiles — possession ground star)
+  TILE_COURT_BASE      +106   (court_bg.c takes over from here)
+  TILE_LOGO_BASE       +121   (177 boot-logo tiles)
+  TILE_FLAG_BASE       +298   (panel/boxes + 20 small + 80 large flag tiles)
+  TILE_TITLE_BASE      +403   (large title glyphs, football and backdrop)
   ```
   A Genesis hardware sprite reads N×M **consecutive** VRAM tiles in column-major order (col0
   top-to-bottom, then col1...) starting at one base index — you cannot mix tiles from different
@@ -126,14 +127,14 @@ docs/
   marker) — a sprite not reachable via the chain from slot 0 is simply never rendered, with no
   error.
 
-- **Player pose system** (`player.c`): `POSE_STAND` / `POSE_RUN` / `POSE_THROW` / `POSE_CATCH`.
+- **Player pose system** (`player.c`): `POSE_STAND` / `POSE_RUN` / `POSE_THROW` / `POSE_CATCH` /
+  `POSE_HIT`.
   `player_draw()` picks `base` tile index + `hflip` from the current pose and `animFrame`. RUN
   now uses its own real art (`TILE_PLAYER_RUN`) instead of aliasing STAND+hflip — that was a
   placeholder fixed this session, see §5.
 
-- **Far-side (CPU) depth cue**: four `TILE_PLAYER_FAR_*` blocks are separately encoded 24x24
-  versions of all poses (Genesis has no hardware sprite scaling), so the far side keeps RUN,
-  THROW and CATCH animation rather than collapsing to one standing silhouette.
+- **Far-side art**: four `TILE_PLAYER_FAR_*` blocks remain available as separately encoded 24x24
+  versions, but the actual match deliberately renders both teams at equal 32x32 size.
 
 ---
 
