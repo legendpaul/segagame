@@ -22,6 +22,7 @@ void player_init(Player *p, s16 startX, s16 y, u8 spriteSlot, u8 pal)
     p->animFrame = 0;
     p->animCounter = 0;
     p->small = FALSE;
+    p->facingLeft = FALSE;
 }
 
 void player_eliminate(Player *p)
@@ -116,12 +117,12 @@ void player_draw(Player *p)
          * distinct depth step from the near side's 32x32 art. Offsets
          * preserve the same visual center and feet baseline. */
         u16 farBase = TILE_PLAYER_FAR_STAND;
-        bool farFlip = FALSE;
+        bool farFlip = p->facingLeft;
         s16 farOffsetY = 0;
         if (p->pose == POSE_RUN)
         {
             farBase = TILE_PLAYER_FAR_RUN;
-            farFlip = (p->animFrame != 0);
+            farOffsetY = p->animFrame ? -1 : 0;
         }
         else if (p->pose == POSE_THROW)
         {
@@ -136,7 +137,6 @@ void player_draw(Player *p)
         else if (p->pose == POSE_HIT)
         {
             farBase = TILE_PLAYER_FAR_CATCH;
-            farFlip = TRUE;
             farOffsetY = 3;
         }
         VDP_setSpriteFull(p->spriteSlot, p->x - 4, p->y - 8 + farOffsetY, SPRITE_SIZE(3, 3),
@@ -146,24 +146,15 @@ void player_draw(Player *p)
     }
 
     u16 base = TILE_PLAYER_STAND;
-    bool flip = FALSE;
+    bool flip = p->facingLeft;
     s16 poseOffsetY = 0;
 
-    /* RUN now uses its own genuine mid-stride 32x32 art (see
-     * sprites_data.c) instead of reusing STAND with hflip - that reuse
-     * was flagged as the single highest-leverage graphics fix ("reads as
-     * placeholder"). Still hflips per animFrame for the other half of the
-     * stride, same cheap 2-phase toggle as before, but now both phases
-     * show a real running pose instead of one running + one idle-with-
-     * mirrored-legs. THROW and CATCH use their own genuinely distinct
-     * 32x32 art (separate Pixel-Art-XL generations - see sprites_data.c)
-     * on top of the same coiled/braced Y-offset nudge from the earlier
-     * motion-only pass, so the pose change reads both in silhouette and
-     * in position. */
+    /* Animation never changes team facing. The second run beat is a subtle
+     * body bob, so the silhouette keeps looking toward the opposition. */
     if (p->pose == POSE_RUN)
     {
         base = TILE_PLAYER_RUN;
-        flip = (p->animFrame != 0);
+        poseOffsetY = p->animFrame ? -1 : 0;
     }
     else if (p->pose == POSE_THROW)
     {
@@ -177,11 +168,8 @@ void player_draw(Player *p)
     }
     else if (p->pose == POSE_HIT)
     {
-        /* Reuse the dynamic catch silhouette as a recoiling impact frame;
-         * mirroring and lowering it makes the hit read distinctly without
-         * spending another full 16-tile animation block. */
+        /* Reuse the dynamic catch silhouette as a lowered recoil frame. */
         base = TILE_PLAYER_CATCH;
-        flip = TRUE;
         poseOffsetY = 4;
     }
 

@@ -55,9 +55,12 @@ static void draw_selector(void)
     sprites_data_apply_teams(gTeamAIndex, gTeamBIndex);
     player_init(&previewA, 258, PREVIEW_Y, SLOT_PREVIEW_A, PAL_TEAM_A);
     player_init(&previewB, 298, PREVIEW_Y, SLOT_PREVIEW_B, PAL_TEAM_B);
+    previewA.facingLeft = FALSE;
+    previewB.facingLeft = TRUE;
     if (phase == MENU_TEAM_A)
     {
         previewA.x = 278;
+        previewA.facingLeft = TRUE;
         previewB.x = -100;
     }
     ui_draw_text(phase == MENU_TEAM_A ? "P1" : "P1   P2", 31, 16, UI_GOLD);

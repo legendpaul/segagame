@@ -774,6 +774,30 @@ game-studio presentation quality.
 - Live Fusion QA confirmed title, selector, match HUD and results screens render correctly with
   no VRAM overlap. The normal scene flow and zeroed initial score were restored after QA.
 
+### Authored isometric stadium and fixed team facing (2026-07-22)
+
+Direct correction after screenshot review: replace the block-pattern pitch, stop animation
+from turning players away from their opponents, and remove the match-screen instructions.
+
+- Created an original stadium source from the supplied visual references, then converted it
+  through `tools/build_stadium_tiles.py` into a fixed-palette 320x224 Mega Drive background.
+  The composition includes a far grandstand, stair tunnel, advertising wall, diagonal turf
+  texture and a compressed near crowd foreground around a broad isometric playing surface.
+- The converter preserves the source, produces `assets/stadium_genesis_preview.png`, deduplicates
+  the screen to 481 unique 8x8 tiles and emits the reproducible 28x40 map in
+  `src/stadium_tiles.inc`. `court_bg.c` now draws this authored map instead of constructing the
+  venue from fifteen repeated procedural tiles.
+- Reserved 488 court tiles in the global VRAM layout. All later logo, flag, title and authored-UI
+  bases move together through `COURT_TILE_COUNT`, keeping the final UI tile below plane memory.
+- Added a stable `facingLeft` property to every player. Team A faces right, Team B faces left,
+  selector previews face inward, and the run cycle now uses a one-pixel body bob instead of
+  horizontally flipping the entire player every six frames.
+- Reduced the match HUD from five rows to a four-row broadcast score strip. It now contains only
+  the two country names and score; the control legend, spin prompt, `IN` labels and status zeros
+  were removed so the stadium and action dominate the frame.
+- Hardware QA used Fusion's internal lossless screenshot capture, confirming the real ROM renders
+  the new stadium, equal-size opposing players, possession star and minimal authored HUD together.
+
 ---
 
 ## 📝 Design Decisions

@@ -39,8 +39,8 @@
  * graphics critique flagged that as reading like a placeholder ("probably
  * costing 80% of perceived polish"). It's now its own genuine 32x32 block:
  * a real Pixel-Art-XL mid-stride running pose run through the same
- * pipeline as THROW/CATCH (see docs/planning.md). player_draw() still
- * hflips it per animFrame for the other half of the stride, but the base
+ * pipeline as THROW/CATCH (see docs/planning.md). player_draw() now keeps
+ * the team-facing direction stable and uses a one-pixel body bob, while the base
  * silhouette itself is now real running art, not the idle pose. */
 #define TILE_PLAYER_RUN     (TILE_USER_INDEX + 48)
 

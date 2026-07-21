@@ -65,7 +65,7 @@ src/
   input_mgr.c                - joypad wrapper (BUTTON_LEFT/RIGHT/A/START etc via SGDK)
   sound_mgr.c / music_mgr.c / fm_synth.c  - audio (real YM2612 FM synth, not PSG beeps)
   sprites_data.c / .h        - ALL tile art (player poses, ball, marker) + per-team palettes
-  court_bg.c                  - court/pitch background tiles
+  court_bg.c / stadium_tiles.inc - authored 40x28 isometric stadium tilemap
   teams.c                      - 10 national teams in current FIFA ranking order
   flag_data.c / .h             - 5x2 flag selector, selection box, PAL0 flag colors
   logo_data.c / .h               - boot splash tile data
@@ -74,6 +74,10 @@ src/
 docs/
   planning.md   - living design doc, dated sections, READ THE TAIL for recent context
   HANDOVER.md   - this file
+
+assets/stadium_source_v1.png      - preserved high-resolution generated source
+assets/stadium_genesis_preview.png - exact fixed-palette 320x224 conversion
+tools/build_stadium_tiles.py       - reproducible source-to-VDP converter
 ```
 
 ### Key architectural facts you need before editing `sprites_data.*`
@@ -92,11 +96,11 @@ docs/
   TILE_PLAYER_FAR_CATCH +93   (9 tiles)
   TILE_MARKER_YELLOW   +102   (2 tiles — controlled-player ground star)
   TILE_MARKER_RED      +104   (2 tiles — possession ground star)
-  TILE_COURT_BASE      +106   (court_bg.c takes over from here)
-  TILE_LOGO_BASE       +121   (177 boot-logo tiles)
-  TILE_FLAG_BASE       +298   (panel/boxes + 20 small + 80 large flag tiles)
-  TILE_TITLE_BASE      +403   (large title glyphs, football and backdrop)
-  TILE_UI_BASE         +471   (308 font tiles + 8 reusable panel/button tiles)
+  TILE_COURT_BASE      +106   (481 generated stadium tiles; 488 reserved)
+  TILE_LOGO_BASE       +594   (177 boot-logo tiles)
+  TILE_FLAG_BASE       +771   (panel/boxes + 20 small + 80 large flag tiles)
+  TILE_TITLE_BASE      +876   (large title glyphs, football and backdrop)
+  TILE_UI_BASE         +944   (308 font tiles + 8 reusable panel/button tiles)
   ```
   A Genesis hardware sprite reads N×M **consecutive** VRAM tiles in column-major order (col0
   top-to-bottom, then col1...) starting at one base index — you cannot mix tiles from different
@@ -131,9 +135,9 @@ docs/
 
 - **Player pose system** (`player.c`): `POSE_STAND` / `POSE_RUN` / `POSE_THROW` / `POSE_CATCH` /
   `POSE_HIT`.
-  `player_draw()` picks `base` tile index + `hflip` from the current pose and `animFrame`. RUN
-  now uses its own real art (`TILE_PLAYER_RUN`) instead of aliasing STAND+hflip — that was a
-  placeholder fixed this session, see §5.
+  `player_draw()` picks the tile block from the current pose and gets `hflip` only from the
+  player's stable `facingLeft` team direction. RUN uses its own real art (`TILE_PLAYER_RUN`)
+  plus a one-pixel animation bob; it never flips the player away from the opposition.
 
 - **Far-side art**: four `TILE_PLAYER_FAR_*` blocks remain available as separately encoded 24x24
   versions, but the actual match deliberately renders both teams at equal 32x32 size.

@@ -206,7 +206,7 @@ static void return_one(Player team[], s8 outStack[], u8 *outCount)
     player_restore(&team[idx]);
 }
 
-static void reset_team(Player team[], u8 baseSlot, u8 pal, s16 baseDepth)
+static void reset_team(Player team[], u8 baseSlot, u8 pal, s16 baseDepth, bool facingLeft)
 {
     static const s8 depthOffset[TEAM_SIZE] = { -8, 10, 0 };
     u8 i;
@@ -215,6 +215,7 @@ static void reset_team(Player team[], u8 baseSlot, u8 pal, s16 baseDepth)
         s16 x = lane_x(i);
         s16 y = baseDepth + depthOffset[i] + (x >> 2);
         player_init(&team[i], x, y, baseSlot + i, pal);
+        team[i].facingLeft = facingLeft;
     }
 }
 
@@ -223,25 +224,15 @@ static void draw_hud(void)
     char buf[8];
     ui_set_palette(PAL0);
     ui_apply_palette();
-    ui_draw_panel(0, 0, 40, 5, FALSE);
-    ui_draw_text("A LEFT  B MID  C RIGHT", 2, 1, UI_CYAN);
-    ui_draw_text("HOLD <> SPIN", 26, 1, UI_GOLD);
-    ui_draw_text(teamNames[gTeamAIndex], 1, 2, UI_WHITE);
-    ui_draw_text(teamNames[gTeamBIndex], 25, 2, UI_WHITE);
+    ui_draw_panel(0, 0, 40, 4, FALSE);
+    ui_draw_text(teamNames[gTeamAIndex], 1, 1, UI_WHITE);
+    ui_draw_text(teamNames[gTeamBIndex], 40 - 1 - strlen(teamNames[gTeamBIndex]), 1, UI_WHITE);
 
     intToStr(gScoreA, buf, 1);
-    ui_draw_big_text(buf, 17, 2, UI_GOLD);
-    ui_draw_text("-", 20, 2, UI_WHITE);
+    ui_draw_big_text(buf, 17, 1, UI_GOLD);
+    ui_draw_text("-", 20, 1, UI_WHITE);
     intToStr(gScoreB, buf, 1);
-    ui_draw_big_text(buf, 21, 2, UI_GOLD);
-
-    ui_draw_text("IN", 1, 3, UI_GOLD);
-    intToStr(count_in_play(teamA), buf, 1);
-    ui_draw_text(buf, 4, 3, UI_WHITE);
-
-    ui_draw_text("IN", 35, 3, UI_GOLD);
-    intToStr(count_in_play(teamB), buf, 1);
-    ui_draw_text(buf, 38, 3, UI_WHITE);
+    ui_draw_big_text(buf, 21, 1, UI_GOLD);
 }
 
 /* SGDK's text-line clear writes opaque font-space tiles, which created
@@ -277,8 +268,8 @@ static void begin_announce(void)
 
 static void start_round(void)
 {
-    reset_team(teamA, SLOT_TEAM_A, PAL_TEAM_A, TEAM_A_DEPTH);
-    reset_team(teamB, SLOT_TEAM_B, PAL_TEAM_B, TEAM_B_DEPTH);
+    reset_team(teamA, SLOT_TEAM_A, PAL_TEAM_A, TEAM_A_DEPTH, FALSE);
+    reset_team(teamB, SLOT_TEAM_B, PAL_TEAM_B, TEAM_B_DEPTH, TRUE);
     /* Both sides use the same 32x32 art. Perspective comes from placement,
      * shadows and the court projection—not "men versus midgets" scaling. */
 
