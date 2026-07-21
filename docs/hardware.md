@@ -1,4 +1,4 @@
-# Running MEGA DODGEBALL on real Mega Drive hardware
+# Running MICRO RETRO DODGEBALL on real Mega Drive hardware
 
 `out/rom.bin` (built by `build.bat`) is a standard 128KB, checksummed Mega Drive ROM
 image - no special handling needed beyond what any homebrew/flash-cart ROM requires.
@@ -22,7 +22,7 @@ image - no special handling needed beyond what any homebrew/flash-cart ROM requi
    copy - the file contents are identical, only the extension differs.
 4. Insert the SD card/USB into the flash cart, insert the cart into the console, and
    power on.
-5. Select "MEGA DODGEBALL" from the cart's menu. It should boot straight to the standard
+5. Select "MICRO RETRO DODGEBALL" from the cart's menu. It should boot straight to the standard
    Sega TMSS splash and then the title screen.
 
 ## Verifying it's genuinely hardware-ready

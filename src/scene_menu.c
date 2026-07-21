@@ -1,10 +1,8 @@
 /*
- * scene_menu.c - Team-select / title screen.
+ * scene_menu.c - Arcade title and sequential national-team selection.
  *
- * National-team selector: ten ranked countries appear as a 5x2 flag
- * grid with a hardware-tile selection frame. The actual player sprite
- * stands below in the selected national kit against the next-ranked
- * opponent, with a bouncing ball between them.
+ * Flow: title -> choose Team 1 -> choose Team 2 -> match. Each team gets
+ * its own full selector screen, large flag and kit preview.
  */
 #include "genesis.h"
 #include "scene_menu.h"
@@ -12,163 +10,140 @@
 #include "teams.h"
 #include "input_mgr.h"
 #include "sound_mgr.h"
-#include "court_bg.h"
 #include "flag_data.h"
+#include "title_data.h"
 #include "sprites_data.h"
 #include "player.h"
 
-#define SLOT_HERO_A   0
-#define SLOT_HERO_B   1
-#define SLOT_BALL     2
+#define SLOT_PREVIEW_A  0
+#define SLOT_PREVIEW_B  1
+#define PREVIEW_Y      150
 
-#define HERO_Y        150
-#define HERO_A_X       80
-#define HERO_B_X      240
+#define BLINK_PERIOD    30
+#define BOB_PERIOD      20
 
-#define BALL_BASE_X   160
-#define BALL_BASE_Y   142
-#define BALL_BOUNCE_PERIOD  40   /* frames per bounce cycle */
-#define BALL_BOUNCE_HEIGHT  18
+typedef enum {
+    MENU_TITLE = 0,
+    MENU_TEAM_A,
+    MENU_TEAM_B
+} MenuPhase;
 
-#define BLINK_PERIOD  30   /* frames each blink state holds */
-#define BOB_PERIOD    24   /* frames per idle-bob half-cycle */
-
-static Player heroA, heroB;
-
+static MenuPhase phase;
+static Player previewA, previewB;
 static u16 blinkCounter;
-static bool startVisible;
-
 static u16 bobCounter;
 static s16 bobOffset;
 
-static u16 ballCounter;
-
-static u8 opponent_index(void)
+static void draw_title(void)
 {
-    return (gTeamAIndex + 1) % NUM_TEAMS;
+    VDP_clearPlane(VDP_BG_A, TRUE);
+    VDP_clearPlane(VDP_BG_B, TRUE);
+    VDP_clearSprites();
+    title_data_draw();
+    blinkCounter = 0;
 }
 
-static void draw_teams(void)
+static void draw_selector(void)
 {
-    u8 oppIndex = opponent_index();
+    u8 selected = (phase == MENU_TEAM_A) ? gTeamAIndex : gTeamBIndex;
+    flag_data_draw_selector(selected, (phase == MENU_TEAM_A) ? 1 : 2);
 
-    flag_data_draw_grid(gTeamAIndex);
-
-    VDP_drawText("TEAM", 1, 13);
-    VDP_drawTextFill(teamNames[gTeamAIndex], 6, 13, 11);
-    VDP_drawText("VS", 19, 13);
-    VDP_drawTextFill(teamNames[oppIndex], 23, 13, 11);
-
-    /* Recolor the shared hero sprites to whatever's actually picked,
-     * instead of the fixed colors the old text-only menu never needed
-     * to worry about. */
-    sprites_data_apply_teams(gTeamAIndex, oppIndex);
+    /* Large 32x32 kit previews make the choice visible as a football side,
+     * not just a line of text. On Team 2's screen Team 1 remains alongside
+     * it as the locked-in opponent. */
+    sprites_data_apply_teams(gTeamAIndex, gTeamBIndex);
+    player_init(&previewA, 258, PREVIEW_Y, SLOT_PREVIEW_A, PAL_TEAM_A);
+    player_init(&previewB, 298, PREVIEW_Y, SLOT_PREVIEW_B, PAL_TEAM_B);
+    if (phase == MENU_TEAM_A)
+    {
+        previewA.x = 278;
+        previewB.x = -100;
+    }
+    VDP_drawText(phase == MENU_TEAM_A ? "P1" : "P1   P2", 31, 16);
 }
 
-static void draw_ball(void)
+static void enter_selector(MenuPhase next)
 {
-    /* Simple triangle-wave bounce - cheap, no floating point, but a
-     * real per-frame motion instead of a static decorative sprite. */
-    u16 phase = ballCounter % BALL_BOUNCE_PERIOD;
-    u16 half = BALL_BOUNCE_PERIOD / 2;
-    u16 dist = (phase < half) ? phase : (BALL_BOUNCE_PERIOD - phase);
-    s16 y = BALL_BASE_Y - (dist * BALL_BOUNCE_HEIGHT) / half;
+    phase = next;
+    VDP_clearSprites();
+    draw_selector();
+    bobCounter = 0;
+    bobOffset = 0;
+}
 
-    VDP_setSpriteFull(SLOT_BALL, BALL_BASE_X, y, SPRITE_SIZE(1, 1),
-                       TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL),
-                       0);
+static void move_selection(s8 delta)
+{
+    u8 *selected = (phase == MENU_TEAM_A) ? &gTeamAIndex : &gTeamBIndex;
+    *selected = (u8)((*selected + NUM_TEAMS + delta) % NUM_TEAMS);
+    draw_selector();
+    sound_mgr_blip();
 }
 
 void scene_menu_enter(void)
 {
-    VDP_clearSprites();
-
-    VDP_clearPlane(VDP_BG_A, TRUE);
-    VDP_clearPlane(VDP_BG_B, TRUE);
     VDP_setTextPalette(PAL0);
-    VDP_clearTextArea(0, 0, 40, 28);
-    court_bg_draw();
-
-    VDP_drawText("MEGA DODGEBALL", 13, 1);
-    VDP_drawText("------------------------------", 4, 2);
-
-    player_init(&heroA, HERO_A_X, HERO_Y, SLOT_HERO_A, PAL_TEAM_A);
-    player_init(&heroB, HERO_B_X, HERO_Y, SLOT_HERO_B, PAL_TEAM_B);
-
-    draw_teams();
-
-    VDP_drawText("D-PAD SELECT   START PLAY", 7, 23);
-
-    blinkCounter = 0;
-    startVisible = TRUE;
-    VDP_drawText("TOP 10 NATIONAL TEAMS", 9, 25);
-
-    bobCounter = 0;
-    bobOffset = 0;
-    ballCounter = 0;
+    phase = MENU_TITLE;
+    draw_title();
 }
 
 void scene_menu_update(void)
 {
     input_mgr_update();
 
-    /* Keep the prompt persistent. Clearing a text row writes opaque
-     * font-space tiles on this SGDK setup and used to flash a thick
-     * black bar across the isometric court. */
-    if (++blinkCounter >= BLINK_PERIOD)
+    if (phase == MENU_TITLE)
     {
-        blinkCounter = 0;
-        startVisible = TRUE;
-        VDP_drawText("TOP 10 NATIONAL TEAMS", 9, 25);
-    }
+        if (++blinkCounter >= BLINK_PERIOD)
+        {
+            blinkCounter = 0;
+            /* A restrained palette pulse keeps the title alive without
+             * erasing text tiles and producing opaque black flashes. */
+            PAL_setColor(0 * 16 + 4,
+                (GET_HVCOUNTER & 1) ? RGB24_TO_VDPCOLOR(0xF8D828)
+                                    : RGB24_TO_VDPCOLOR(0xF09818));
+        }
 
-    /* Subtle idle "breathing" bob on both heroes so the lineup doesn't
-     * read as a frozen screenshot. */
-    if (++bobCounter >= BOB_PERIOD)
-    {
-        bobCounter = 0;
-        bobOffset = bobOffset ? 0 : -1;
-    }
-
-    ballCounter++;
-
-    if (input_pressed(BUTTON_LEFT))
-    {
-        u8 rowBase = (gTeamAIndex / 5) * 5;
-        gTeamAIndex = rowBase + ((gTeamAIndex + 4) % 5);
-        draw_teams();
-        sound_mgr_blip();
-    }
-    else if (input_pressed(BUTTON_RIGHT))
-    {
-        u8 rowBase = (gTeamAIndex / 5) * 5;
-        gTeamAIndex = rowBase + ((gTeamAIndex + 1) % 5);
-        draw_teams();
-        sound_mgr_blip();
-    }
-    else if (input_pressed(BUTTON_UP) || input_pressed(BUTTON_DOWN))
-    {
-        gTeamAIndex = (gTeamAIndex + 5) % NUM_TEAMS;
-        draw_teams();
-        sound_mgr_blip();
-    }
-    else if (input_pressed(BUTTON_START))
-    {
-        gTeamBIndex = opponent_index();
-        gScoreA = 0;
-        gScoreB = 0;
-        sound_mgr_blip();
-        /* Fade to black rather than hard-cutting straight into the
-         * match - cheap scene-transition polish. */
-        PAL_fadeOutAll(20, FALSE);
-        gCurrentScene = GS_MATCH;
+        if (input_pressed(BUTTON_START) || input_pressed(BUTTON_A))
+        {
+            sound_mgr_blip();
+            enter_selector(MENU_TEAM_A);
+        }
         return;
     }
 
-    heroA.y = HERO_Y + bobOffset;
-    heroB.y = HERO_Y - bobOffset;
+    if (++bobCounter >= BOB_PERIOD)
+    {
+        bobCounter = 0;
+        bobOffset = bobOffset ? 0 : -2;
+    }
 
-    player_draw(&heroA);
-    player_draw(&heroB);
-    draw_ball();
+    if (input_pressed(BUTTON_UP) || input_pressed(BUTTON_LEFT))
+        move_selection(-1);
+    else if (input_pressed(BUTTON_DOWN) || input_pressed(BUTTON_RIGHT))
+        move_selection(1);
+    else if (input_pressed(BUTTON_B) && phase == MENU_TEAM_B)
+        enter_selector(MENU_TEAM_A);
+    else if (input_pressed(BUTTON_A) || input_pressed(BUTTON_START))
+    {
+        sound_mgr_blip();
+        if (phase == MENU_TEAM_A)
+        {
+            /* Begin the other selector on a different team by default,
+             * while still allowing any country to be chosen deliberately. */
+            gTeamBIndex = (gTeamAIndex + 1) % NUM_TEAMS;
+            enter_selector(MENU_TEAM_B);
+        }
+        else
+        {
+            gScoreA = 0;
+            gScoreB = 0;
+            PAL_fadeOutAll(20, FALSE);
+            gCurrentScene = GS_MATCH;
+            return;
+        }
+    }
+
+    previewA.y = PREVIEW_Y + bobOffset;
+    previewB.y = PREVIEW_Y - bobOffset;
+    player_draw(&previewA);
+    player_draw(&previewB);
 }

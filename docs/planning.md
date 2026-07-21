@@ -702,6 +702,30 @@ countries, and make team selection a flag UI with a box around the current choic
   Spain starts with a visible white box; labels read `TEAM SPAIN VS ARGENTINA`; the two heroes
   render in red and sky-blue national palettes; no flag/boot-logo/court VRAM corruption appears.
 
+### MICRO RETRO DODGEBALL presentation and stadium pass (2026-07-21)
+
+Direct follow-up: add a much stronger title screen, select Team 1 and Team 2 separately,
+increase the visual scale, and make the isometric pitch feel like a stadium.
+
+- Renamed the game and cartridge header to **MICRO RETRO DODGEBALL**.
+- Added `title_data.c/.h` and `tools/build_title_tiles.py`. The title uses custom outlined,
+  shaded 16x16 arcade letters, a 32x32 football emblem, animated palette pulse, light streaks,
+  presentation rail and its own reproducible native-resolution preview.
+- Rebuilt `scene_menu.c` as a three-stage flow: title, full Team 1 selector, then full Team 2
+  selector. Each selector has a ten-country list, selected-row brackets, large boxed 32x16
+  flag, country name, 32x32 kit preview and explicit confirmation prompt. Team 2 defaults to
+  the next-ranked country but remains independently selectable; B returns to Team 1.
+- Extended the flag generator with genuine nearest-neighbour 32x16 flag tile sets. This avoids
+  blur and does not pretend the Genesis has runtime tile scaling.
+- Rebuilt `court_bg.c` as a stadium: multicolour crowd tiers, perimeter spectators, illuminated
+  advertising wall, dark run-off surface and a recessed three-shade isometric court. Corrected
+  the four diagonal-line tile phases, which previously aliased crowd-pattern data, and derive
+  rendered sidelines from the same depth bounds used by player movement.
+- Live Fusion QA confirmed the title, large flags, list layout, kit previews, and the new
+  stadium/court/player composition without VRAM overlap. Temporary selector-first QA entry was
+  removed before the final build; normal flow remains studio splash -> title -> Team 1 -> Team 2
+  -> match.
+
 ---
 
 ## 📝 Design Decisions

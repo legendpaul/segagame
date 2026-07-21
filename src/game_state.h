@@ -1,7 +1,7 @@
 /*
  * game_state.h - Shared constants, enums and cross-scene globals.
  *
- * Part of MEGA DODGEBALL, a Sega Mega Drive game.
+ * Part of MICRO RETRO DODGEBALL, a Sega Mega Drive game.
  * See docs/planning.md for the original design brief.
  */
 #ifndef _GAME_STATE_H_

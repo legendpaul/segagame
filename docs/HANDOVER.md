@@ -54,7 +54,8 @@ bash sandbox mount (it has its own separate permission quirks even after the loc
 src/
   main.c              - entry point, scene dispatcher
   scene_boot.c         - boot splash (Minnka logo)
-  scene_menu.c          - title/team-select screen
+  scene_menu.c          - title, Team 1 select and Team 2 select flow
+  title_data.c/.h       - MICRO RETRO DODGEBALL arcade title tile art
   scene_match.c          - THE BIG ONE: match state machine, player/ball draw loop, AI hooks
   scene_gameover.c
   player.c / player.h    - player entity: pose state machine, animation, draw
@@ -90,8 +91,9 @@ docs/
   TILE_PLAYER_FAR_CATCH +93   (9 tiles)
   TILE_MARKER          +102   (1 tile — controlled-player arrow)
   TILE_COURT_BASE      +103   (court_bg.c takes over from here)
-  TILE_LOGO_BASE       +113   (177 boot-logo tiles)
-  TILE_FLAG_BASE       +290   (panel/box + 20 flag tiles)
+  TILE_LOGO_BASE       +118   (177 boot-logo tiles)
+  TILE_FLAG_BASE       +295   (panel/boxes + 20 small + 80 large flag tiles)
+  TILE_TITLE_BASE      +400   (large title glyphs, football and backdrop)
   ```
   A Genesis hardware sprite reads N×M **consecutive** VRAM tiles in column-major order (col0
   top-to-bottom, then col1...) starting at one base index — you cannot mix tiles from different

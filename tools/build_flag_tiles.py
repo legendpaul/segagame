@@ -108,6 +108,25 @@ for flag in flags:
         values = ", ".join(f"0x{value:08x}" for value in encode_tile(flag, x0))
         lines.append(f"    {{ {values} }},")
 lines.append("};")
+
+# A crisp 2x nearest-neighbour version for the selected-team showcase.
+# The hardware cannot scale sprites or tiles, so the larger flags are real
+# pre-authored 32x16 tile data rather than a blurry runtime approximation.
+lines.append("static const u32 flag_large_tiles[NUM_TEAMS * 8][8] = {")
+for flag in flags:
+    large = [[flag[y // 2][x // 2] for x in range(32)] for y in range(16)]
+    # Genesis multi-tile ordering is column-major, matching the draw loop.
+    for tx in range(4):
+        for ty in range(2):
+            rows = []
+            for y in range(ty * 8, ty * 8 + 8):
+                value = 0
+                for x in range(tx * 8, tx * 8 + 8):
+                    value = (value << 4) | large[y][x]
+                rows.append(value)
+            values = ", ".join(f"0x{value:08x}" for value in rows)
+            lines.append(f"    {{ {values} }},")
+lines.append("};")
 OUTPUT.write_text("\n".join(lines) + "\n", encoding="ascii")
 
 preview = Image.new("RGB", (5 * 22, 2 * 14), (24, 40, 72))
