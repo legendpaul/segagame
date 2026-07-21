@@ -31,7 +31,7 @@
 | Ball entity           | ✅ Done         | `src/ball.c` |
 | Collision manager     | ✅ Done         | catch/hit resolution inline in `scene_match.c` |
 | AI manager            | ✅ Done         | `src/ai_mgr.c` |
-| Graphics assets       | ✅ Done         | player STAND pose derived from a real ComfyUI (Stable Diffusion 1.5) generation, quantized into hardware tiles in `src/sprites_data.c`; pose variants + pitch in `src/court_bg.c` still hand-authored |
+| Graphics assets       | ✅ Done         | STAND/THROW/CATCH each have real, distinct AI-generated (Pixel-Art-XL via ComfyUI) 32x32 sprite art in `src/sprites_data.c`; pitch in `src/court_bg.c` still hand-authored |
 | Court background      | ✅ Done         | `src/court_bg.c` - striped green pitch on BG_B, tapered sideline for an elevated/perspective camera feel, stand bands |
 | Team colors           | ✅ Done         | `sprites_data_apply_teams()` recolors the shared player sprite per the team actually picked, instead of a fixed color per side |
 | Music & SFX           | ✅ Done         | PSG SFX in `src/sound_mgr.c` + a looping menu jingle in `src/music_mgr.c` (see note below) |
@@ -470,6 +470,43 @@ isolation.
   conclusively identified - the watchdog guarantees the game can't get permanently stuck, but
   isn't a substitute for finding and fixing the real cause if it resurfaces. Worth a closer look
   with real hardware-level debugging tools (e.g. Fusion's built-in 68k debugger) if it recurs.
+
+### Real distinct THROW/CATCH pose art (2026-07-21)
+
+Closed out the honest limitation flagged at the end of the previous pass: all 4 poses had been
+sharing one 32x32 art block, with THROW/CATCH getting only a Y-offset nudge and a palette flash
+on top of the STAND silhouette, not real per-pose artwork.
+
+- **Root-caused ComfyUI's 500 errors** that had blocked this since the last pass. The terse log
+  ComfyUI writes by default only said "Error handling request" - the real traceback lived in
+  `Comfy-Desktop`'s own log file and pointed at `json.decoder.JSONDecodeError: Unexpected UTF-8
+  BOM`. PowerShell's `Out-File -Encoding utf8` was silently prepending a UTF-8 BOM to every JSON
+  request body, which ComfyUI's parser rejected outright - not a GPU/model/workflow problem as
+  it looked from the outside. Fixed by writing request bodies with an explicit no-BOM UTF8
+  encoder instead.
+- Generated real THROW and CATCH references through the same Pixel-Art-XL/ComfyUI pipeline as
+  STAND. The first CATCH generation was rejected on sight - a static holding-the-ball pose too
+  close to STAND to read as distinct - and regenerated with a more specific prompt (diving,
+  deep crouch, off-balance) until it actually looked like a different pose.
+- Processed both through a refined version of the existing quantization pipeline, with two real
+  pipeline bugs found and fixed along the way: a numpy view-aliasing bug in the flood-fill
+  background remover (a captured "reference color" slice was silently corrupted by a later
+  in-place mutation of the same array, breaking background removal entirely), and a stray
+  disconnected AI-generated decoration in the throw reference that survived background removal
+  and had to be dropped via a hand-rolled largest-connected-blob filter.
+- Kit/skin color classification is hand-verified per pose, not automatic: two different
+  automatic heuristics were tried and both misclassified some colors (one undercounted the kit
+  ramp, the other pulled saturated skin/hair tones into the kit group). Caught before shipping
+  by rendering a red-hue-rotation sanity preview of each classification and inspecting it
+  directly - the final classification was hand-picked from the printed color list against the
+  quantized preview image, confirmed correct by the same red-rotation check.
+- `sprites_data.h`: `TILE_PLAYER_THROW`/`TILE_PLAYER_CATCH` are now their own tile indices
+  instead of aliasing `TILE_PLAYER_STAND`. `sprites_data.c` uploads all 3 blocks at init.
+  `player.c`'s `player_draw()` selects the right tile base per pose (keeping the existing
+  Y-offset nudge and impact flash from the previous pass on top).
+- **Verified live in Fusion**: clean rebuild with zero warnings, ROM loads and runs through a
+  full match restart and an elimination round with no crash, no VRAM/tile corruption, and no
+  regression to score/round/team-recolor behavior.
 
 ---
 
