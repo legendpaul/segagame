@@ -35,9 +35,11 @@
  * preserving each shade's lightness (same technique real sports games
  * use for team swaps), baked into pal_team_red/blue/green/gold[16]
  * below.
- * Honest limitation, unchanged: all 4 poses (stand/run/throw/catch)
- * still share this one block - see sprites_data_init() and
- * docs/planning.md. */
+ * RUN still reuses this block with hflip for a cheap side-to-side sway.
+ * THROW and CATCH now have their own separate 16-tile blocks below,
+ * generated the same way from prompts describing the actual action -
+ * see the note above tile_player_throw for why they didn't exist until
+ * this pass (a request-encoding bug, not a modeling one). */
 static const u32 tile_player_stand[16][8] = {
     { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
     { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x0000000b, 0x0000000e },
@@ -55,6 +57,68 @@ static const u32 tile_player_stand[16][8] = {
     { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
     { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
     { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x50000000, 0x50000000, 0x00000000 },
+};
+
+/* THROW pose - a real separate Pixel-Art-XL generation ("arm raised
+ * overhead about to release the ball, leaning forward, dynamic athletic
+ * pose"), run through the same pipeline as the stand pose above. The
+ * ComfyUI request that finally produced this (and CATCH below) had been
+ * failing with a bare 500 for every prompt, including trivial unrelated
+ * ones - not a model/GPU problem as first suspected, but PowerShell's
+ * `Out-File -Encoding utf8` silently prepending a UTF-8 BOM to the JSON
+ * body, which the server's JSON parser rejected outright. Writing the
+ * request with a real no-BOM UTF-8 encoder fixed it immediately.
+ * Same 14-color plan as the stand pose (kit ramp at 2,5,6,7,12,13,14),
+ * hand-classified by inspecting this specific generation's quantized
+ * palette - an automatic hue-window and an automatic saturation-rank
+ * classifier were both tried first and both misjudged which colors were
+ * jersey vs skin for at least one of the two new poses (badly enough
+ * that team recoloring visibly tinted the skin too), so the real fix was
+ * looking at the actual 14 colors and deciding by eye, same as a human
+ * pixel artist would when hand-indexing a sprite. */
+static const u32 tile_player_throw[16][8] = {
+    { 0x000000b9, 0x00000043, 0x00000094, 0x00000039, 0x000000ab, 0x00000004, 0x00000004, 0x00000008 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x0000000d, 0x0000003b, 0x00000003 },
+    { 0x40000000, 0x33000000, 0x39000000, 0x90000000, 0x90000000, 0x80000bbb, 0xa000a898, 0x300baa44 },
+    { 0x300bb344, 0x4300b339, 0xa43eb933, 0x0425544a, 0x0edcc233, 0x00edc555, 0x000dc555, 0x000ddd66 },
+    { 0x000edc56, 0x000eeb2e, 0x000dcc56, 0x000c6c5e, 0x000c65ee, 0x000666d0, 0x000222c0, 0x000a8ae0 },
+    { 0x00043a00, 0x0033a000, 0x0a3a0000, 0x09a00000, 0xa2000000, 0x23000000, 0x2e333333, 0x33333333 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x80000000, 0xa0000000 },
+    { 0xb0000000, 0xb0000000, 0xb0000000, 0xc6e00000, 0x66600000, 0x2e529000, 0x5be93400, 0xd0008480 },
+    { 0xe0000a40, 0xeeee0040, 0x65e33a00, 0x65e44300, 0xede04300, 0x0000a3a0, 0x00000b80, 0x000000d2 },
+    { 0x000000ed, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x33333330, 0x33333333 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x3d000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x30000000 },
+};
+
+/* CATCH pose - a diving/leaping reach for the ball, same pipeline again.
+ * The first attempt at this pose came back as a static standing-holding-
+ * the-ball shot (too close to STAND to read as a distinct animation) -
+ * rejected and regenerated with a stronger prompt ("deep crouch, knees
+ * bent wide, both arms stretched forward... off-balance dynamic action
+ * pose") before quantizing, rather than shipping the weaker first
+ * result. */
+static const u32 tile_player_catch[16][8] = {
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x000000b2, 0x000000d1, 0x0000003b, 0x000000e0 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00aa4800, 0x00055000, 0x000a4600 },
+    { 0x0000a580, 0x0000085a, 0x00000075, 0x000000a9, 0x000000a9, 0x0000000a, 0x00000000, 0x00000000 },
+    { 0x00000eea, 0x0000ed2b, 0x000edddd, 0x889d2ddd, 0x445b2222, 0x4648beee, 0x00b000ed, 0x000000e8 },
+    { 0x00000009, 0x0000009a, 0x00000454, 0x0b294564, 0x0ad1a000, 0x00de0000, 0x003e0000, 0x00000000 },
+    { 0x000000e1, 0x00000021, 0x00000e22, 0x00000031, 0x00000082, 0x000000a3, 0x00000080, 0x00aaa040 },
+    { 0xa9999050, 0xaa495a50, 0xaa365570, 0x5446b3c0, 0x75988460, 0xc7c44540, 0x9cc57500, 0xcc5551a0 },
+    { 0xcccc5500, 0xc7cc5500, 0x9cccc000, 0xebcc0000, 0x2de00000, 0xdde00000, 0x22e00000, 0x55e00000 },
+    { 0x65000000, 0x55000000, 0x64000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x69000000, 0x11000000, 0x11000000, 0x1c000000, 0x49000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
 };
 
 /* Ball: white with a soft shadow (2) and a dark outline (3) so it reads
@@ -146,10 +210,11 @@ static const u16 pal_ball[16] = {
 
 void sprites_data_init(void)
 {
-    /* STAND/RUN/THROW/CATCH all currently alias the same 16-tile block
-     * (see the comment above tile_player_stand) - one upload covers
-     * all 4 pose constants since they're the same tile index. */
+    /* RUN reuses STAND's tiles (hflip only); THROW and CATCH are now
+     * genuinely separate 16-tile blocks, each uploaded on its own. */
     VDP_loadTileData(tile_player_stand[0], TILE_PLAYER_STAND, 16, DMA);
+    VDP_loadTileData(tile_player_throw[0], TILE_PLAYER_THROW, 16, DMA);
+    VDP_loadTileData(tile_player_catch[0], TILE_PLAYER_CATCH, 16, DMA);
 
     VDP_loadTileData(tile_ball,        TILE_BALL,        1, DMA);
     VDP_loadTileData(tile_ball_shadow, TILE_BALL_SHADOW,  1, DMA);

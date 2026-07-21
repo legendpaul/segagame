@@ -14,27 +14,31 @@
  * one base index - you cannot mix tiles from different blocks at
  * runtime, so the full 16-tile block is uploaded as one unit.
  *
- * All 4 poses (stand/run/throw/catch) currently share this one AI-
- * derived 32x32 block - see the honest note in sprites_data.c and
- * docs/planning.md about why per-pose art isn't split out yet. THROW
- * and CATCH get real distinct animation on top of the shared art
- * anyway: a coiled/braced position offset (player.c) plus a whole-team
- * impact flash (sprites_data_flash_team()) on the frame the ball
- * actually connects.
+ * STAND/RUN share one AI-derived 32x32 block (run reuses it with hflip
+ * for a cheap side-to-side sway). THROW and CATCH each now get their OWN
+ * genuinely distinct 32x32 block too - separate Pixel-Art-XL generations
+ * (a real wind-up reach and a real diving/leaping grab), run through the
+ * same flood-fill/crop/pad/quantize pipeline as the stand pose. Fixing
+ * a ComfyUI request-encoding bug (PowerShell was writing a UTF-8 BOM
+ * into the JSON body, which the server's JSON parser silently 500'd on)
+ * is what unblocked generating these - see docs/planning.md. Each pose
+ * still needs its own full 16-tile upload since Genesis hardware sprites
+ * read one CONSECUTIVE tile block per draw call - swapping "pose" at
+ * runtime just means player_draw() picks a different base tile index.
  */
 #ifndef _SPRITES_DATA_H_
 #define _SPRITES_DATA_H_
 
 #include "genesis.h"
 
-/* Player pose tile block - 16 consecutive tiles (4x4, 32x32px) */
+/* Player pose tile blocks - each a full 16 consecutive tiles (4x4, 32x32px) */
 #define TILE_PLAYER_STAND   (TILE_USER_INDEX + 0)
 #define TILE_PLAYER_RUN     TILE_PLAYER_STAND
-#define TILE_PLAYER_THROW   TILE_PLAYER_STAND
-#define TILE_PLAYER_CATCH   TILE_PLAYER_STAND
+#define TILE_PLAYER_THROW   (TILE_USER_INDEX + 16)
+#define TILE_PLAYER_CATCH   (TILE_USER_INDEX + 32)
 
-#define TILE_BALL           (TILE_USER_INDEX + 16)
-#define TILE_BALL_SHADOW    (TILE_USER_INDEX + 17)
+#define TILE_BALL           (TILE_USER_INDEX + 48)
+#define TILE_BALL_SHADOW    (TILE_USER_INDEX + 49)
 
 /* A single small 8x8 sprite (no pose variants) used only for the far
  * (CPU) side. Genesis sprites can't be hardware-scaled, so this fakes
@@ -43,10 +47,10 @@
  * rely on, by hand-authoring a separate tiny tile instead of scaling
  * the 16x16 one. Paired with court_bg.c's tapered sidelines for a
  * consistent perspective illusion. */
-#define TILE_PLAYER_SMALL   (TILE_USER_INDEX + 18)
+#define TILE_PLAYER_SMALL   (TILE_USER_INDEX + 50)
 
 /* First tile index free for court_bg.c to use */
-#define TILE_COURT_BASE     (TILE_USER_INDEX + 19)
+#define TILE_COURT_BASE     (TILE_USER_INDEX + 51)
 
 /* Palette lines: PAL0 is used by the system font + pitch background,
  * so sprites use 1-3. PAL1/PAL2 are *slots*, not fixed teams - which

@@ -106,20 +106,26 @@ void player_draw(Player *p)
     bool flip = FALSE;
     s16 poseOffsetY = 0;
 
-    /* All 4 poses currently alias the same 32x32 AI-derived tile block
-     * (see sprites_data.c) - hflip during RUN still gives a cheap
-     * side-to-side sway since the pose itself is asymmetric. THROW and
-     * CATCH get their own real per-frame motion instead: a coiled
-     * "reaching up" nudge on the release, and a braced "crouching down"
-     * nudge on the catch - cheap (just a Y offset, no extra tiles) but
-     * a genuine, distinct silhouette change on top of the shared art,
-     * not just a flip. */
+    /* RUN still reuses the STAND tiles with hflip for a cheap side-to-
+     * side sway. THROW and CATCH now use their own genuinely distinct
+     * 32x32 art (separate Pixel-Art-XL generations - see sprites_data.c)
+     * on top of the same coiled/braced Y-offset nudge from the earlier
+     * motion-only pass, so the pose change reads both in silhouette and
+     * in position. */
     if (p->pose == POSE_RUN)
+    {
         flip = (p->animFrame != 0);
+    }
     else if (p->pose == POSE_THROW)
+    {
+        base = TILE_PLAYER_THROW;
         poseOffsetY = -3;
+    }
     else if (p->pose == POSE_CATCH)
+    {
+        base = TILE_PLAYER_CATCH;
         poseOffsetY = 2;
+    }
 
     VDP_setSpriteFull(p->spriteSlot, p->x - 8, p->y - 16 + poseOffsetY, SPRITE_SIZE(4, 4),
                        TILE_ATTR_FULL(p->pal, 0, FALSE, flip, base),
