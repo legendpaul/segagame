@@ -41,6 +41,7 @@ static u8  server;          /* 0 = team A serves, 1 = team B serves */
 static u8  roundWinnerIsA;
 
 static u8  flashTimer;      /* frames left in the current impact flash, 0 = none */
+static u8  shakeTimer;      /* frames left in the current screen shake, 0 = none */
 
 /* Safety watchdog: if the match state hasn't changed for an
  * unreasonably long time (STALL_LIMIT frames), something has gone
@@ -65,6 +66,21 @@ static void trigger_flash(u8 palLine)
 {
     sprites_data_flash_team(palLine);
     flashTimer = 4;
+}
+
+/* Decaying vertical jolt on the court plane (BG_B only - HUD text lives on
+ * BG_A and deliberately stays put, same as real games keep the score
+ * readable while the game world shakes) on a hard hit. Cheap (one register
+ * write per frame, no extra tiles/sprites) but real, per-frame-decaying
+ * "impact" feedback - a second-opinion suggestion (Qwen) flagged this as
+ * one of the single highest-leverage, lowest-cost polish moves available
+ * given this project's hardware constraints. Restored to 0 automatically
+ * once shakeTimer hits 0 (see scene_match_update()). */
+static const s8 shakePattern[6] = { 3, -3, 2, -2, 1, 0 };
+
+static void trigger_shake(void)
+{
+    shakeTimer = 6;
 }
 
 static s16 lane_x(u8 i)
@@ -204,6 +220,8 @@ void scene_match_enter(void)
     sprites_data_apply_teams(gTeamAIndex, gTeamBIndex);
 
     flashTimer = 0;
+    shakeTimer = 0;
+    VDP_setVerticalScroll(VDP_BG_B, 0);
     stallTrackerInit = FALSE;
     server = 0;
     start_round();
@@ -259,6 +277,7 @@ static void resolve_throw_to_B(void)
     else
     {
         sound_mgr_hit();
+        trigger_shake();
         eliminate_from(teamB, responderB, outStackB, &outCountB);
         draw_hud();
 
@@ -302,6 +321,7 @@ static void resolve_throw_to_A(void)
     else
     {
         sound_mgr_hit();
+        trigger_shake();
         eliminate_from(teamA, responderA, outStackA, &outCountA);
         draw_hud();
 
@@ -327,6 +347,14 @@ void scene_match_update(void)
         flashTimer--;
         if (flashTimer == 0)
             sprites_data_apply_teams(gTeamAIndex, gTeamBIndex);
+    }
+
+    if (shakeTimer > 0)
+    {
+        VDP_setVerticalScroll(VDP_BG_B, shakePattern[6 - shakeTimer]);
+        shakeTimer--;
+        if (shakeTimer == 0)
+            VDP_setVerticalScroll(VDP_BG_B, 0);
     }
 
     /* Switch which teammate you're directly controlling - always skips
