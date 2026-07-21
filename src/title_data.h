@@ -6,6 +6,7 @@
 #include "flag_data.h"
 
 #define TILE_TITLE_BASE  (TILE_FLAG_BASE + FLAG_TILE_COUNT)
+#define TITLE_TILE_COUNT 68
 
 void title_data_init(void);
 void title_data_draw(void);

@@ -9,6 +9,7 @@
 #include "sound_mgr.h"
 #include "sprites_data.h"
 #include "court_bg.h"
+#include "ui_data.h"
 
 #define SLOT_TEAM_A   0    /* teamA uses sprite slots 0,1,2 */
 #define SLOT_TEAM_B   3    /* teamB uses sprite slots 3,4,5 */
@@ -219,24 +220,28 @@ static void reset_team(Player team[], u8 baseSlot, u8 pal, s16 baseDepth)
 
 static void draw_hud(void)
 {
-    VDP_drawText("A:LEFT B:MID C:RIGHT  HOLD <> SPIN", 3, 0);
-    VDP_drawTextFill(teamNames[gTeamAIndex], 1, 1, 14);
-    VDP_drawTextFill(teamNames[gTeamBIndex], 25, 1, 14);
-
     char buf[8];
+    ui_set_palette(PAL0);
+    ui_apply_palette();
+    ui_draw_panel(0, 0, 40, 5, FALSE);
+    ui_draw_text("A LEFT  B MID  C RIGHT", 2, 1, UI_CYAN);
+    ui_draw_text("HOLD <> SPIN", 26, 1, UI_GOLD);
+    ui_draw_text(teamNames[gTeamAIndex], 1, 2, UI_WHITE);
+    ui_draw_text(teamNames[gTeamBIndex], 25, 2, UI_WHITE);
+
     intToStr(gScoreA, buf, 1);
-    VDP_drawTextFill(buf, 18, 1, 2);
-    VDP_drawText("-", 20, 1);
+    ui_draw_big_text(buf, 17, 2, UI_GOLD);
+    ui_draw_text("-", 20, 2, UI_WHITE);
     intToStr(gScoreB, buf, 1);
-    VDP_drawTextFill(buf, 21, 1, 2);
+    ui_draw_big_text(buf, 21, 2, UI_GOLD);
 
-    VDP_drawText("IN", 1, 2);
+    ui_draw_text("IN", 1, 3, UI_GOLD);
     intToStr(count_in_play(teamA), buf, 1);
-    VDP_drawTextFill(buf, 4, 2, 2);
+    ui_draw_text(buf, 4, 3, UI_WHITE);
 
-    VDP_drawText("IN", 36, 2);
+    ui_draw_text("IN", 35, 3, UI_GOLD);
     intToStr(count_in_play(teamB), buf, 1);
-    VDP_drawTextFill(buf, 39, 2, 1);
+    ui_draw_text(buf, 38, 3, UI_WHITE);
 }
 
 /* SGDK's text-line clear writes opaque font-space tiles, which created

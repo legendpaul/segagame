@@ -1,4 +1,5 @@
 #include "title_data.h"
+#include "ui_data.h"
 
 #include "title_tiles.inc"
 
@@ -74,6 +75,8 @@ void title_data_draw(void)
     u16 row, col;
     u16 ballBase = TILE_TITLE_BASE + TITLE_GLYPH_COUNT * 4;
     PAL_setPalette(PAL0, title_palette, DMA);
+    ui_set_palette(PAL3);
+    ui_apply_palette();
 
     for (row = 0; row < 28; row++)
         for (col = 0; col < 40; col++)
@@ -97,8 +100,9 @@ void title_data_draw(void)
             VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 1, FALSE, FALSE,
                 ballBase + col * 4 + row), 31 + col, 14 + row);
 
-    VDP_drawText("WORLD CHAMPIONSHIP", 10, 14);
-    VDP_drawText("10 NATIONAL TEAMS", 11, 17);
-    VDP_drawText("PRESS START", 14, 21);
-    VDP_drawText("MINNKA GAMES  2026", 10, 25);
+    ui_draw_text_center("WORLD CHAMPIONSHIP", 14, UI_CYAN);
+    ui_draw_text_center("10 NATIONAL TEAMS", 17, UI_WHITE);
+    ui_draw_panel(11, 20, 18, 3, TRUE);
+    ui_draw_text_center("PRESS START", 21, UI_GOLD);
+    ui_draw_text_center("MINNKA GAMES 2026", 25, UI_WHITE);
 }

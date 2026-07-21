@@ -11,6 +11,7 @@
 #include "court_bg.h"
 #include "flag_data.h"
 #include "title_data.h"
+#include "ui_data.h"
 #include "sound_mgr.h"
 #include "music_mgr.h"
 #include "scene_boot.h"
@@ -40,6 +41,7 @@ int main(bool hardReset)
     court_bg_init();
     flag_data_init();
     title_data_init();
+    ui_data_init();
     sound_mgr_init();
     music_mgr_init();
 

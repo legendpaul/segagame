@@ -14,6 +14,7 @@
 #include "title_data.h"
 #include "sprites_data.h"
 #include "player.h"
+#include "ui_data.h"
 
 #define SLOT_PREVIEW_A  0
 #define SLOT_PREVIEW_B  1
@@ -59,7 +60,7 @@ static void draw_selector(void)
         previewA.x = 278;
         previewB.x = -100;
     }
-    VDP_drawText(phase == MENU_TEAM_A ? "P1" : "P1   P2", 31, 16);
+    ui_draw_text(phase == MENU_TEAM_A ? "P1" : "P1   P2", 31, 16, UI_GOLD);
 }
 
 static void enter_selector(MenuPhase next)

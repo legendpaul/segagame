@@ -56,6 +56,7 @@ src/
   scene_boot.c         - boot splash (Minnka logo)
   scene_menu.c          - title, Team 1 select and Team 2 select flow
   title_data.c/.h       - MICRO RETRO DODGEBALL arcade title tile art
+  ui_data.c/.h          - custom small/large fonts, scores, panels and buttons
   scene_match.c          - THE BIG ONE: match state machine, player/ball draw loop, AI hooks
   scene_gameover.c
   player.c / player.h    - player entity: pose state machine, animation, draw
@@ -95,6 +96,7 @@ docs/
   TILE_LOGO_BASE       +121   (177 boot-logo tiles)
   TILE_FLAG_BASE       +298   (panel/boxes + 20 small + 80 large flag tiles)
   TILE_TITLE_BASE      +403   (large title glyphs, football and backdrop)
+  TILE_UI_BASE         +471   (308 font tiles + 8 reusable panel/button tiles)
   ```
   A Genesis hardware sprite reads N×M **consecutive** VRAM tiles in column-major order (col0
   top-to-bottom, then col1...) starting at one base index — you cannot mix tiles from different

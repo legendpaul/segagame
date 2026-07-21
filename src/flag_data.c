@@ -1,5 +1,6 @@
 #include "flag_data.h"
 #include "teams.h"
+#include "ui_data.h"
 
 #define TILE_FLAG_PANEL  (TILE_FLAG_BASE + 0)
 #define TILE_FLAG_BOX_H  (TILE_FLAG_BASE + 1)
@@ -73,6 +74,8 @@ void flag_data_draw_selector(u8 selected, u8 playerNumber)
     u8 i;
     u16 largeBase = TILE_FLAGS_LARGE + selected * 8;
     apply_flag_palette();
+    ui_set_palette(PAL0);
+    ui_apply_palette();
 
     /* Dark broadcast-style backing with a bright selected row. */
     for (row = 0; row < 28; row++)
@@ -82,9 +85,10 @@ void flag_data_draw_selector(u8 selected, u8 playerNumber)
                     ? TILE_FLAG_SELECT : TILE_FLAG_PANEL), col, row);
 
     VDP_clearPlane(VDP_BG_A, TRUE);
-    VDP_drawText("SELECT TEAM", 2, 1);
-    VDP_drawText(playerNumber == 1 ? "PLAYER 1" : "PLAYER 2", 29, 1);
-    VDP_drawText("----------------------", 1, 3);
+    ui_draw_panel(0, 0, 40, 4, FALSE);
+    ui_draw_big_text("SELECT TEAM", 1, 1, UI_WHITE);
+    ui_draw_text(playerNumber == 1 ? "PLAYER 1" : "PLAYER 2", 30, 1, UI_GOLD);
+    ui_draw_text("WORLD TOP 10", 28, 2, UI_CYAN);
 
     for (i = 0; i < NUM_TEAMS; i++)
     {
@@ -93,15 +97,13 @@ void flag_data_draw_selector(u8 selected, u8 playerNumber)
             TILE_FLAGS + i * 2), 2, y);
         VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
             TILE_FLAGS + i * 2 + 1), 3, y);
-        VDP_setTextPalette((i == selected) ? PAL3 : PAL0);
-        VDP_drawText(teamNames[i], 6, y);
+        ui_draw_text(teamNames[i], 6, y, (i == selected) ? UI_GOLD : UI_WHITE);
         if (i == selected)
         {
-            VDP_drawText(">", 0, y);
-            VDP_drawText("<", 20, y);
+            ui_draw_text(">", 0, y, UI_GOLD);
+            ui_draw_text("<", 20, y, UI_GOLD);
         }
     }
-    VDP_setTextPalette(PAL0);
 
     /* Large, nearest-neighbour flag and a proper white box on the right. */
     for (col = 25; col <= 30; col++)
@@ -119,10 +121,10 @@ void flag_data_draw_selector(u8 selected, u8 playerNumber)
             VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
                 largeBase + col * 2 + row), 26 + col, 7 + row);
 
-    VDP_drawText(teamNames[selected], 25, 11);
-    VDP_drawText("UP/DOWN SELECT", 24, 19);
-    VDP_drawText("A/START CONFIRM", 24, 21);
-    VDP_drawText(playerNumber == 1 ? "CHOOSE TEAM 1" : "CHOOSE TEAM 2", 24, 24);
+    ui_draw_text(teamNames[selected], 25, 11, UI_GOLD);
+    ui_draw_text("UP DOWN SELECT", 24, 20, UI_CYAN);
+    ui_draw_button("A CONFIRM", 24, 22, 14);
+    ui_draw_text(playerNumber == 1 ? "CHOOSE TEAM 1" : "CHOOSE TEAM 2", 24, 25, UI_WHITE);
 }
 
 void flag_data_draw_grid(u8 selected)
