@@ -33,6 +33,7 @@
 
 /* ch: 0-5, one of the YM2612's 6 FM channels. */
 void fm_synth_initChannel(u8 ch);
+void fm_synth_initBassChannel(u8 ch);
 void fm_synth_noteOn(u8 ch, u8 note, u8 octave);
 void fm_synth_noteOff(u8 ch);
 

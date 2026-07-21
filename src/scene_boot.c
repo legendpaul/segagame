@@ -39,7 +39,7 @@ void scene_boot_update(void)
 
     if ((bootTimer == 0) || input_pressed(BUTTON_START))
     {
-        sound_mgr_blip();
+        sound_mgr_confirm();
         PAL_fadeOutAll(20, FALSE);
         gCurrentScene = GS_MENU;
     }

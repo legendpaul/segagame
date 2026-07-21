@@ -66,7 +66,7 @@ void scene_gameover_update(void)
 
     if (input_pressed(BUTTON_START))
     {
-        sound_mgr_blip();
+        sound_mgr_confirm();
         PAL_fadeOutAll(20, FALSE);
         gCurrentScene = GS_MENU;
     }

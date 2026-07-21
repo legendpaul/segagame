@@ -162,15 +162,15 @@ static const u32 tile_player_run[16][8] = {
 
 /* Ball: white with a soft shadow (2) and a dark outline (3) so it reads
  * clearly against the green pitch. */
-static const u32 tile_ball[8] = {
-    0x00333000,
-    0x03111130,
-    0x31122213,
-    0x31122213,
-    0x31222213,
-    0x31222213,
-    0x03222230,
-    0x00333000
+static const u32 tile_ball[4][8] = {
+    { 0x00333000, 0x03131130, 0x31121213, 0x31121213,
+      0x31212113, 0x31212113, 0x03232230, 0x00333000 },
+    { 0x00333000, 0x03111130, 0x31122113, 0x31221313,
+      0x31213213, 0x31132213, 0x03222230, 0x00333000 },
+    { 0x00333000, 0x03111130, 0x31122213, 0x33333333,
+      0x31222213, 0x31222213, 0x03222230, 0x00333000 },
+    { 0x00333000, 0x03111130, 0x31132213, 0x31213213,
+      0x31221313, 0x31122113, 0x03222230, 0x00333000 }
 };
 
 /* Ground shadow cast by the ball while it's airborne - a soft dark
@@ -185,6 +185,11 @@ static const u32 tile_ball_shadow[8] = {
     0x00333300,
     0x00033000,
     0x00000000
+};
+
+static const u32 tile_ball_shadow_air[8] = {
+    0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x00033000, 0x00333300, 0x00033000, 0x00000000
 };
 
 #if 0 /* Replaced by tile_iso_far from the generated isometric sheet. */
@@ -206,6 +211,7 @@ static const u32 tile_player_far[9][8] = {
     { 0x00000000, 0x11900000, 0x14b00000, 0x9b000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
     { 0x00000000, 0x00000000, 0xee000000, 0xeb000000, 0xe9e00000, 0x2de00000, 0x55500000, 0x55500000 },
 };
+
 #endif
 
 /* Two-tile ground stars. Yellow identifies the controlled player; red
@@ -316,8 +322,9 @@ void sprites_data_init(void)
     VDP_loadTileData(tile_iso_catch[0], TILE_PLAYER_CATCH, 16, DMA);
     VDP_loadTileData(tile_iso_run[0],   TILE_PLAYER_RUN,   16, DMA);
 
-    VDP_loadTileData(tile_ball,        TILE_BALL,        1, DMA);
+    VDP_loadTileData(tile_ball[0],     TILE_BALL,        4, DMA);
     VDP_loadTileData(tile_ball_shadow, TILE_BALL_SHADOW,  1, DMA);
+    VDP_loadTileData(tile_ball_shadow_air, TILE_BALL_SHADOW_AIR, 1, DMA);
     VDP_loadTileData(tile_iso_far_stand[0], TILE_PLAYER_FAR_STAND, 9, DMA);
     VDP_loadTileData(tile_iso_far_run[0],   TILE_PLAYER_FAR_RUN,   9, DMA);
     VDP_loadTileData(tile_iso_far_throw[0], TILE_PLAYER_FAR_THROW, 9, DMA);

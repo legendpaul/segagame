@@ -43,19 +43,18 @@ void player_restore(Player *p)
 
 void player_moveHuman(Player *p)
 {
-    bool moved = FALSE;
-
     /* Both world axes project diagonally in the reference camera.
      * This makes every d-pad direction change screen X and Y instead
      * of sliding players along one flat horizontal baseline. */
-    if (input_held(BUTTON_LEFT))  { p->x -= 2; p->y -= 1; moved = TRUE; }
-    if (input_held(BUTTON_RIGHT)) { p->x += 2; p->y += 1; moved = TRUE; }
-    if (input_held(BUTTON_UP))    { p->x += 1; p->y -= 2; moved = TRUE; }
-    if (input_held(BUTTON_DOWN))  { p->x -= 1; p->y += 2; moved = TRUE; }
+    if (input_held(BUTTON_LEFT))  { p->x -= 2; p->y -= 1; }
+    if (input_held(BUTTON_RIGHT)) { p->x += 2; p->y += 1; }
+    if (input_held(BUTTON_UP))    { p->x += 1; p->y -= 2; }
+    if (input_held(BUTTON_DOWN))  { p->x -= 1; p->y += 2; }
 
     player_clampToCourt(p);
 
-    player_tickAnim(p, moved);
+    /* Animation is advanced once, centrally, after the match state update.
+     * Ticking here as well made the controlled player run at double cadence. */
 }
 
 void player_clampToCourt(Player *p)

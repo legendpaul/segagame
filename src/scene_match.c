@@ -46,6 +46,7 @@ static u16 aiDelay;
 static u16 roundEndTimer;
 static u8  windupTimer;
 static u8  impactTimer;
+static u8  catchTimer;      /* brief skill window opened by a fresh A press */
 static s8  pendingSpin;
 static s16 pendingTargetX;
 static s16 pendingTargetY;
@@ -54,6 +55,9 @@ static u8  roundWinnerIsA;
 
 static u8  flashTimer;      /* frames left in the current impact flash, 0 = none */
 static u8  shakeTimer;      /* frames left in the current screen shake, 0 = none */
+static s8  worldOffsetY;    /* applied to BG_B and every world sprite together */
+
+#define CATCH_SKILL_WINDOW  8
 
 /* Safety watchdog: if the match state hasn't changed for an
  * unreasonably long time (STALL_LIMIT frames), something has gone
@@ -104,7 +108,7 @@ static void draw_control_marker(void)
                    (state == MS_A_HOLD || state == MS_A_WINDUP ||
                     (state == MS_ANNOUNCE && server == 0));
     u16 markerTile = hasBall ? TILE_MARKER_RED : TILE_MARKER_YELLOW;
-    VDP_setSpriteFull(SLOT_MARKER, p->x, p->y + 10, SPRITE_SIZE(2, 1),
+    VDP_setSpriteFull(SLOT_MARKER, p->x, p->y + 10 + worldOffsetY, SPRITE_SIZE(2, 1),
                        TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, markerTile),
                        SLOT_SHADOWS);
 }
@@ -116,10 +120,10 @@ static void draw_player_shadows(void)
     {
         u8 slotA = SLOT_SHADOWS + i;
         u8 slotB = SLOT_SHADOWS + TEAM_SIZE + i;
-        VDP_setSpriteFull(slotA, teamA[i].x + 4, teamA[i].y + 10, SPRITE_SIZE(1, 1),
+        VDP_setSpriteFull(slotA, teamA[i].x + 4, teamA[i].y + 10 + worldOffsetY, SPRITE_SIZE(1, 1),
                            TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL_SHADOW),
                            slotA + 1);
-        VDP_setSpriteFull(slotB, teamB[i].x + 4, teamB[i].y + 10, SPRITE_SIZE(1, 1),
+        VDP_setSpriteFull(slotB, teamB[i].x + 4, teamB[i].y + 10 + worldOffsetY, SPRITE_SIZE(1, 1),
                            TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL_SHADOW),
                            (i == TEAM_SIZE - 1) ? 0 : (slotB + 1));
     }
@@ -299,6 +303,8 @@ void scene_match_enter(void)
 
     flashTimer = 0;
     shakeTimer = 0;
+    catchTimer = 0;
+    worldOffsetY = 0;
     VDP_setVerticalScroll(VDP_BG_B, 0);
     stallTrackerInit = FALSE;
     server = 0;
@@ -335,6 +341,7 @@ static void resolve_throw_to_B(void)
     {
         /* A genuine miss: no invisible endpoint hit. The defending lane
          * recovers the loose ball and play continues. */
+        sound_mgr_bounce();
         holderB = first_in_play_from(teamB, responderB);
         ball_init(&ball, SLOT_BALL, teamB[holderB].x - 3,
                   teamB[holderB].y - 8, BALL_HELD_B);
@@ -392,11 +399,12 @@ static void resolve_throw_to_A(void)
 {
     bool isHuman = (responderA == activeA);
     bool inRange = ball_overlaps_player(&teamA[responderA]);
-    bool caught = isHuman ? (inRange && input_held(BUTTON_A))
+    bool caught = isHuman ? (inRange && catchTimer > 0)
                            : (inRange && ai_willCatch());
 
     if (!inRange)
     {
+        sound_mgr_bounce();
         holderA = first_in_play_from(teamA, responderA);
         activeA = holderA;
         ball_init(&ball, SLOT_BALL, teamA[holderA].x + 9,
@@ -462,11 +470,17 @@ void scene_match_update(void)
 
     if (shakeTimer > 0)
     {
-        VDP_setVerticalScroll(VDP_BG_B, shakePattern[6 - shakeTimer]);
+        worldOffsetY = shakePattern[6 - shakeTimer];
+        VDP_setVerticalScroll(VDP_BG_B, worldOffsetY);
         shakeTimer--;
         if (shakeTimer == 0)
+        {
+            worldOffsetY = 0;
             VDP_setVerticalScroll(VDP_BG_B, 0);
+        }
     }
+
+    if (catchTimer > 0) catchTimer--;
 
     /* The player you're actively controlling always moves on input,
      * whether or not they're the one currently resolving a play - lets
@@ -536,7 +550,6 @@ void scene_match_update(void)
                 pendingTargetX = teamB[responderB].x + 4;
                 pendingTargetY = teamB[responderB].y - 3;
 
-                sound_mgr_throw();
                 player_setPose(&teamA[holderA], POSE_THROW, 18);
                 windupTimer = 8;
                 state = MS_A_WINDUP;
@@ -553,6 +566,7 @@ void scene_match_update(void)
             {
                 ball_startThrow(&ball, pendingTargetX, pendingTargetY,
                                 BALL_FLYING_TO_B, pendingSpin);
+                sound_mgr_throw();
                 state = MS_FLY_TO_B;
             }
             break;
@@ -571,7 +585,6 @@ void scene_match_update(void)
                 pendingTargetY = teamA[responderA].y - 3;
                 pendingSpin = (random() % 3) - 1;
 
-                sound_mgr_throw();
                 player_setPose(&teamB[holderB], POSE_THROW, 18);
                 windupTimer = 8;
                 state = MS_B_WINDUP;
@@ -588,6 +601,8 @@ void scene_match_update(void)
             {
                 ball_startThrow(&ball, pendingTargetX, pendingTargetY,
                                 BALL_FLYING_TO_A, pendingSpin);
+                catchTimer = 0;
+                sound_mgr_throw();
                 state = MS_FLY_TO_A;
             }
             break;
@@ -612,6 +627,14 @@ void scene_match_update(void)
 
         case MS_FLY_TO_A:
         {
+            /* Catching is a timed action, not a button that can be held
+             * throughout the whole flight. The pose itself communicates
+             * the active eight-frame window without adding HUD text. */
+            if (responderA == activeA && input_pressed(BUTTON_A))
+            {
+                catchTimer = CATCH_SKILL_WINDOW;
+                player_setPose(&teamA[responderA], POSE_CATCH, CATCH_SKILL_WINDOW);
+            }
             /* If the responder isn't the human's active player, drive
              * them with the same simple chase AI the CPU side uses. */
             if (responderA != activeA)
@@ -668,14 +691,20 @@ void scene_match_update(void)
                        (input_held(BUTTON_LEFT) || input_held(BUTTON_RIGHT) ||
                         input_held(BUTTON_UP) || input_held(BUTTON_DOWN));
         player_tickAnim(&teamA[i], aMoving);
+        teamA[i].y += worldOffsetY;
         player_draw(&teamA[i]);
+        teamA[i].y -= worldOffsetY;
 
         bool bMoving = cpuMoved && (i == responderB) && (state == MS_FLY_TO_B);
         player_tickAnim(&teamB[i], bMoving);
+        teamB[i].y += worldOffsetY;
         player_draw(&teamB[i]);
+        teamB[i].y -= worldOffsetY;
     }
 
+    ball.y += worldOffsetY;
     ball_draw(&ball);
+    ball.y -= worldOffsetY;
     draw_control_marker();
     draw_player_shadows();
 }

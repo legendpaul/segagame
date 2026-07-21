@@ -47,6 +47,23 @@ void fm_synth_initChannel(u8 ch)
     writeOp(part, chOff, 0x0C, /*mul*/1, /*dt*/0, /*tl*/16, /*ar*/31, /*d1r*/5, /*d2r*/2, /*sl*/1, /*rr*/7);
 }
 
+void fm_synth_initBassChannel(u8 ch)
+{
+    u8 part = (ch >= 3) ? 1 : 0;
+    u8 chOff = ch % 3;
+
+    YM2612_writeReg(part, 0xB0 + chOff, 0x07);
+    YM2612_writeReg(part, 0xB4 + chOff, 0xC0);
+
+    /* Darker, tighter voice than the lead: a strong fundamental with
+     * restrained upper harmonics, so the two parts no longer sound like
+     * the same organ copied one octave apart. */
+    writeOp(part, chOff, 0x00, 1, 0,  2, 31, 8, 5, 2, 9);
+    writeOp(part, chOff, 0x08, 1, 0, 26, 31, 9, 5, 3, 9);
+    writeOp(part, chOff, 0x04, 2, 0, 42, 31, 9, 5, 3, 9);
+    writeOp(part, chOff, 0x0C, 1, 0, 22, 31, 8, 5, 2, 9);
+}
+
 void fm_synth_noteOn(u8 ch, u8 note, u8 octave)
 {
     u8  part  = (ch >= 3) ? 1 : 0;

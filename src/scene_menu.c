@@ -108,7 +108,7 @@ void scene_menu_update(void)
 
         if (input_pressed(BUTTON_START) || input_pressed(BUTTON_A))
         {
-            sound_mgr_blip();
+            sound_mgr_confirm();
             enter_selector(MENU_TEAM_A);
         }
         return;
@@ -125,10 +125,13 @@ void scene_menu_update(void)
     else if (input_pressed(BUTTON_DOWN) || input_pressed(BUTTON_RIGHT))
         move_selection(1);
     else if (input_pressed(BUTTON_B) && phase == MENU_TEAM_B)
+    {
+        sound_mgr_cancel();
         enter_selector(MENU_TEAM_A);
+    }
     else if (input_pressed(BUTTON_A) || input_pressed(BUTTON_START))
     {
-        sound_mgr_blip();
+        sound_mgr_confirm();
         if (phase == MENU_TEAM_A)
         {
             /* Begin the other selector on a different team by default,

@@ -44,25 +44,26 @@
  * silhouette itself is now real running art, not the idle pose. */
 #define TILE_PLAYER_RUN     (TILE_USER_INDEX + 48)
 
-#define TILE_BALL           (TILE_USER_INDEX + 64)
-#define TILE_BALL_SHADOW    (TILE_USER_INDEX + 65)
+#define TILE_BALL           (TILE_USER_INDEX + 64) /* four seam-rotation frames */
+#define TILE_BALL_SHADOW    (TILE_USER_INDEX + 68)
+#define TILE_BALL_SHADOW_AIR (TILE_USER_INDEX + 69)
 
 /* Dedicated 24x24 (3x3 tile) far-side size. Genesis sprites cannot be
  * hardware-scaled, so this is a separately encoded reduction of the
  * real STAND artwork rather than a runtime transform. */
-#define TILE_PLAYER_FAR_STAND (TILE_USER_INDEX + 66)
-#define TILE_PLAYER_FAR_RUN   (TILE_USER_INDEX + 75)
-#define TILE_PLAYER_FAR_THROW (TILE_USER_INDEX + 84)
-#define TILE_PLAYER_FAR_CATCH (TILE_USER_INDEX + 93)
+#define TILE_PLAYER_FAR_STAND (TILE_USER_INDEX + 70)
+#define TILE_PLAYER_FAR_RUN   (TILE_USER_INDEX + 79)
+#define TILE_PLAYER_FAR_THROW (TILE_USER_INDEX + 88)
+#define TILE_PLAYER_FAR_CATCH (TILE_USER_INDEX + 97)
 
 /* Two-tile ground stars: yellow identifies the controlled player and red
  * identifies possession/wind-up. They use PAL_BALL so kit recolouring
  * never changes their meaning. */
-#define TILE_MARKER_YELLOW  (TILE_USER_INDEX + 102) /* two 8x8 tiles */
-#define TILE_MARKER_RED     (TILE_USER_INDEX + 104) /* two 8x8 tiles */
+#define TILE_MARKER_YELLOW  (TILE_USER_INDEX + 106) /* two 8x8 tiles */
+#define TILE_MARKER_RED     (TILE_USER_INDEX + 108) /* two 8x8 tiles */
 
 /* First tile index free for court_bg.c to use */
-#define TILE_COURT_BASE     (TILE_USER_INDEX + 106)
+#define TILE_COURT_BASE     (TILE_USER_INDEX + 110)
 
 /* Palette lines: PAL0 is used by the system font + pitch background,
  * so sprites use 1-3. PAL1/PAL2 are *slots*, not fixed teams - which

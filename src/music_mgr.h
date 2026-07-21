@@ -4,8 +4,9 @@
  * 1990s Genesis games score through the YM2612 FM chip and keep PSG
  * free for SFX - this follows the same split).
  *
- * Honest limitation: this is one hand-built FM instrument voice
- * playing a short hand-written phrase, not a composed multi-
+ * The current score is a gated 32-step lead phrase over a separate dark
+ * bass patch, with rests and PAL/NTSC-correct tempo. It remains a hand-
+ * programmed procedural score rather than a tracker-authored multi-
  * instrument soundtrack - authoring that normally means a tracker
  * tool (DefleMask/Furnace) exporting to SGDK's XGM driver, which
  * isn't available in this environment.

@@ -62,6 +62,7 @@ void ball_draw(Ball *b)
 {
     bool inFlight = (b->state == BALL_FLYING_TO_A) || (b->state == BALL_FLYING_TO_B);
     s16 drawY = b->y;
+    u16 ballTile = TILE_BALL;
 
     if (inFlight)
     {
@@ -73,12 +74,21 @@ void ball_draw(Ball *b)
         s32 height = (ARC_HEIGHT * 4 * t * (255 - t)) / (255L * 255L);
         drawY = b->y - (s16)height;
 
+        /* Four authored seam positions now make rotation readable. Spin
+         * reverses their order instead of merely flipping a symmetric ball. */
+        {
+            u16 frame = (b->progress >> 4) & 3;
+            if (b->spin < 0) frame = (4 - frame) & 3;
+            ballTile += frame;
+        }
+
         /* Shadow stays on the true ground track - the read on where
          * the ball will actually land. Links on to spriteSlot+2, the
          * controlled-player ground star (see scene_match.c) - the shadow is
          * no longer the last sprite in the chain. */
         VDP_setSpriteFull(b->spriteSlot + 1, b->x, b->y, SPRITE_SIZE(1, 1),
-                           TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL_SHADOW),
+                           TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE,
+                               (height > 12) ? TILE_BALL_SHADOW_AIR : TILE_BALL_SHADOW),
                            b->spriteSlot + 2);
     }
     else
@@ -93,9 +103,6 @@ void ball_draw(Ball *b)
     /* The ball links to the shadow, which now links on to the ground star
      * (see scene_match.c) so all three stay reachable from slot 0. */
     VDP_setSpriteFull(b->spriteSlot, b->x, drawY, SPRITE_SIZE(1, 1),
-                       TILE_ATTR_FULL(PAL_BALL, 0,
-                           inFlight && ((b->progress >> 4) & 1),
-                           inFlight && (((b->progress >> 3) & 1) ^ (b->spin < 0)),
-                           TILE_BALL),
+                       TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, ballTile),
                        b->spriteSlot + 1);
 }

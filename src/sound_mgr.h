@@ -21,9 +21,12 @@ void sound_mgr_play(u8 channel, u16 freq, u8 decayStep);
 
 /* Convenience shortcuts used across scenes */
 void sound_mgr_blip(void);     /* menu move / select */
+void sound_mgr_confirm(void);
+void sound_mgr_cancel(void);
 void sound_mgr_throw(void);
 void sound_mgr_catch(void);
 void sound_mgr_hit(void);
+void sound_mgr_bounce(void);
 void sound_mgr_score(void);
 
 #endif /* _SOUND_MGR_H_ */

@@ -798,6 +798,33 @@ from turning players away from their opponents, and remove the match-screen inst
 - Hardware QA used Fusion's internal lossless screenshot capture, confirming the real ROM renders
   the new stadium, equal-size opposing players, possession star and minimal authored HUD together.
 
+### Cursor + Codex exchange-polish pass (2026-07-22)
+
+The user requested a collaborative desktop-AI review. The project was opened in the installed
+Cursor desktop app for an independent Agent review while three Codex reviewers separately audited
+gameplay, graphics and audio. Their recommendations converged on throw readability, catch timing,
+animation cadence, ball motion and audio articulation, so the implementation stayed focused on
+one coherent wind-up/flight/contact loop rather than adding unrelated modes or HUD text.
+
+- Catching is now an eight-frame skill window opened by a fresh A press during an incoming throw.
+  Holding A for the entire flight no longer guarantees a catch, and the catch pose itself shows
+  when the window is active without adding instructions to the match HUD.
+- Removed the duplicate animation tick from `player_moveHuman()`. All players now advance once in
+  the centralized render/update pass, fixing the controlled player's unnaturally fast cadence.
+- Replaced the ball's ineffective H/V flips with four authored seam-rotation tiles. Spin reverses
+  frame order, while a second compact shadow tile makes the shadow visibly tighten near arc peak.
+- Screen shake now offsets the court, players, ball, marker and all shadows together while BG_A's
+  scoreboard remains fixed. Sprites no longer appear detached from the pitch on impact.
+- Throw SFX now fires on the actual `ball_startThrow()` release frame rather than eight frames early.
+  Misses gain a low bounce plus white-noise contact transient; hits combine their tone with a noise
+  crack. Menu movement, confirm and cancel now have distinct cues.
+- Fixed YM2612 articulation by keying off before each note and applying short gates. Expanded the
+  melody to a 32-step phrase with rests, added a distinct darker bass patch and normalized step
+  duration for 50Hz PAL versus 60Hz NTSC hardware.
+- Fusion hardware capture confirmed the revised VRAM layout and match presentation render correctly.
+  Cursor's follow-up blocker review independently checked the chained tile bases, PSG channel 3,
+  YM key-off/tempo logic, catch/throw paths and shared shake offsets and found no must-fix issue.
+
 ---
 
 ## 📝 Design Decisions
