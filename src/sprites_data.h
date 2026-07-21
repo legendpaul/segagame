@@ -56,8 +56,16 @@
  * consistent perspective illusion. */
 #define TILE_PLAYER_SMALL   (TILE_USER_INDEX + 66)
 
+/* Small downward-pointing arrow drawn above whichever player the human
+ * currently controls. Added after ChatGPT's screenshot critique flagged
+ * "there is no obvious controlled character" as a real usability gap -
+ * cheapest fix on their list (one 8x8 tile, no new art pipeline). Uses
+ * PAL_BALL (white/grey/black) rather than a team palette line so it
+ * reads the same regardless of which team color is active. */
+#define TILE_MARKER         (TILE_USER_INDEX + 67)
+
 /* First tile index free for court_bg.c to use */
-#define TILE_COURT_BASE     (TILE_USER_INDEX + 67)
+#define TILE_COURT_BASE     (TILE_USER_INDEX + 68)
 
 /* Palette lines: PAL0 is used by the system font + pitch background,
  * so sprites use 1-3. PAL1/PAL2 are *slots*, not fixed teams - which

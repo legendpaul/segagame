@@ -63,10 +63,12 @@ void ball_draw(Ball *b)
         drawY = b->y - (s16)height;
 
         /* Shadow stays on the true ground track - the read on where
-         * the ball will actually land. */
+         * the ball will actually land. Links on to spriteSlot+2, the
+         * controlled-player marker (see scene_match.c) - the shadow is
+         * no longer the last sprite in the chain. */
         VDP_setSpriteFull(b->spriteSlot + 1, b->x, b->y, SPRITE_SIZE(1, 1),
                            TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL_SHADOW),
-                           0);
+                           b->spriteSlot + 2);
     }
     else
     {
@@ -74,11 +76,11 @@ void ball_draw(Ball *b)
          * leaving a stray dot under the holding player. */
         VDP_setSpriteFull(b->spriteSlot + 1, -16, -16, SPRITE_SIZE(1, 1),
                            TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL_SHADOW),
-                           0);
+                           b->spriteSlot + 2);
     }
 
-    /* Last sprite in the link chain (see player_draw()) is the shadow;
-     * the ball links to it so both stay reachable from slot 0. */
+    /* The ball links to the shadow, which now links on to the marker
+     * (see scene_match.c) so all three stay reachable from slot 0. */
     VDP_setSpriteFull(b->spriteSlot, b->x, drawY, SPRITE_SIZE(1, 1),
                        TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL),
                        b->spriteSlot + 1);

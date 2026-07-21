@@ -215,6 +215,21 @@ static const u32 tile_player_small[8] = {
     0xff0000ff
 };
 
+/* Controlled-player marker (see TILE_MARKER) - a small downward arrow,
+ * outlined in black (3) with a white fill (1) so it reads clearly
+ * against green court, red kit, or green kit alike. Drawn with PAL_BALL
+ * rather than a team palette so it never gets hue-rotated. */
+static const u32 tile_marker[8] = {
+    0x00333300,
+    0x03111130,
+    0x03111130,
+    0x31111113,
+    0x03111130,
+    0x00311300,
+    0x00033000,
+    0x00000000
+};
+
 /* Per-team jersey palettes. Indices 2,5,6,7,12,13,14 are the "kit ramp"
  * - hue-rotated per team while preserving each shade's original
  * lightness (a real color-preserving recolor, not a single flat-color
@@ -270,6 +285,7 @@ void sprites_data_init(void)
     VDP_loadTileData(tile_ball,        TILE_BALL,        1, DMA);
     VDP_loadTileData(tile_ball_shadow, TILE_BALL_SHADOW,  1, DMA);
     VDP_loadTileData(tile_player_small, TILE_PLAYER_SMALL, 1, DMA);
+    VDP_loadTileData(tile_marker, TILE_MARKER, 1, DMA);
 
     PAL_setPalette(PAL_BALL, pal_ball, DMA);
 }

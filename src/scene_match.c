@@ -13,6 +13,7 @@
 #define SLOT_TEAM_A   0    /* teamA uses sprite slots 0,1,2 */
 #define SLOT_TEAM_B   3    /* teamB uses sprite slots 3,4,5 */
 #define SLOT_BALL     6    /* ball uses slots 6 (ball) and 7 (shadow) */
+#define SLOT_MARKER   8    /* controlled-player arrow (see draw_control_marker) */
 
 typedef enum {
     MS_ANNOUNCE = 0,
@@ -81,6 +82,22 @@ static const s8 shakePattern[6] = { 3, -3, 2, -2, 1, 0 };
 static void trigger_shake(void)
 {
     shakeTimer = 6;
+}
+
+/* Draws a small white arrow above whichever teamA slot the human
+ * currently controls (activeA). Added after an outside AI critique
+ * (given a real screenshot) flagged that there was no way to tell which
+ * player you controlled - one 8x8 sprite, no new art pipeline needed.
+ * Terminates the sprite link chain that ball_draw() now extends through
+ * the ball's shadow (slot 7 -> slot 8, see ball.c). If the active player
+ * is eliminated and parked off-screen, the marker simply follows them
+ * off-screen too - harmless, and control naturally moves on. */
+static void draw_control_marker(void)
+{
+    Player *p = &teamA[activeA];
+    VDP_setSpriteFull(SLOT_MARKER, p->x + 4, p->y - 26, SPRITE_SIZE(1, 1),
+                       TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_MARKER),
+                       0);
 }
 
 static s16 lane_x(u8 i)
@@ -500,4 +517,5 @@ void scene_match_update(void)
     }
 
     ball_draw(&ball);
+    draw_control_marker();
 }
