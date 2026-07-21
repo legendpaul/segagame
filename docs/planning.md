@@ -508,6 +508,57 @@ on top of the STAND silhouette, not real per-pose artwork.
   full match restart and an elimination round with no crash, no VRAM/tile corruption, and no
   regression to score/round/team-recolor behavior.
 
+### Green Vipers small-sprite visibility fix + real RUN pose art (2026-07-21)
+
+Second opinion from Qwen (local desktop chat app), given an actual live gameplay screenshot
+rather than a description, flagged that the far-side (CPU) team's small 8x8 sprites went
+functionally invisible against the pitch specifically for Green Vipers.
+
+- **Root cause**: `tile_player_small`'s outline used palette index 14, which the code comment
+  claimed was a "fixed" color but is actually part of the per-team hue-rotated kit ramp
+  (`pal_team_*[16]` indices 2,5,6,7,12,13,14). For Green Vipers, index 14 rotates to
+  `0x1D4E2D` - a dark green that blends into the court. **Fix**: switched the outline to index
+  15, which every `pal_team_*[16]` array leaves implicitly zero-initialized (pure black,
+  `0x0000`) since the C initializer list only ever sets 15 of the 16 entries - genuinely
+  team-independent, unlike 14. Verified live in Fusion (zoomed screenshot of the far-side
+  sprites) and cross-checked with Qwen against the fixed screenshot.
+- **Real 4-frame... in practice 2-phase RUN pose**, closing out the last placeholder: RUN had
+  been reusing the STAND tile block with hflip for a cheap sway - Qwen's top-ranked graphics
+  critique flagged this as "reads as placeholder... probably costing 80% of perceived polish".
+  Generated a real mid-stride sprint pose through the same Pixel-Art-XL/ComfyUI pipeline as
+  THROW/CATCH, with two new pipeline issues found and fixed along the way:
+  - The source render's background wasn't a flat card - it had an outer neutral-gray frame
+    around a white interior, and the enclosed white gaps between the striding legs don't touch
+    the image border, so the existing border-seeded flood-fill left most of the background
+    untouched (~70% of the 14-color quantized palette got wasted on near-white shades instead
+    of the character). Fixed for this pose with a global lightness/saturation background
+    threshold instead of border-flood-fill.
+  - The baked-in ground shadow (desaturated gray-green, coincidentally close in lightness to
+    the skin midtones) kept getting merged into the same quantized color slot as the vivid skin
+    orange during palette reduction, rendering as a bright orange smear instead of a shadow.
+    Fixed by darkening the shadow pixels before quantization so they cluster with the dark/
+    neutral tones instead - confirmed by re-inspecting the quantized preview against the
+    existing STAND/THROW pose shadows for a consistent look.
+  - Kit vs. fixed color classification was hand-verified the same way as THROW/CATCH: an
+    annotated 32x32 grid overlay was used to sample specific pixel coordinates (jersey chest,
+    shorts, skin, hair, shadow) and cross-reference against the printed HSL values, rather than
+    trusting an automatic hue/saturation heuristic.
+- `sprites_data.h`: `TILE_PLAYER_RUN` is now its own tile block (`TILE_USER_INDEX + 48`)
+  instead of aliasing `TILE_PLAYER_STAND`; `TILE_BALL`/`TILE_BALL_SHADOW`/`TILE_PLAYER_SMALL`/
+  `TILE_COURT_BASE` all shifted up by 16 tiles accordingly. `sprites_data.c` uploads the new
+  block at init. `player.c`'s `player_draw()` now sets `base = TILE_PLAYER_RUN` for
+  `POSE_RUN` (previously left at the default `TILE_PLAYER_STAND`), still hflipping per
+  `animFrame` for the other half of the stride - so both halves of the run cycle now show real
+  running art instead of one running + one idle-with-mirrored-legs.
+- **Verified**: clean rebuild, ROM loads correctly in Fusion (title bar confirms, static match
+  frame renders with no VRAM/tile corruption from the new block), and the generated tile array
+  was diffed byte-for-byte against the pipeline's own output to rule out a transcription error.
+  **Honest limitation**: live on-screen confirmation of the pose actually swapping to RUN while
+  moving was not completed this session - the automation's synthetic key-hold didn't reliably
+  reach Fusion's input handling (likely a DirectInput vs. injected-input mismatch, a tooling
+  gap rather than a game-code issue), and the static match frame doesn't move on its own to show
+  it. Worth a quick manual keyboard check next time the ROM is open.
+
 ---
 
 ## 📝 Design Decisions

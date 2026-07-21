@@ -121,6 +121,41 @@ static const u32 tile_player_catch[16][8] = {
     { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
 };
 
+/* RUN pose - a real mid-stride sprint (previously this slot didn't exist:
+ * player_draw() just reused STAND with hflip, which Qwen flagged as the
+ * single highest-leverage graphics fix - "reads as placeholder... probably
+ * costing 80% of perceived polish"). Same Pixel-Art-XL pipeline as THROW/
+ * CATCH, with one addition: the source render's background wasn't a flat
+ * card - it had an outer neutral-gray frame around a white interior, and
+ * the enclosed white gaps between the striding legs don't touch the image
+ * border, so the existing border-seeded flood-fill couldn't reach them
+ * and left ~70% of the quantized palette wasted on near-white background
+ * shades. Fixed with a global lightness/saturation background threshold
+ * instead of border-flood-fill for this pose. That also surfaced a second
+ * issue: the baked-in ground shadow (a desaturated gray-green, coincidentally
+ * close in lightness to the skin midtones) kept getting merged into the
+ * same quantized slot as the vivid skin orange, rendering as a bright
+ * orange smear instead of a shadow. Fixed by darkening the shadow pixels
+ * before quantization so they cluster with the dark/neutral tones instead. */
+static const u32 tile_player_run[16][8] = {
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000999 },
+    { 0x00000003, 0x00000888, 0x00000433, 0x00000018, 0x000000a1, 0x000000a2, 0x000000b1, 0x000000eb },
+    { 0x00000ad5, 0x00000422, 0x00000495, 0x031a14bd, 0x0341348e, 0x00831800, 0x000aa000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x99999999 },
+    { 0x4aa00000, 0x848a0000, 0x88420000, 0x1aaa0000, 0x14ba0000, 0x11aa0000, 0x81edd000, 0x31954100 },
+    { 0x1e2d1143, 0x05583331, 0x555d8311, 0x2ed5ebba, 0xd5555900, 0xdd5d5d00, 0xddd255e0, 0xbd5995b0 },
+    { 0x9de25250, 0xe9de552e, 0xe950555d, 0xe983ed2e, 0xee111ede, 0xb41134b0, 0x011388aa, 0x03111a82 },
+    { 0x004110be, 0x0083100e, 0x000a3100, 0x00000180, 0x000002b2, 0x00000bda, 0x00000b90, 0x99999999 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x10000000, 0x14000000, 0x31000000, 0x81800000, 0x03800000, 0x0a100000, 0x0a180000 },
+    { 0x04130000, 0x00a00000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0xa0000000 },
+    { 0xe0000000, 0xa0000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x90000000 },
+};
+
 /* Ball: white with a soft shadow (2) and a dark outline (3) so it reads
  * clearly against the green pitch. */
 static const u32 tile_ball[8] = {
@@ -151,18 +186,33 @@ static const u32 tile_ball_shadow[8] = {
 /* Small single-tile player (see TILE_PLAYER_SMALL) - a compact 8x8
  * humanoid, remapped onto the new 14-color plan so it shares a team's
  * real palette instead of a separate one: 6=kit (jersey ramp), 1=skin
- * (fixed), 2=highlight (kit ramp), 14=dark outline (fixed). Keeps a
- * 1px dark outline on its torso edges (like the ball's) so a
- * light-kit team doesn't disappear against the pitch. */
+ * (fixed), 15=dark outline.
+ *
+ * Bug found via a live screenshot review (Qwen flagged "Green Vipers'
+ * sprites are nearly invisible against the court", independently
+ * confirmed by zooming the actual capture): the outline used to be
+ * index 14, which this comment used to claim was "fixed" - it isn't.
+ * Per the palette layout above, 14 is part of the hue-rotated kit ramp
+ * (2,5,6,7,12,13,14), so for Green Vipers it resolves to
+ * pal_team_green[14] = 0x1D4E2D, a dark GREEN - which blends straight
+ * into the pitch's own dark grass shading stripe. Every other team's
+ * index 14 happens to land on a non-green dark shade, which is why
+ * this only ever showed up for one team.
+ *
+ * Fixed by using index 15 instead: every pal_team_*[16] array only
+ * initializes 15 of its 16 entries, so index 15 is implicitly zero
+ * (VDP color 0x0000 = pure black) for every team already, with no
+ * hue-rotation possible - a genuinely fixed, maximum-contrast outline
+ * against the pitch regardless of which team is playing. */
 static const u32 tile_player_small[8] = {
-    0x00eeee00,
-    0x00e11e00,
-    0x0e6666e0,
-    0xe666666e,
-    0xe666666e,
-    0x0e1661e0,
-    0x0e1661e0,
-    0xee0000ee
+    0x00ffff00,
+    0x00f11f00,
+    0x0f6666f0,
+    0xf666666f,
+    0xf666666f,
+    0x0f1661f0,
+    0x0f1661f0,
+    0xff0000ff
 };
 
 /* Per-team jersey palettes. Indices 2,5,6,7,12,13,14 are the "kit ramp"
@@ -215,6 +265,7 @@ void sprites_data_init(void)
     VDP_loadTileData(tile_player_stand[0], TILE_PLAYER_STAND, 16, DMA);
     VDP_loadTileData(tile_player_throw[0], TILE_PLAYER_THROW, 16, DMA);
     VDP_loadTileData(tile_player_catch[0], TILE_PLAYER_CATCH, 16, DMA);
+    VDP_loadTileData(tile_player_run[0],   TILE_PLAYER_RUN,   16, DMA);
 
     VDP_loadTileData(tile_ball,        TILE_BALL,        1, DMA);
     VDP_loadTileData(tile_ball_shadow, TILE_BALL_SHADOW,  1, DMA);

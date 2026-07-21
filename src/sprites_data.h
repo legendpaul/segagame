@@ -33,12 +33,19 @@
 
 /* Player pose tile blocks - each a full 16 consecutive tiles (4x4, 32x32px) */
 #define TILE_PLAYER_STAND   (TILE_USER_INDEX + 0)
-#define TILE_PLAYER_RUN     TILE_PLAYER_STAND
 #define TILE_PLAYER_THROW   (TILE_USER_INDEX + 16)
 #define TILE_PLAYER_CATCH   (TILE_USER_INDEX + 32)
+/* RUN used to alias STAND+hflip as a cheap sway - Qwen's top-ranked
+ * graphics critique flagged that as reading like a placeholder ("probably
+ * costing 80% of perceived polish"). It's now its own genuine 32x32 block:
+ * a real Pixel-Art-XL mid-stride running pose run through the same
+ * pipeline as THROW/CATCH (see docs/planning.md). player_draw() still
+ * hflips it per animFrame for the other half of the stride, but the base
+ * silhouette itself is now real running art, not the idle pose. */
+#define TILE_PLAYER_RUN     (TILE_USER_INDEX + 48)
 
-#define TILE_BALL           (TILE_USER_INDEX + 48)
-#define TILE_BALL_SHADOW    (TILE_USER_INDEX + 49)
+#define TILE_BALL           (TILE_USER_INDEX + 64)
+#define TILE_BALL_SHADOW    (TILE_USER_INDEX + 65)
 
 /* A single small 8x8 sprite (no pose variants) used only for the far
  * (CPU) side. Genesis sprites can't be hardware-scaled, so this fakes
@@ -47,10 +54,10 @@
  * rely on, by hand-authoring a separate tiny tile instead of scaling
  * the 16x16 one. Paired with court_bg.c's tapered sidelines for a
  * consistent perspective illusion. */
-#define TILE_PLAYER_SMALL   (TILE_USER_INDEX + 50)
+#define TILE_PLAYER_SMALL   (TILE_USER_INDEX + 66)
 
 /* First tile index free for court_bg.c to use */
-#define TILE_COURT_BASE     (TILE_USER_INDEX + 51)
+#define TILE_COURT_BASE     (TILE_USER_INDEX + 67)
 
 /* Palette lines: PAL0 is used by the system font + pitch background,
  * so sprites use 1-3. PAL1/PAL2 are *slots*, not fixed teams - which

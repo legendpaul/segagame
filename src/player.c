@@ -106,14 +106,20 @@ void player_draw(Player *p)
     bool flip = FALSE;
     s16 poseOffsetY = 0;
 
-    /* RUN still reuses the STAND tiles with hflip for a cheap side-to-
-     * side sway. THROW and CATCH now use their own genuinely distinct
+    /* RUN now uses its own genuine mid-stride 32x32 art (see
+     * sprites_data.c) instead of reusing STAND with hflip - that reuse
+     * was flagged as the single highest-leverage graphics fix ("reads as
+     * placeholder"). Still hflips per animFrame for the other half of the
+     * stride, same cheap 2-phase toggle as before, but now both phases
+     * show a real running pose instead of one running + one idle-with-
+     * mirrored-legs. THROW and CATCH use their own genuinely distinct
      * 32x32 art (separate Pixel-Art-XL generations - see sprites_data.c)
      * on top of the same coiled/braced Y-offset nudge from the earlier
      * motion-only pass, so the pose change reads both in silhouette and
      * in position. */
     if (p->pose == POSE_RUN)
     {
+        base = TILE_PLAYER_RUN;
         flip = (p->animFrame != 0);
     }
     else if (p->pose == POSE_THROW)
