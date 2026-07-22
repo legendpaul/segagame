@@ -988,3 +988,29 @@ A clean SGDK rebuild produced the checksummed 256KB ROM. Fusion QA verified the 
 selector, projected stadium, centre board, front/back players, wide possession ring, clear loose
 ball and a live scoring state after eliminations, with no tile-map corruption. `tools/fusion_qa.ps1`
 now provides repeatable focused-window input and lossless emulator captures for future passes.
+
+---
+
+## Rear-view anatomy, net depth and stadium-life pass (2026-07-22)
+
+- Replaced the procedural mirrored near-team heads with an authored four-pose rear-view sheet,
+  generated as raster reference art and converted through the existing deterministic 32x32/VDP
+  pipeline. The back of the skull, neck, shoulders and jersey are now structurally rear-facing;
+  no facial/chest pixels remain on the bottom team.
+- Reduced the visible ball diameter from roughly 13 pixels to 10 pixels (about 75%) while retaining
+  the 16x16 hardware container, dark outline and four rotating seam frames.
+- Split the centre divider into a background glass treatment and a 35-tile transparent priority
+  foreground. Rails, posts and glints now occlude far-side players correctly without opaque tile
+  rectangles hiding the rest of their bodies.
+- Rebuilt the outer stadium treatment with a full sloped grandstand, repeating coloured spectators,
+  concrete perimeter and projected advertising rail. The court is visually embedded in a venue
+  instead of floating inside unused green space.
+- Added slow home-relative off-ball movement for CPU players and unselected teammates. Movement is
+  clamped to each projected half and feeds the real alternating-leg run cycle.
+- The expanded 592-tile background and foreground net reuse the boot-logo VRAM range only during
+  match/game-over scenes. `court_bg_draw()` restores that scene-local overlap before drawing, so
+  selector flags, UI and plane maps retain their existing safe addresses.
+
+Clean SGDK rebuild and Fusion capture QA confirmed the matchup preview, correct rear anatomy,
+smaller held ball, far-side net occlusion, animated off-ball positioning, realistic grandstand and
+uncorrupted HUD. The hardware capture is preserved as `assets/fusion_match_v3_qa.png`.

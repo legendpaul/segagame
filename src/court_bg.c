@@ -32,6 +32,9 @@ void court_bg_init(void)
 void court_bg_draw(void)
 {
     u16 row, col;
+    /* Restore the scene-local tail that deliberately overlaps unused boot
+     * logo tiles in VRAM. */
+    VDP_loadTileData(stadium_tiles[0], TILE_COURT_BASE, STADIUM_TILE_COUNT, CPU);
     restore_colors();
     for (row = 0; row < 28; row++)
         for (col = 0; col < 40; col++)
@@ -39,4 +42,20 @@ void court_bg_draw(void)
                 TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
                     TILE_COURT_BASE + stadium_tilemap[row][col]),
                 col, row);
+}
+
+void court_bg_drawForeground(void)
+{
+    u16 row, col;
+    VDP_loadTileData(stadium_foreground_tiles[0], TILE_COURT_FG_BASE,
+                     STADIUM_FOREGROUND_TILE_COUNT, CPU);
+    for (row = 0; row < 28; row++)
+        for (col = 0; col < 40; col++)
+        {
+            u16 tile = stadium_foreground_tilemap[row][col];
+            if (tile)
+                VDP_setTileMapXY(BG_A,
+                    TILE_ATTR_FULL(PAL0, 1, FALSE, FALSE,
+                        TILE_COURT_FG_BASE + tile), col, row);
+        }
 }

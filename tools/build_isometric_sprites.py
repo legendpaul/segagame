@@ -16,6 +16,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "assets" / "player_isometric_sheet.png"
+BACK_SOURCE = ROOT / "assets" / "player_isometric_back_sheet_v2.png"
 OUTPUT = ROOT / "src" / "player_isometric_tiles.inc"
 PREVIEW = ROOT / "assets" / "player_isometric_preview.png"
 
@@ -43,14 +44,15 @@ def alternate_stride(canvas):
     return result
 
 
-def back_view(canvas):
-    """Create the opposing diagonal/back view used by the near team."""
-    result = [list(reversed(row)) for row in canvas]
-    # Suppress the forward-facing facial pixels while leaving the arms alone.
-    for y in range(2, 12):
-        for x in range(10, 22):
-            if result[y][x] in (1, 3, 4, 8, 9, 10, 11):
-                result[y][x] = 15 if y < 8 else 11
+def remove_green_key(image):
+    """Turn the authored rear sheet's bright-green matte transparent."""
+    result = image.convert("RGBA")
+    pixels = result.load()
+    for y in range(result.height):
+        for x in range(result.width):
+            r, g, b, a = pixels[x, y]
+            if g > 110 and g > r * 3 // 2 and g > b * 3 // 2:
+                pixels[x, y] = (r, g, b, 0)
     return result
 
 
@@ -135,8 +137,7 @@ def encode_far(canvas):
     return tiles
 
 
-def main():
-    image = Image.open(SOURCE).convert("RGBA")
+def build_canvases(image):
     boxes = sorted((box for _, box in components(image.getchannel("A"))), key=lambda b: b[0])
     if len(boxes) != 4:
         raise SystemExit(f"Expected four player components, found {len(boxes)}")
@@ -154,9 +155,14 @@ def main():
             for x in range(nw):
                 canvas[oy + y][ox + x] = index_pixel(sprite.getpixel((x, y)))
         pose_canvases[pose] = canvas
-    front = dict(pose_canvases)
+    return pose_canvases
+
+
+def main():
+    front = build_canvases(Image.open(SOURCE).convert("RGBA"))
     front["run_alt"] = alternate_stride(front["run"])
-    back = {name: back_view(canvas) for name, canvas in front.items()}
+    back = build_canvases(remove_green_key(Image.open(BACK_SOURCE)))
+    back["run_alt"] = alternate_stride(back["run"])
 
     preview = Image.new("RGB", (5 * 40, 2 * 40), (24, 40, 72))
     for row, canvases in enumerate((front, back)):

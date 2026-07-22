@@ -56,6 +56,7 @@ static s16 pendingTargetX;
 static s16 pendingTargetY;
 static u8  server;          /* 0 = team A serves, 1 = team B serves */
 static u8  roundWinnerIsA;
+static u16 ambientTick;      /* gentle off-ball repositioning cadence */
 
 static u8  flashTimer;      /* frames left in the current impact flash, 0 = none */
 static u8  shakeTimer;      /* frames left in the current screen shake, 0 = none */
@@ -216,6 +217,28 @@ static bool move_toward_ball(Player *p)
     return moved;
 }
 
+static bool move_ambient(Player *p, u8 slot)
+{
+    static const s8 offsetX[4] = { -6, 2, 7, -2 };
+    static const s8 offsetY[4] = { -2, -3, 2, 3 };
+    u8 beat = (u8)(((ambientTick / 48) + slot * 2) & 3);
+    s16 targetX = p->homeX + offsetX[beat];
+    s16 targetY = p->homeY + offsetY[beat];
+    bool moved = FALSE;
+
+    /* One-pixel corrections make players look alert without turning their
+     * idle movement into constant high-speed chasing. */
+    if (p->x < targetX) { p->x++; moved = TRUE; }
+    else if (p->x > targetX) { p->x--; moved = TRUE; }
+    if ((ambientTick & 1) == 0)
+    {
+        if (p->y < targetY) { p->y++; moved = TRUE; }
+        else if (p->y > targetY) { p->y--; moved = TRUE; }
+    }
+    player_clampToCourt(p);
+    return moved;
+}
+
 /* A/B/C address the visible left/middle/right opponent lanes. If that
  * exact slot is out, use the nearest surviving lane rather than silently
  * choosing a random target. */
@@ -329,6 +352,7 @@ static void clear_playfield_text(void)
      * supposedly temporary lower-third stuck over live play. */
     VDP_clearTileMapRect(BG_A, 0, 0, 40, 28);
     draw_hud();
+    court_bg_drawForeground();
 }
 
 static void begin_announce(void)
@@ -388,6 +412,7 @@ void scene_match_enter(void)
     looseTimer = 0;
     worldOffsetY = 0;
     matchSeconds = 0;
+    ambientTick = 0;
     clockFrameCounter = 0;
     VDP_setVerticalScroll(BG_B, 0);
     stallTrackerInit = FALSE;
@@ -497,6 +522,8 @@ static void finish_hit_to_A(void)
 void scene_match_update(void)
 {
     bool cpuMoved = FALSE;
+    bool ambientMovedA[TEAM_SIZE] = { FALSE, FALSE, FALSE };
+    bool ambientMovedB[TEAM_SIZE] = { FALSE, FALSE, FALSE };
     u8 i;
 
     input_mgr_update();
@@ -528,6 +555,21 @@ void scene_match_update(void)
     }
 
     if (looseTimer > 0) looseTimer--;
+    ambientTick++;
+
+    if (state != MS_ANNOUNCE && state != MS_ROUND_END &&
+        state != MS_HIT_A && state != MS_HIT_B)
+    {
+        for (i = 0; i < TEAM_SIZE; i++)
+        {
+            bool cpuBusy = (i == holderB) &&
+                (state == MS_B_HOLD || state == MS_B_WINDUP || state == MS_LOOSE_B);
+            if (i != activeA && !teamA[i].eliminated && !teamA[i].exiting)
+                ambientMovedA[i] = move_ambient(&teamA[i], i);
+            if (!cpuBusy && !teamB[i].eliminated && !teamB[i].exiting)
+                ambientMovedB[i] = move_ambient(&teamB[i], i + TEAM_SIZE);
+        }
+    }
 
     /* The player you're actively controlling always moves on input,
      * whether or not they're the one currently resolving a play - lets
@@ -765,7 +807,8 @@ void scene_match_update(void)
      * parked off-screen by player_eliminate() so this stays simple). */
     for (i = 0; i < TEAM_SIZE; i++)
     {
-        bool aMoving = teamA[i].exiting || ((i == activeA) && !teamA[i].eliminated &&
+        bool aMoving = teamA[i].exiting || ambientMovedA[i] ||
+                       ((i == activeA) && !teamA[i].eliminated &&
                        (input_held(BUTTON_LEFT) || input_held(BUTTON_RIGHT) ||
                         input_held(BUTTON_UP) || input_held(BUTTON_DOWN)));
         player_tickAnim(&teamA[i], aMoving);
@@ -773,7 +816,7 @@ void scene_match_update(void)
         player_draw(&teamA[i]);
         teamA[i].y -= worldOffsetY;
 
-        bool bMoving = teamB[i].exiting ||
+        bool bMoving = teamB[i].exiting || ambientMovedB[i] ||
                        (cpuMoved && (i == holderB) && (state == MS_LOOSE_B));
         player_tickAnim(&teamB[i], bMoving);
         teamB[i].y += worldOffsetY;

@@ -17,6 +17,8 @@ Design brief: [docs/planning.md](docs/planning.md).
   - There is no catch action: an airborne collision is always a hit.
   - Missed and deflected throws ricochet inside a damped projected rebound box.
   - The ball remains loose until a player physically runs to it; it never teleports into a hand.
+  - CPU and unselected teammates make small bounded off-ball runs instead of standing frozen.
+  - A priority-layer transparent centre net correctly occludes players on the far half.
   - Hit players drop the ball at their feet and visibly run off the right touchline.
   - 3 players per side per round; eliminate all 3 to score a point.
   - First to 3 points wins the match.

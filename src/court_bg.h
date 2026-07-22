@@ -4,10 +4,15 @@
 
 #include "genesis.h"
 
-/* Exact generated bank size. Downstream scene banks are compile-time based. */
+/* Static reservation. The match-local court bank may extend into the boot
+ * logo's VRAM because those scenes are mutually exclusive. */
 #define COURT_TILE_COUNT 549
+/* Match-local background currently contains 592 generated tiles; place the
+ * 35 foreground tiles immediately after it, still inside the unused logo bank. */
+#define TILE_COURT_FG_BASE (TILE_COURT_BASE + 592)
 
 void court_bg_init(void);   /* uploads tiles + pitch colors, call once at boot */
 void court_bg_draw(void);   /* paints BG_B, call from each scene's _enter() */
+void court_bg_drawForeground(void); /* transparent priority net on BG_A */
 
 #endif /* _COURT_BG_H_ */
