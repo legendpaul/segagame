@@ -1,8 +1,8 @@
 /*
  * scene_menu.c - Arcade title and sequential national-team selection.
  *
- * Flow: title -> choose Team 1 -> choose Team 2 -> match. Each team gets
- * its own full selector screen, large flag and kit preview.
+ * Flow: title -> choose Team 1 -> choose Team 2 -> broadcast matchup ->
+ * match. Each team gets its own selector, large flag and kit preview.
  */
 #include "genesis.h"
 #include "scene_menu.h"
@@ -26,7 +26,8 @@
 typedef enum {
     MENU_TITLE = 0,
     MENU_TEAM_A,
-    MENU_TEAM_B
+    MENU_TEAM_B,
+    MENU_MATCHUP
 } MenuPhase;
 
 static MenuPhase phase;
@@ -37,8 +38,8 @@ static s16 bobOffset;
 
 static void draw_title(void)
 {
-    VDP_clearPlane(VDP_BG_A, TRUE);
-    VDP_clearPlane(VDP_BG_B, TRUE);
+    VDP_clearPlane(BG_A, TRUE);
+    VDP_clearPlane(BG_B, TRUE);
     VDP_clearSprites();
     title_data_draw();
     blinkCounter = 0;
@@ -71,6 +72,20 @@ static void enter_selector(MenuPhase next)
     phase = next;
     VDP_clearSprites();
     draw_selector();
+    bobCounter = 0;
+    bobOffset = 0;
+}
+
+static void enter_matchup(void)
+{
+    phase = MENU_MATCHUP;
+    VDP_clearSprites();
+    sprites_data_apply_teams(gTeamAIndex, gTeamBIndex);
+    flag_data_draw_matchup(gTeamAIndex, gTeamBIndex);
+    player_init(&previewA, 106, 152, SLOT_PREVIEW_A, PAL_TEAM_A);
+    player_init(&previewB, 214, 152, SLOT_PREVIEW_B, PAL_TEAM_B);
+    previewA.facingLeft = FALSE;
+    previewB.facingLeft = TRUE;
     bobCounter = 0;
     bobOffset = 0;
 }
@@ -114,6 +129,35 @@ void scene_menu_update(void)
         return;
     }
 
+    if (phase == MENU_MATCHUP)
+    {
+        if (++bobCounter >= BOB_PERIOD)
+        {
+            bobCounter = 0;
+            bobOffset = bobOffset ? 0 : -2;
+        }
+        if (input_pressed(BUTTON_B))
+        {
+            sound_mgr_cancel();
+            enter_selector(MENU_TEAM_B);
+            return;
+        }
+        if (input_pressed(BUTTON_A) || input_pressed(BUTTON_START))
+        {
+            sound_mgr_confirm();
+            gScoreA = 0;
+            gScoreB = 0;
+            PAL_fadeOutAll(20, FALSE);
+            gCurrentScene = GS_MATCH;
+            return;
+        }
+        previewA.y = 152 + bobOffset;
+        previewB.y = 152 - bobOffset;
+        player_draw(&previewA);
+        player_draw(&previewB);
+        return;
+    }
+
     if (++bobCounter >= BOB_PERIOD)
     {
         bobCounter = 0;
@@ -141,10 +185,7 @@ void scene_menu_update(void)
         }
         else
         {
-            gScoreA = 0;
-            gScoreB = 0;
-            PAL_fadeOutAll(20, FALSE);
-            gCurrentScene = GS_MATCH;
+            enter_matchup();
             return;
         }
     }

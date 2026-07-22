@@ -415,6 +415,29 @@ you're asked to do.
 - Commit messages in this repo are intentionally detailed (see `git log`) — they document not
   just what changed but what was tried and rejected, and why, because that's genuinely useful to
   the next person (you). Keep that standard.
+
+---
+
+## 10. Broadcast presentation pass (2026-07-22)
+
+The menu flow is now:
+
+`boot -> title -> Player 1 country -> Player 2 country -> MATCH UP -> match`
+
+The new matchup screen is implemented by `flag_data_draw_matchup()` and rendered from
+`MENU_MATCHUP` in `scene_menu.c`. A or Start confirms the fixture; B returns to Player 2 select.
+The match opens each round with a temporary FIFA-style flag card and whistle, then clears to a
+Virtua Striker-inspired compact top scoreboard containing country flags, names, clock and score.
+
+Critical SGDK note: plane-taking APIs in this project must receive the `VDPPlane` enum values
+`BG_A`, `BG_B` or `WINDOW`. Do not pass `VDP_BG_A` / `VDP_BG_B`; in the installed SGDK those are
+VRAM address macros, and using them here can silently select the wrong plane. All source call sites
+were corrected in this pass after this bug was found to be the reason UI clears damaged the pitch.
+
+Verified reference footage:
+
+- FIFA International Soccer (Mega-CD): https://www.youtube.com/watch?v=68TFHQlugiY
+- Virtua Striker 2 (Dreamcast): https://www.youtube.com/watch?v=3lSwlIjwhVY
 - `docs/planning.md`'s dated sections are the source of truth for implementation detail; this
   file is the map to get you oriented fast, not a replacement for reading the actual code and
   the last couple of `planning.md` entries.

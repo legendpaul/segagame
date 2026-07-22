@@ -27,6 +27,7 @@ void sound_mgr_throw(void);
 void sound_mgr_catch(void);
 void sound_mgr_hit(void);
 void sound_mgr_bounce(void);
+void sound_mgr_whistle(void);
 void sound_mgr_score(void);
 
 #endif /* _SOUND_MGR_H_ */

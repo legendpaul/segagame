@@ -211,7 +211,7 @@ void logo_data_draw(void)
         for (col = 0; col < LOGO_TILES_W; col++)
         {
             u16 t = logo_tilemap[row][col];
-            VDP_setTileMapXY(VDP_BG_A, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_LOGO_BASE + t), offX + col, offY + row);
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_LOGO_BASE + t), offX + col, offY + row);
         }
     }
 }

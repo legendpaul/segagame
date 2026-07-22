@@ -867,3 +867,37 @@ one coherent wind-up/flight/contact loop rather than adding unrelated modes or H
 ---
 
 🎮 *Let’s build a great Mega Drive game — together — and test it thoroughly every step of the way!*
+
+---
+
+## FIFA Mega-CD + Virtua Striker 2 broadcast presentation study (2026-07-22)
+
+Reference footage studied in motion:
+
+- FIFA International Soccer (Mega-CD): https://www.youtube.com/watch?v=68TFHQlugiY
+- Virtua Striker 2 (Dreamcast): https://www.youtube.com/watch?v=3lSwlIjwhVY
+
+The artistic target is not to copy either game's assets. It combines FIFA's clean three-quarter
+match framing, grounded players, sparse in-play information and temporary flag-led kickoff card
+with Virtua Striker 2's dark-blue broadcast chrome, bright score digits, compact clock and strong
+arcade hierarchy.
+
+Implemented in this pass:
+
+- Added a dedicated `MATCH UP` screen after both players select their countries. Large national
+  flags, inward-facing kit previews and a gold `VS` establish the fixture before kickoff.
+- Rebuilt the match HUD as a compact three-row broadcast scoreboard with flags, abbreviated team
+  names, a live match clock and a centered score. The pitch is no longer covered by control text.
+- Added a temporary lower-third match-introduction card over a clean stadium establishing shot.
+  Gameplay sprites are hidden only during this short announcement, then the graphic clears.
+- Added a whistle cue at the beginning of each round so the visual transition also has an audible
+  broadcast beat.
+- Expanded the shared ball/UI palette with the flag colours required during gameplay, preserving
+  the authored stadium palette.
+- Corrected every current-SGDK plane API call to use the `BG_A` / `BG_B` `VDPPlane` values. The
+  obsolete-looking `VDP_BG_A` / `VDP_BG_B` identifiers are VRAM address macros in this SGDK build;
+  passing them as plane enums caused foreground UI operations to affect the wrong plane and erase
+  stadium art. This was a presentation-wide rendering fault, not merely a cosmetic typo.
+
+Fusion capture verification confirmed the flag-led matchup screen, stadium establishing card and
+compact in-match scoreboard render correctly at 320x224.

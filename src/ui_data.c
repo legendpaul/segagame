@@ -98,7 +98,7 @@ void ui_draw_text(const char *text, u16 x, u16 y, u8 style)
         if (text[i] == ' ') continue;
         glyph = glyph_index(text[i]);
         if (glyph < 0) continue;
-        VDP_setTileMapXY(VDP_BG_A, TILE_ATTR_FULL(uiPalette, 1, FALSE, FALSE,
+        VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(uiPalette, 1, FALSE, FALSE,
             TILE_UI_SMALL + style * UI_GLYPH_COUNT + (u16)glyph), x, y);
     }
 }
@@ -131,10 +131,10 @@ void ui_draw_big_text(const char *text, u16 x, u16 y, u8 style)
         if (glyph >= 0)
         {
             u16 base = TILE_UI_BIG + (u16)glyph * 4;
-            VDP_setTileMapXY(VDP_BG_A, TILE_ATTR_FULL(bigPalette, 1, FALSE, FALSE, base + 0), x, y);
-            VDP_setTileMapXY(VDP_BG_A, TILE_ATTR_FULL(bigPalette, 1, FALSE, FALSE, base + 1), x, y + 1);
-            VDP_setTileMapXY(VDP_BG_A, TILE_ATTR_FULL(bigPalette, 1, FALSE, FALSE, base + 2), x + 1, y);
-            VDP_setTileMapXY(VDP_BG_A, TILE_ATTR_FULL(bigPalette, 1, FALSE, FALSE, base + 3), x + 1, y + 1);
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(bigPalette, 1, FALSE, FALSE, base + 0), x, y);
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(bigPalette, 1, FALSE, FALSE, base + 1), x, y + 1);
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(bigPalette, 1, FALSE, FALSE, base + 2), x + 1, y);
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(bigPalette, 1, FALSE, FALSE, base + 3), x + 1, y + 1);
         }
         x += 2;
     }
@@ -170,7 +170,7 @@ void ui_draw_panel(u16 x, u16 y, u16 w, u16 h, bool gold)
             {
                 tile = vTile; hf = (col == w - 1);
             }
-            VDP_setTileMapXY(VDP_BG_A, TILE_ATTR_FULL(uiPalette, 0, vf, hf, tile), x + col, y + row);
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(uiPalette, 0, vf, hf, tile), x + col, y + row);
         }
 }
 

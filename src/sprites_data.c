@@ -310,7 +310,8 @@ static const u16 * const pal_teams[NUM_TEAMS] = {
 static const u16 pal_ball[16] = {
     0x0000, P(0xF8F8F8), P(0x9098A0), P(0x101010),
     P(0xF8D020), P(0xE82828), P(0xF08020), 0,
-    0, 0, 0, 0, 0, 0, 0, 0
+    P(0xD82830), P(0x2048B0), P(0xF8C820), P(0x101018),
+    P(0x70C0E8), P(0x189048), P(0xE87018), 0
 };
 
 void sprites_data_init(void)

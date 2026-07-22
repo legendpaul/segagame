@@ -17,8 +17,8 @@ static u16 bootTimer;
 
 void scene_boot_enter(void)
 {
-    VDP_clearPlane(VDP_BG_A, TRUE);
-    VDP_clearPlane(VDP_BG_B, TRUE);
+    VDP_clearPlane(BG_A, TRUE);
+    VDP_clearPlane(BG_B, TRUE);
     VDP_clearSprites();
     VDP_clearTextArea(0, 0, 40, 28);
 

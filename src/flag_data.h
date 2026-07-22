@@ -11,5 +11,8 @@
 void flag_data_init(void);
 void flag_data_draw_grid(u8 selected);
 void flag_data_draw_selector(u8 selected, u8 playerNumber);
+void flag_data_draw_small(u8 teamIndex, u16 x, u16 y, u8 palette);
+void flag_data_draw_large(u8 teamIndex, u16 x, u16 y, u8 palette);
+void flag_data_draw_matchup(u8 teamAIndex, u8 teamBIndex);
 
 #endif /* _FLAG_DATA_H_ */

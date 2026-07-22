@@ -35,7 +35,7 @@ void court_bg_draw(void)
     restore_colors();
     for (row = 0; row < 28; row++)
         for (col = 0; col < 40; col++)
-            VDP_setTileMapXY(VDP_BG_B,
+            VDP_setTileMapXY(BG_B,
                 TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
                     TILE_COURT_BASE + stadium_tilemap[row][col]),
                 col, row);

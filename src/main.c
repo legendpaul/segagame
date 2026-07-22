@@ -33,9 +33,9 @@ int main(bool hardReset)
     setRandomSeed(GET_HVCOUNTER ^ 0xACE1);
 
     /* Force all VDP_drawText/VDP_clearText* calls onto a single, known
-     * plane so each scene's VDP_clearPlane(VDP_BG_A, ...) reliably wipes
+     * plane so each scene's VDP_clearPlane(BG_A, ...) reliably wipes
      * whatever the previous scene drew there. */
-    VDP_setTextPlane(VDP_BG_A);
+    VDP_setTextPlane(BG_A);
 
     sprites_data_init();
     court_bg_init();

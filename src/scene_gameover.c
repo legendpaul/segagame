@@ -20,8 +20,8 @@ void scene_gameover_enter(void)
     char buf[4];
 
     VDP_clearSprites();
-    VDP_clearPlane(VDP_BG_A, TRUE);
-    VDP_clearPlane(VDP_BG_B, TRUE);
+    VDP_clearPlane(BG_A, TRUE);
+    VDP_clearPlane(BG_B, TRUE);
     VDP_clearTextArea(0, 0, 40, 28);
     court_bg_draw();
     sprites_data_apply_teams(gTeamAIndex, gTeamBIndex);

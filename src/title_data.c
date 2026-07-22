@@ -54,10 +54,10 @@ static void draw_word(const char *word, u16 y)
         u16 base;
         if (glyph < 0) continue;
         base = TILE_TITLE_BASE + (u16)glyph * 4;
-        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, base + 0), x, y);
-        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, base + 1), x, y + 1);
-        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, base + 2), x + 1, y);
-        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, base + 3), x + 1, y + 1);
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, base + 0), x, y);
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, base + 1), x, y + 1);
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, base + 2), x + 1, y);
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, base + 3), x + 1, y + 1);
     }
 }
 
@@ -80,14 +80,14 @@ void title_data_draw(void)
 
     for (row = 0; row < 28; row++)
         for (col = 0; col < 40; col++)
-            VDP_setTileMapXY(VDP_BG_B,
+            VDP_setTileMapXY(BG_B,
                 TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
                     ((row + col) % 17 == 0) ? TILE_TITLE_LIGHT_A :
                     ((row * 3 + col) % 23 == 0) ? TILE_TITLE_LIGHT_B : TILE_TITLE_BG),
                 col, row);
 
     for (col = 0; col < 40; col++)
-        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_TITLE_RAIL), col, 23);
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_TITLE_RAIL), col, 23);
 
     draw_word("MICRO", 3);
     draw_word("RETRO", 6);
@@ -97,7 +97,7 @@ void title_data_draw(void)
      * large emblem without copying its branding. */
     for (col = 0; col < 4; col++)
         for (row = 0; row < 4; row++)
-            VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 1, FALSE, FALSE,
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 1, FALSE, FALSE,
                 ballBase + col * 4 + row), 31 + col, 14 + row);
 
     ui_draw_text_center("WORLD CHAMPIONSHIP", 14, UI_CYAN);

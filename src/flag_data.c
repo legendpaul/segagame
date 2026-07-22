@@ -67,6 +67,60 @@ void flag_data_init(void)
     VDP_loadTileData(tile_flag_select, TILE_FLAG_SELECT, 1, DMA);
 }
 
+void flag_data_draw_small(u8 teamIndex, u16 x, u16 y, u8 palette)
+{
+    VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(palette, 1, FALSE, FALSE,
+        TILE_FLAGS + teamIndex * 2), x, y);
+    VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(palette, 1, FALSE, FALSE,
+        TILE_FLAGS + teamIndex * 2 + 1), x + 1, y);
+}
+
+void flag_data_draw_large(u8 teamIndex, u16 x, u16 y, u8 palette)
+{
+    u16 row, col;
+    u16 base = TILE_FLAGS_LARGE + teamIndex * 8;
+    for (col = 0; col < 4; col++)
+        for (row = 0; row < 2; row++)
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(palette, 1, FALSE, FALSE,
+                base + col * 2 + row), x + col, y + row);
+}
+
+void flag_data_draw_matchup(u8 teamAIndex, u8 teamBIndex)
+{
+    u16 row, col;
+    u16 leftBase = TILE_FLAGS_LARGE + teamAIndex * 8;
+    u16 rightBase = TILE_FLAGS_LARGE + teamBIndex * 8;
+    apply_flag_palette();
+    ui_set_palette(PAL0);
+    ui_apply_palette();
+
+    for (row = 0; row < 28; row++)
+        for (col = 0; col < 40; col++)
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
+                TILE_FLAG_PANEL), col, row);
+
+    VDP_clearPlane(BG_A, TRUE);
+    ui_draw_panel(1, 1, 38, 26, FALSE);
+    ui_draw_big_center("MATCH UP", 3, UI_WHITE);
+    ui_draw_text_center("WORLD CHAMPIONSHIP", 6, UI_CYAN);
+
+    for (col = 0; col < 4; col++)
+        for (row = 0; row < 2; row++)
+        {
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL0, 1, FALSE, FALSE,
+                leftBase + col * 2 + row), 7 + col, 9 + row);
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL0, 1, FALSE, FALSE,
+                rightBase + col * 2 + row), 29 + col, 9 + row);
+        }
+
+    ui_draw_big_text("VS", 18, 9, UI_GOLD);
+    ui_draw_text(teamNames[teamAIndex], 9 - strlen(teamNames[teamAIndex]) / 2,
+                 12, UI_GOLD);
+    ui_draw_text(teamNames[teamBIndex], 31 - strlen(teamNames[teamBIndex]) / 2,
+                 12, UI_GOLD);
+    ui_draw_button("START MATCH", 13, 23, 14);
+}
+
 
 void flag_data_draw_selector(u8 selected, u8 playerNumber)
 {
@@ -80,11 +134,11 @@ void flag_data_draw_selector(u8 selected, u8 playerNumber)
     /* Dark broadcast-style backing with a bright selected row. */
     for (row = 0; row < 28; row++)
         for (col = 0; col < 40; col++)
-            VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
                 (row >= 5 && row <= 16 && col < 23 && row == selected + 6)
                     ? TILE_FLAG_SELECT : TILE_FLAG_PANEL), col, row);
 
-    VDP_clearPlane(VDP_BG_A, TRUE);
+    VDP_clearPlane(BG_A, TRUE);
     ui_draw_panel(0, 0, 40, 4, FALSE);
     ui_draw_big_text("SELECT TEAM", 1, 1, UI_WHITE);
     ui_draw_text(playerNumber == 1 ? "PLAYER 1" : "PLAYER 2", 30, 1, UI_GOLD);
@@ -93,9 +147,9 @@ void flag_data_draw_selector(u8 selected, u8 playerNumber)
     for (i = 0; i < NUM_TEAMS; i++)
     {
         u16 y = i + 6;
-        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
             TILE_FLAGS + i * 2), 2, y);
-        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
             TILE_FLAGS + i * 2 + 1), 3, y);
         ui_draw_text(teamNames[i], 6, y, (i == selected) ? UI_GOLD : UI_WHITE);
         if (i == selected)
@@ -108,17 +162,17 @@ void flag_data_draw_selector(u8 selected, u8 playerNumber)
     /* Large, nearest-neighbour flag and a proper white box on the right. */
     for (col = 25; col <= 30; col++)
     {
-        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_H), col, 6);
-        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, TRUE, FALSE, TILE_FLAG_BOX_H), col, 9);
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_H), col, 6);
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, TRUE, FALSE, TILE_FLAG_BOX_H), col, 9);
     }
     for (row = 7; row <= 8; row++)
     {
-        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_L), 25, row);
-        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_R), 30, row);
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_L), 25, row);
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_R), 30, row);
     }
     for (col = 0; col < 4; col++)
         for (row = 0; row < 2; row++)
-            VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
                 largeBase + col * 2 + row), 26 + col, 7 + row);
 
     ui_draw_text(teamNames[selected], 25, 11, UI_GOLD);
@@ -137,14 +191,14 @@ void flag_data_draw_grid(u8 selected)
      * leaving font-space artifacts over the isometric court. */
     for (row = 3; row <= 11; row++)
         for (col = 0; col < 40; col++)
-            VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_PANEL), col, row);
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_PANEL), col, row);
 
     for (i = 0; i < NUM_TEAMS; i++)
     {
         u16 x = 1 + (i % 5) * 8;
         u16 y = 4 + (i / 5) * 4;
-        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAGS + i * 2), x + 1, y + 1);
-        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAGS + i * 2 + 1), x + 2, y + 1);
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAGS + i * 2), x + 1, y + 1);
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAGS + i * 2 + 1), x + 2, y + 1);
     }
 
     {
@@ -152,10 +206,10 @@ void flag_data_draw_grid(u8 selected)
         u16 y = 4 + (selected / 5) * 4;
         for (col = x; col < x + 4; col++)
         {
-            VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_H), col, y);
-            VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, TRUE, FALSE, TILE_FLAG_BOX_H), col, y + 2);
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_H), col, y);
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, TRUE, FALSE, TILE_FLAG_BOX_H), col, y + 2);
         }
-        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_L), x, y + 1);
-        VDP_setTileMapXY(VDP_BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_R), x + 3, y + 1);
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_L), x, y + 1);
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_R), x + 3, y + 1);
     }
 }

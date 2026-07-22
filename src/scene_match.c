@@ -10,6 +10,7 @@
 #include "sprites_data.h"
 #include "court_bg.h"
 #include "ui_data.h"
+#include "flag_data.h"
 
 #define SLOT_TEAM_A   0    /* teamA uses sprite slots 0,1,2 */
 #define SLOT_TEAM_B   3    /* teamB uses sprite slots 3,4,5 */
@@ -42,6 +43,8 @@ static s8  outStackA[TEAM_SIZE], outStackB[TEAM_SIZE];  /* elimination order, LI
 static u8  outCountA, outCountB;
 
 static u16 announceTimer;
+static u16 matchSeconds;
+static u8  clockFrameCounter;
 static u16 aiDelay;
 static u16 roundEndTimer;
 static u8  windupTimer;
@@ -226,17 +229,45 @@ static void reset_team(Player team[], u8 baseSlot, u8 pal, s16 baseDepth, bool f
 static void draw_hud(void)
 {
     char buf[8];
+    char clock[6];
+    u16 minutes = matchSeconds / 60;
+    u16 seconds = matchSeconds % 60;
     ui_set_palette(PAL0);
     ui_apply_palette();
-    ui_draw_panel(0, 0, 40, 4, FALSE);
-    ui_draw_text(teamNames[gTeamAIndex], 1, 1, UI_WHITE);
-    ui_draw_text(teamNames[gTeamBIndex], 40 - 1 - strlen(teamNames[gTeamBIndex]), 1, UI_WHITE);
+    ui_draw_panel(0, 0, 40, 3, FALSE);
+    flag_data_draw_small(gTeamAIndex, 1, 1, PAL3);
+    flag_data_draw_small(gTeamBIndex, 37, 1, PAL3);
+    ui_draw_text(teamNames[gTeamAIndex], 4, 1, UI_WHITE);
+    ui_draw_text(teamNames[gTeamBIndex], 36 - strlen(teamNames[gTeamBIndex]), 1, UI_WHITE);
+
+    clock[0] = '0' + ((minutes / 10) % 10);
+    clock[1] = '0' + (minutes % 10);
+    clock[2] = ':';
+    clock[3] = '0' + (seconds / 10);
+    clock[4] = '0' + (seconds % 10);
+    clock[5] = 0;
+    ui_draw_text(clock, 13, 1, UI_CYAN);
 
     intToStr(gScoreA, buf, 1);
-    ui_draw_big_text(buf, 17, 1, UI_GOLD);
-    ui_draw_text("-", 20, 1, UI_WHITE);
+    ui_draw_text(buf, 20, 1, UI_GOLD);
+    ui_draw_text("-", 21, 1, UI_WHITE);
     intToStr(gScoreB, buf, 1);
-    ui_draw_big_text(buf, 21, 1, UI_GOLD);
+    ui_draw_text(buf, 22, 1, UI_GOLD);
+}
+
+static void draw_match_intro(void)
+{
+    char roundBuf[4];
+    u8 roundNumber = gScoreA + gScoreB + 1;
+    ui_draw_panel(2, 20, 36, 7, TRUE);
+    ui_draw_text("ROUND", 16, 21, UI_CYAN);
+    intToStr(roundNumber, roundBuf, 1);
+    ui_draw_text(roundBuf, 22, 21, UI_GOLD);
+    flag_data_draw_large(gTeamAIndex, 4, 23, PAL3);
+    flag_data_draw_large(gTeamBIndex, 32, 23, PAL3);
+    ui_draw_text(teamNames[gTeamAIndex], 9, 23, UI_WHITE);
+    ui_draw_text(teamNames[gTeamBIndex], 31 - strlen(teamNames[gTeamBIndex]), 23, UI_WHITE);
+    ui_draw_big_text("VS", 18, 23, UI_GOLD);
 }
 
 /* SGDK's text-line clear writes opaque font-space tiles, which created
@@ -245,7 +276,10 @@ static void draw_hud(void)
  * the isometric BG_B court visible again everywhere else. */
 static void clear_playfield_text(void)
 {
-    VDP_clearPlane(VDP_BG_A, TRUE);
+    /* Use the immediate rectangular clear here. The asynchronous full-plane
+     * clear could remain queued behind the per-second HUD writes, leaving a
+     * supposedly temporary lower-third stuck over live play. */
+    VDP_clearTileMapRect(BG_A, 0, 0, 40, 28);
     draw_hud();
 }
 
@@ -254,6 +288,8 @@ static void begin_announce(void)
     /* Keep state messaging out of the projected playfield. The old
      * full-width text row broke the court into two flat halves. */
     clear_playfield_text();
+    draw_match_intro();
+    sound_mgr_whistle();
 
     announceTimer = 60;
     state = MS_ANNOUNCE;
@@ -287,8 +323,8 @@ static void start_round(void)
 
 void scene_match_enter(void)
 {
-    VDP_clearPlane(VDP_BG_A, TRUE);
-    VDP_clearPlane(VDP_BG_B, TRUE);
+    VDP_clearPlane(BG_A, TRUE);
+    VDP_clearPlane(BG_B, TRUE);
     VDP_clearSprites();
     VDP_setTextPalette(PAL0);
     /* VDP_clearPlane alone can leave stale text tiles behind on a scene
@@ -305,7 +341,9 @@ void scene_match_enter(void)
     shakeTimer = 0;
     catchTimer = 0;
     worldOffsetY = 0;
-    VDP_setVerticalScroll(VDP_BG_B, 0);
+    matchSeconds = 0;
+    clockFrameCounter = 0;
+    VDP_setVerticalScroll(BG_B, 0);
     stallTrackerInit = FALSE;
     server = 0;
     start_round();
@@ -461,6 +499,13 @@ void scene_match_update(void)
 
     input_mgr_update();
 
+    if (++clockFrameCounter >= (SYS_isPAL() ? 50 : 60))
+    {
+        clockFrameCounter = 0;
+        if (matchSeconds < 5999) matchSeconds++;
+        draw_hud();
+    }
+
     if (flashTimer > 0)
     {
         flashTimer--;
@@ -471,12 +516,12 @@ void scene_match_update(void)
     if (shakeTimer > 0)
     {
         worldOffsetY = shakePattern[6 - shakeTimer];
-        VDP_setVerticalScroll(VDP_BG_B, worldOffsetY);
+        VDP_setVerticalScroll(BG_B, worldOffsetY);
         shakeTimer--;
         if (shakeTimer == 0)
         {
             worldOffsetY = 0;
-            VDP_setVerticalScroll(VDP_BG_B, 0);
+            VDP_setVerticalScroll(BG_B, 0);
         }
     }
 
@@ -681,6 +726,15 @@ void scene_match_update(void)
             }
             break;
         }
+    }
+
+    /* The FIFA-style lower-third opens on a clean stadium establishing
+     * shot. Gameplay sprites appear together when the banner clears,
+     * avoiding the hardware-sprite layer cutting through the graphic. */
+    if (state == MS_ANNOUNCE)
+    {
+        VDP_clearSprites();
+        return;
     }
 
     /* Animate + draw every player on both sides (eliminated ones are
