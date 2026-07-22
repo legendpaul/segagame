@@ -50,6 +50,8 @@ static u16 roundEndTimer;
 static u8  windupTimer;
 static u8  impactTimer;
 static bool hitExitStarted;
+static s8  hitKnockX;       /* signed screen-space direction of the incoming ball */
+static s8  hitKnockY;
 static u8  looseTimer;      /* prevents instant pickup at the impact point */
 static s8  pendingSpin;
 static s16 pendingTargetX;
@@ -527,6 +529,31 @@ static void begin_loose_for_A(void)
     state = MS_LOOSE_A;
 }
 
+/* Lock the actual start-to-contact travel vector before ball_dropAt() changes
+ * the ball state. The authored hit/fall silhouette leans left unflipped and
+ * right when mirrored, so facingLeft deliberately follows a rightward knock. */
+static void lock_hit_direction(Player *victim)
+{
+    s16 travelX = ball.x - ball.startX;
+    s16 travelY = ball.y - ball.startY;
+
+    hitKnockX = (travelX > 2) ? 1 : ((travelX < -2) ? -1 : 0);
+    hitKnockY = (travelY > 2) ? 1 : ((travelY < -2) ? -1 : 0);
+    if (hitKnockX != 0) victim->facingLeft = (hitKnockX > 0);
+}
+
+static void advance_hit_recoil(Player *victim)
+{
+    /* Six one-pixel steps carry the body along the incoming vector during
+     * recoil. The grounded fall then holds that displaced contact point. */
+    if ((impactTimer >= HIT_FALL_FRAMES) &&
+        (((impactTimer - HIT_FALL_FRAMES) & 1) == 0))
+    {
+        victim->x += hitKnockX;
+        victim->y += hitKnockY;
+    }
+}
+
 /* Every airborne overlap is a hit. A miss enters the same loose-ball
  * rally as a hit; possession is earned only by reaching the rebound. */
 static void resolve_throw_to_B(void)
@@ -540,13 +567,13 @@ static void resolve_throw_to_B(void)
     }
 
     responderB = (u8)hit;
+    lock_hit_direction(&teamB[responderB]);
     ball_dropAt(&ball, teamB[responderB].x + 4, teamB[responderB].y + 5);
     sound_mgr_hit();
     trigger_flash(PAL_TEAM_B);
     trigger_shake();
     player_setPose(&teamB[responderB], POSE_HIT, HIT_RECOIL_FRAMES);
     player_setPose(&teamA[holderA], POSE_CELEBRATE, HIT_TOTAL_FRAMES);
-    teamB[responderB].x += (ball.spin < 0) ? -6 : 6;
     impactTimer = HIT_TOTAL_FRAMES;
     hitExitStarted = FALSE;
     state = MS_HIT_B;
@@ -571,13 +598,13 @@ static void resolve_throw_to_A(void)
     }
 
     responderA = (u8)hit;
+    lock_hit_direction(&teamA[responderA]);
     ball_dropAt(&ball, teamA[responderA].x + 4, teamA[responderA].y + 5);
     sound_mgr_hit();
     trigger_flash(PAL_TEAM_A);
     trigger_shake();
     player_setPose(&teamA[responderA], POSE_HIT, HIT_RECOIL_FRAMES);
     player_setPose(&teamB[holderB], POSE_CELEBRATE, HIT_TOTAL_FRAMES);
-    teamA[responderA].x += (ball.spin < 0) ? -6 : 6;
     impactTimer = HIT_TOTAL_FRAMES;
     hitExitStarted = FALSE;
     state = MS_HIT_A;
@@ -827,6 +854,7 @@ void scene_match_update(void)
             if (impactTimer > 0)
             {
                 impactTimer--;
+                advance_hit_recoil(&teamB[responderB]);
                 if (impactTimer == HIT_FALL_FRAMES)
                     player_setPose(&teamB[responderB], POSE_FALL, HIT_FALL_FRAMES);
             }
@@ -843,6 +871,7 @@ void scene_match_update(void)
             if (impactTimer > 0)
             {
                 impactTimer--;
+                advance_hit_recoil(&teamA[responderA]);
                 if (impactTimer == HIT_FALL_FRAMES)
                     player_setPose(&teamA[responderA], POSE_FALL, HIT_FALL_FRAMES);
             }

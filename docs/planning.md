@@ -1109,5 +1109,18 @@ within the existing ROM/VRAM layout.
 - Recalculated front/rear hand anchors from the player's visual centre. Player 2 now carries the
   ball a full hand-width beyond the outside shoulder rather than across the chest, with wind-up
   extension continuing in the player's facing direction.
+
+---
+
+## Ball-vector knockdown direction (2026-07-22)
+
+- Removed the fall direction's dependency on spin sign. At contact, the match now locks the actual
+  screen-space vector from the ball's release point to its impact point, including lane aim and
+  the displacement created by curve.
+- The hit silhouette mirrors toward the vector's horizontal direction, while six restrained
+  one-pixel recoil steps move the victim along both its horizontal and vertical components. Up-,
+  down- and diagonal throws therefore knock players in visibly corresponding directions.
+- The direction remains locked through recoil and the grounded fall. Only after that sequence does
+  the eliminated player turn right to perform the established off-court exit.
 - This removes the board stripe that previously cut across a near player's head and torso without
   weakening the correct far-side occlusion or changing the authored stadium tiles.
