@@ -367,6 +367,8 @@ void sprites_data_init(void)
     VDP_loadTileData(tile_iso_back_hit[0], TILE_PLAYER_BACK_HIT, 16, DMA);
     VDP_loadTileData(tile_iso_back_fall[0], TILE_PLAYER_BACK_FALL, 16, DMA);
     VDP_loadTileData(tile_iso_back_celebrate[0], TILE_PLAYER_BACK_CELEBRATE, 16, DMA);
+    VDP_loadTileData(tile_iso_front_run_pass[0], TILE_PLAYER_FRONT_RUN_PASS, 16, DMA);
+    VDP_loadTileData(tile_iso_back_run_pass[0], TILE_PLAYER_BACK_RUN_PASS, 16, DMA);
     /* Pickup still shares the established low silhouette; impact, grounded
      * fall and celebration now use their own front/rear authored blocks. */
     VDP_loadTileData(tile_ball_shadow, TILE_BALL_SHADOW,  1, DMA);

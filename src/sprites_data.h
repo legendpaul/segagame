@@ -78,9 +78,11 @@
 #define TILE_PLAYER_BACK_HIT        (TILE_USER_INDEX + 222)
 #define TILE_PLAYER_BACK_FALL       (TILE_USER_INDEX + 238)
 #define TILE_PLAYER_BACK_CELEBRATE  (TILE_USER_INDEX + 254)
+#define TILE_PLAYER_FRONT_RUN_PASS  (TILE_USER_INDEX + 270)
+#define TILE_PLAYER_BACK_RUN_PASS   (TILE_USER_INDEX + 286)
 
 /* First tile index free for court_bg.c to use */
-#define TILE_COURT_BASE     (TILE_USER_INDEX + 270)
+#define TILE_COURT_BASE     (TILE_USER_INDEX + 302)
 
 /* Palette lines: PAL0 is used by the system font + pitch background,
  * so sprites use 1-3. PAL1/PAL2 are *slots*, not fixed teams - which

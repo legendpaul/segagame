@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "assets" / "player_isometric_sheet.png"
 BACK_SOURCE = ROOT / "assets" / "player_isometric_back_sheet_v2.png"
 RUN_SOURCE = ROOT / "assets" / "player_run_cycle_v2.png"
+RUN_PASS_SOURCE = ROOT / "assets" / "player_run_pass_v1.png"
 ACTION_SOURCE = ROOT / "assets" / "player_action_sheet_v1.png"
 OUTPUT = ROOT / "src" / "player_isometric_tiles.inc"
 PREVIEW = ROOT / "assets" / "player_isometric_preview.png"
@@ -158,18 +159,22 @@ def main():
     back = build_canvases(remove_green_key(Image.open(BACK_SOURCE)))
     runs = build_canvases(remove_green_key(Image.open(RUN_SOURCE)),
                           ("front_run", "front_run_alt", "back_run", "back_run_alt"))
+    run_passes = build_canvases(remove_green_key(Image.open(RUN_PASS_SOURCE)),
+                                ("front_run_pass", "back_run_pass"))
     actions = build_canvases(remove_green_key(Image.open(ACTION_SOURCE)),
                              ("front_hit", "front_fall", "front_celebrate",
                               "back_hit", "back_fall", "back_celebrate"))
     front["run"] = runs["front_run"]
+    front["run_pass"] = run_passes["front_run_pass"]
     front["run_alt"] = runs["front_run_alt"]
     back["run"] = runs["back_run"]
+    back["run_pass"] = run_passes["back_run_pass"]
     back["run_alt"] = runs["back_run_alt"]
     for pose in ("hit", "fall", "celebrate"):
         front[pose] = actions[f"front_{pose}"]
         back[pose] = actions[f"back_{pose}"]
 
-    output_poses = ("stand", "run", "run_alt", "throw", "catch",
+    output_poses = ("stand", "run", "run_pass", "run_alt", "throw", "catch",
                     "hit", "fall", "celebrate")
     preview = Image.new("RGB", (len(output_poses) * 40, 2 * 40), (24, 40, 72))
     for row, canvases in enumerate((front, back)):

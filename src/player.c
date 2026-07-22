@@ -164,18 +164,17 @@ void player_draw(Player *p)
     s16 poseOffsetY = 0;
     s16 direction = p->facingLeft ? -1 : 1;
 
-    /* RUN and RUN_ALT are separately authored contact poses with exactly
-     * two legs each; no partial-row reflection or ghost limbs. */
+    /* A grounded four-beat gait: contact, passing step, opposite contact,
+     * passing step. The torso stays level; all perceived motion comes from
+     * actual leg silhouettes instead of moving the whole player up/down. */
     if (p->pose == POSE_RUN)
     {
-        static const s8 runX[4] = { -1, 0, 1, 0 };
-        if (backView)
-            base = (p->animFrame & 1) ? TILE_PLAYER_BACK_RUN_ALT : TILE_PLAYER_BACK_RUN;
+        if (p->animFrame & 1)
+            base = backView ? TILE_PLAYER_BACK_RUN_PASS : TILE_PLAYER_FRONT_RUN_PASS;
+        else if (backView)
+            base = (p->animFrame == 2) ? TILE_PLAYER_BACK_RUN_ALT : TILE_PLAYER_BACK_RUN;
         else
-            base = (p->animFrame & 1) ? TILE_PLAYER_FRONT_RUN_ALT : TILE_PLAYER_FRONT_RUN;
-        static const s8 runY[4] = { 0, -2, -1, 1 };
-        poseOffsetX = runX[p->animFrame & 3];
-        poseOffsetY = runY[p->animFrame & 3];
+            base = (p->animFrame == 2) ? TILE_PLAYER_FRONT_RUN_ALT : TILE_PLAYER_FRONT_RUN;
     }
     else if (p->pose == POSE_THROW)
     {

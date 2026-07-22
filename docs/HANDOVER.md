@@ -140,7 +140,8 @@ tools/build_stadium_tiles.py       - reproducible source-to-VDP converter
   run-off; the thrower and round-winning survivors use a looping raised-fist animation.
   `player_draw()` picks the tile block from the current pose and gets `hflip` only from the
   player's stable `facingLeft` team direction. RUN uses its own real art (`TILE_PLAYER_RUN`)
-  with a four-beat body path; actions use anticipation, contact and recovery offsets without
+  with a grounded contact/pass/opposite-contact/pass gait and no whole-body bounce; actions use
+  anticipation, contact and recovery offsets without
   ever flipping the player away from the opposition.
 
 - **Far-side art**: four `TILE_PLAYER_FAR_*` blocks remain available as separately encoded 24x24

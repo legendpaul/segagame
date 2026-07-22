@@ -1081,5 +1081,20 @@ round scoring, a 3-0 match finish and the dedicated champion pose without gamepl
   high-priority centre board, while near-side athletes render in front of it.
 - Held-ball priority follows the same projected half, so the selected near player and the ball in
   their hand are not split into contradictory layers at the divider.
+
+---
+
+## Grounded four-phase run gait (2026-07-22)
+
+- Replaced the two-extremes-plus-body-bob cycle with contact, passing step, opposite contact and
+  passing step. The new front/rear passing artwork keeps one foot planted below the hip and the
+  other low to the ground, so the legs visibly travel through a stride instead of teleporting.
+- Removed all run-cycle vertical and horizontal whole-body offsets. The player origin and head now
+  stay level while the authored legs and opposing arm swing carry the motion.
+- `assets/player_run_pass_v1.png` is the reproducible source for the two passing poses; the sprite
+  converter emits dedicated front/rear 4x4 tile blocks and includes them in the QA preview.
+
+Clean SGDK compilation confirmed the expanded player bank and shifted court allocation remain
+within the existing ROM/VRAM layout.
 - This removes the board stripe that previously cut across a near player's head and torso without
   weakening the correct far-side occlusion or changing the authored stadium tiles.
