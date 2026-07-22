@@ -202,6 +202,7 @@ void ball_draw(Ball *b)
     bool inFlight = (b->state == BALL_FLYING_TO_A) || (b->state == BALL_FLYING_TO_B);
     s16 drawY = b->y;
     u16 ballTile = TILE_BALL16_FRAME_0;
+    u16 netPriority = ((b->y - (b->x >> 2)) >= COURT_CENTER_DEPTH) ? 1 : 0;
 
     if (inFlight)
     {
@@ -225,7 +226,7 @@ void ball_draw(Ball *b)
          * controlled-player ground star (see scene_match.c) - the shadow is
          * no longer the last sprite in the chain. */
         VDP_setSpriteFull(b->spriteSlot + 1, b->x, b->y, SPRITE_SIZE(1, 1),
-                           TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE,
+                           TILE_ATTR_FULL(PAL_BALL, netPriority, FALSE, FALSE,
                                (height > 12) ? TILE_BALL_SHADOW_AIR : TILE_BALL_SHADOW),
                            b->spriteSlot + 2);
     }
@@ -235,7 +236,7 @@ void ball_draw(Ball *b)
         drawY = b->y - looseHeight;
         ballTile += (((b->x + b->y) >> 2) & 3) * 4;
         VDP_setSpriteFull(b->spriteSlot + 1, b->x, b->y, SPRITE_SIZE(1, 1),
-                           TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE,
+                           TILE_ATTR_FULL(PAL_BALL, netPriority, FALSE, FALSE,
                                looseHeight > 4 ? TILE_BALL_SHADOW_AIR : TILE_BALL_SHADOW),
                            b->spriteSlot + 2);
     }
@@ -251,6 +252,6 @@ void ball_draw(Ball *b)
     /* The ball links to the shadow, which now links on to the ground star
      * (see scene_match.c) so all three stay reachable from slot 0. */
     VDP_setSpriteFull(b->spriteSlot, b->x - 4, drawY - 4, SPRITE_SIZE(2, 2),
-                       TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, ballTile),
+                       TILE_ATTR_FULL(PAL_BALL, netPriority, FALSE, FALSE, ballTile),
                        b->spriteSlot + 1);
 }

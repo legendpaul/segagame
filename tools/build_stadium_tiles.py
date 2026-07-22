@@ -166,13 +166,17 @@ def prepare_foreground():
     top_l = (base_l[0], base_l[1] - 12)
     top_r = (base_r[0], base_r[1] - 12)
 
-    # Sparse blue glass glints keep panels visibly transparent.
-    for i in range(1, 16, 2):
-        t = i / 16
-        x = round(top_l[0] + (top_r[0] - top_l[0]) * t)
+    # Fine clipped mesh makes depth readable even through the clear panels:
+    # a far-side ball is crossed by at least one thread rather than appearing
+    # pasted on top of an almost-empty glass area.
+    for x in range(top_l[0] + 4, top_r[0], 8):
+        t = (x - top_l[0]) / (top_r[0] - top_l[0])
         y_top = round(top_l[1] + (top_r[1] - top_l[1]) * t)
         y_base = round(base_l[1] + (base_r[1] - base_l[1]) * t)
-        draw.line((x, y_top + 2, x, y_base - 2), fill=11, width=1)
+        draw.line((x, y_top + 2, x, y_base - 2),
+                  fill=12 if ((x // 8) & 1) else 11, width=1)
+    draw.line((top_l[0], top_l[1] + 6, top_r[0], top_r[1] + 6),
+              fill=11, width=1)
     for i in range(5):
         t = i / 4
         x = round(base_l[0] + (base_r[0] - base_l[0]) * t)

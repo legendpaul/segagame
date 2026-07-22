@@ -999,9 +999,12 @@ now provides repeatable focused-window input and lossless emulator captures for 
   no facial/chest pixels remain on the bottom team.
 - Reduced the visible ball diameter from roughly 13 pixels to 10 pixels (about 75%) while retaining
   the 16x16 hardware container, dark outline and four rotating seam frames.
-- Split the centre divider into a background glass treatment and a 35-tile transparent priority
+- Split the centre divider into a background glass treatment and a transparent priority
   foreground. Rails, posts and glints now occlude far-side players correctly without opaque tile
   rectangles hiding the rest of their bodies.
+- Ball and shadow priority now switches from behind to in front at the projected centre depth.
+  An eight-pixel foreground mesh plus cross-thread guarantees that a loose far-side ball beside
+  the divider is visibly crossed by net pixels, while a near-side ball remains above the net.
 - Rebuilt the outer stadium treatment with a full sloped grandstand, repeating coloured spectators,
   concrete perimeter and projected advertising rail. The court is visually embedded in a venue
   instead of floating inside unused green space.
