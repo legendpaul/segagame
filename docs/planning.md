@@ -1072,3 +1072,14 @@ sprites remain visible with an intact court, net, ball and HUD.
 
 Clean SGDK compilation and live Fusion playthrough confirmed real hits, scorer celebrations,
 round scoring, a 3-0 match finish and the dedicated champion pose without gameplay corruption.
+
+---
+
+## Centre-board player occlusion correction (2026-07-22)
+
+- Player sprite priority now follows the court half: far-side athletes remain behind the
+  high-priority centre board, while near-side athletes render in front of it.
+- Held-ball priority follows the same projected half, so the selected near player and the ball in
+  their hand are not split into contradictory layers at the divider.
+- This removes the board stripe that previously cut across a near player's head and torso without
+  weakening the correct far-side occlusion or changing the authored stadium tiles.

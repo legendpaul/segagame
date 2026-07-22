@@ -213,8 +213,11 @@ void player_draw(Player *p)
     }
     else poseOffsetY = (p->animFrame == 3) ? -1 : 0;
 
+    /* The centre board is a high-priority BG_A foreground. Near-half players
+     * must use high sprite priority to cover it; far-half players remain low
+     * priority so the same board correctly passes in front of them. */
     VDP_setSpriteFull(p->spriteSlot, p->x - 8 + poseOffsetX,
                        p->y - 16 + poseOffsetY, SPRITE_SIZE(4, 4),
-                       TILE_ATTR_FULL(p->pal, 0, FALSE, flip, base),
+                       TILE_ATTR_FULL(p->pal, backView ? 1 : 0, FALSE, flip, base),
                        p->spriteSlot + 1);
 }
