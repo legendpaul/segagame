@@ -1052,3 +1052,23 @@ front/rear matchup previews, stable live held-ball placement and uncorrupted mat
 
 Clean SGDK compilation and live Fusion match capture confirmed all six dynamically assigned player
 sprites remain visible with an intact court, net, ball and HUD.
+
+---
+
+## Impact, fall and victory animation pass (2026-07-22)
+
+- Added six authored action silhouettes to the reproducible player pipeline: front/rear impact,
+  grounded fall and raised-fist celebration. The source sheet is
+  `assets/player_action_sheet_v1.png`; `tools/build_isometric_sprites.py` quantizes it into the
+  shared team palette and emits the Genesis-native 4x4 tile blocks.
+- A confirmed hit now plays 12 frames of recoil followed by 24 frames on the floor. The ball still
+  drops at the victim's feet, then the victim gets up and follows the established right-side
+  run-off instead of disappearing.
+- The successful thrower immediately performs a short looping celebration during the knockdown.
+  When a round is won, every surviving teammate celebrates; a match-winning celebration receives
+  a longer 150-frame camera hold before the game-over presentation.
+- The game-over champion now uses the dedicated raised-fist artwork instead of borrowing the throw
+  silhouette.
+
+Clean SGDK compilation and live Fusion playthrough confirmed real hits, scorer celebrations,
+round scoring, a 3-0 match finish and the dedicated champion pose without gameplay corruption.

@@ -135,7 +135,9 @@ tools/build_stadium_tiles.py       - reproducible source-to-VDP converter
   error.
 
 - **Player pose system** (`player.c`): `POSE_STAND` / `POSE_RUN` / `POSE_THROW` / `POSE_PICKUP` /
-  `POSE_HIT`.
+  `POSE_HIT` / `POSE_FALL` / `POSE_CELEBRATE` select authored front/rear tile blocks. A successful
+  hit progresses through recoil and grounded fall before `player_eliminate()` starts the existing
+  run-off; the thrower and round-winning survivors use a looping raised-fist animation.
   `player_draw()` picks the tile block from the current pose and gets `hflip` only from the
   player's stable `facingLeft` team direction. RUN uses its own real art (`TILE_PLAYER_RUN`)
   with a four-beat body path; actions use anticipation, contact and recovery offsets without

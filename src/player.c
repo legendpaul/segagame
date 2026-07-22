@@ -112,7 +112,10 @@ void player_tickAnim(Player *p, bool isMoving)
         if (++p->animCounter >= 4)
         {
             p->animCounter = 0;
-            if (p->animFrame < 3) p->animFrame++;
+            if (p->pose == POSE_CELEBRATE)
+                p->animFrame = (p->animFrame + 1) & 3;
+            else if (p->animFrame < 3)
+                p->animFrame++;
         }
         p->poseTimer--;
         return;
@@ -190,10 +193,23 @@ void player_draw(Player *p)
     }
     else if (p->pose == POSE_HIT)
     {
-        /* Reuse the low dynamic silhouette as a three-beat recoil. */
-        base = backView ? TILE_PLAYER_BACK_STAND : TILE_PLAYER_FRONT_PICKUP;
-        poseOffsetX = -direction * (3 + (p->animFrame & 1));
-        poseOffsetY = 3 + (p->animFrame & 1);
+        base = backView ? TILE_PLAYER_BACK_HIT : TILE_PLAYER_FRONT_HIT;
+        poseOffsetX = -direction * (2 + (p->animFrame & 1));
+        poseOffsetY = p->animFrame & 1;
+    }
+    else if (p->pose == POSE_FALL)
+    {
+        base = backView ? TILE_PLAYER_BACK_FALL : TILE_PLAYER_FRONT_FALL;
+        /* Settle by two pixels after the initial collapse instead of freezing
+         * the fallen silhouette at exactly one coordinate. */
+        poseOffsetX = -direction * (p->animFrame > 1 ? 2 : 0);
+        poseOffsetY = p->animFrame > 1 ? 2 : 0;
+    }
+    else if (p->pose == POSE_CELEBRATE)
+    {
+        static const s8 victoryY[4] = { 0, -3, -1, -3 };
+        base = backView ? TILE_PLAYER_BACK_CELEBRATE : TILE_PLAYER_FRONT_CELEBRATE;
+        poseOffsetY = victoryY[p->animFrame & 3];
     }
     else poseOffsetY = (p->animFrame == 3) ? -1 : 0;
 

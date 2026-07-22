@@ -2,7 +2,8 @@
  * player.h - A court-side entity (human or CPU side), rendered as a
  * 32x32 near-side or 24x24 far-side hardware sprite, recolored per team
  * via its "pal" palette slot, with a small pose/animation system: idle, a
- * four-beat run/idle motion and brief throw, pickup and hit poses.
+ * four-beat run/idle motion plus throw, pickup, impact, fall and
+ * raised-fist celebration sequences.
  */
 #ifndef _PLAYER_H_
 #define _PLAYER_H_
@@ -14,7 +15,9 @@ typedef enum {
     POSE_RUN,
     POSE_THROW,
     POSE_PICKUP,
-    POSE_HIT
+    POSE_HIT,
+    POSE_FALL,
+    POSE_CELEBRATE
 } PlayerPose;
 
 typedef struct {

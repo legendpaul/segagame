@@ -361,8 +361,14 @@ void sprites_data_init(void)
     VDP_loadTileData(tile_iso_back_run[0], TILE_PLAYER_BACK_RUN, 16, DMA);
     VDP_loadTileData(tile_iso_back_run_alt[0], TILE_PLAYER_BACK_RUN_ALT, 16, DMA);
     VDP_loadTileData(tile_iso_back_throw[0], TILE_PLAYER_BACK_THROW, 16, DMA);
-    /* Back-facing pickup/hit reuse the strong back stand silhouette, saving
-     * one full 16-tile block for the enlarged ball and court art. */
+    VDP_loadTileData(tile_iso_front_hit[0], TILE_PLAYER_FRONT_HIT, 16, DMA);
+    VDP_loadTileData(tile_iso_front_fall[0], TILE_PLAYER_FRONT_FALL, 16, DMA);
+    VDP_loadTileData(tile_iso_front_celebrate[0], TILE_PLAYER_FRONT_CELEBRATE, 16, DMA);
+    VDP_loadTileData(tile_iso_back_hit[0], TILE_PLAYER_BACK_HIT, 16, DMA);
+    VDP_loadTileData(tile_iso_back_fall[0], TILE_PLAYER_BACK_FALL, 16, DMA);
+    VDP_loadTileData(tile_iso_back_celebrate[0], TILE_PLAYER_BACK_CELEBRATE, 16, DMA);
+    /* Pickup still shares the established low silhouette; impact, grounded
+     * fall and celebration now use their own front/rear authored blocks. */
     VDP_loadTileData(tile_ball_shadow, TILE_BALL_SHADOW,  1, DMA);
     VDP_loadTileData(tile_ball_shadow_air, TILE_BALL_SHADOW_AIR, 1, DMA);
     VDP_loadTileData(tile_ball16[0], TILE_BALL16_FRAME_0, 16, DMA);

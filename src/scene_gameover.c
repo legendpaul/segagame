@@ -44,7 +44,7 @@ void scene_gameover_enter(void)
     /* Animated winning-kit figure turns the result into a celebration
      * screen instead of a static text card. */
     player_init(&champion, 278, 153, 0, aWon ? PAL_TEAM_A : PAL_TEAM_B);
-    player_setPose(&champion, POSE_THROW, 255);
+    player_setPose(&champion, POSE_CELEBRATE, 255);
     victoryCounter = 0;
     victoryBob = 0;
     player_draw(&champion);

@@ -71,6 +71,9 @@ static s8  worldOffsetY;    /* applied to BG_B and every world sprite together *
  * on code review, so this is a defensive net on top of, not a
  * replacement for, actually finding that root cause later. */
 #define STALL_LIMIT   400   /* ~6.6s at 60fps - well beyond any real delay */
+#define HIT_RECOIL_FRAMES 12
+#define HIT_FALL_FRAMES   24
+#define HIT_TOTAL_FRAMES  (HIT_RECOIL_FRAMES + HIT_FALL_FRAMES)
 static MatchState lastState;
 static u16 stallCounter;
 static bool stallTrackerInit;
@@ -476,6 +479,9 @@ void scene_match_enter(void)
 
 static void go_round_end(u8 winnerIsA)
 {
+    Player *winners;
+    u8 i;
+
     roundWinnerIsA = winnerIsA;
     sound_mgr_score();
 
@@ -486,9 +492,16 @@ static void go_round_end(u8 winnerIsA)
 
     clear_playfield_text();
 
+    /* Keep the match camera on the winning side long enough to enjoy the
+     * result. Every surviving teammate joins the scorer's raised-fist loop. */
+    winners = winnerIsA ? teamA : teamB;
+    for (i = 0; i < TEAM_SIZE; i++)
+        if (!winners[i].eliminated)
+            player_setPose(&winners[i], POSE_CELEBRATE, 255);
+
     /* Losing team serves next, to keep matches competitive. */
     server = winnerIsA ? 1 : 0;
-    roundEndTimer = 90;
+    roundEndTimer = ((gScoreA >= WIN_SCORE) || (gScoreB >= WIN_SCORE)) ? 150 : 90;
     state = MS_ROUND_END;
 }
 
@@ -529,9 +542,10 @@ static void resolve_throw_to_B(void)
     sound_mgr_hit();
     trigger_flash(PAL_TEAM_B);
     trigger_shake();
-    player_setPose(&teamB[responderB], POSE_HIT, 14);
+    player_setPose(&teamB[responderB], POSE_HIT, HIT_RECOIL_FRAMES);
+    player_setPose(&teamA[holderA], POSE_CELEBRATE, HIT_TOTAL_FRAMES);
     teamB[responderB].x += (ball.spin < 0) ? -6 : 6;
-    impactTimer = 8;
+    impactTimer = HIT_TOTAL_FRAMES;
     hitExitStarted = FALSE;
     state = MS_HIT_B;
 }
@@ -559,9 +573,10 @@ static void resolve_throw_to_A(void)
     sound_mgr_hit();
     trigger_flash(PAL_TEAM_A);
     trigger_shake();
-    player_setPose(&teamA[responderA], POSE_HIT, 14);
+    player_setPose(&teamA[responderA], POSE_HIT, HIT_RECOIL_FRAMES);
+    player_setPose(&teamB[holderB], POSE_CELEBRATE, HIT_TOTAL_FRAMES);
     teamA[responderA].x += (ball.spin < 0) ? -6 : 6;
-    impactTimer = 8;
+    impactTimer = HIT_TOTAL_FRAMES;
     hitExitStarted = FALSE;
     state = MS_HIT_A;
 }
@@ -807,7 +822,12 @@ void scene_match_update(void)
 
         case MS_HIT_B:
             if (ball_updateLoose(&ball)) sound_mgr_bounce();
-            if (impactTimer > 0) impactTimer--;
+            if (impactTimer > 0)
+            {
+                impactTimer--;
+                if (impactTimer == HIT_FALL_FRAMES)
+                    player_setPose(&teamB[responderB], POSE_FALL, HIT_FALL_FRAMES);
+            }
             else if (!hitExitStarted)
             {
                 eliminate_from(teamB, responderB);
@@ -818,7 +838,12 @@ void scene_match_update(void)
 
         case MS_HIT_A:
             if (ball_updateLoose(&ball)) sound_mgr_bounce();
-            if (impactTimer > 0) impactTimer--;
+            if (impactTimer > 0)
+            {
+                impactTimer--;
+                if (impactTimer == HIT_FALL_FRAMES)
+                    player_setPose(&teamA[responderA], POSE_FALL, HIT_FALL_FRAMES);
+            }
             else if (!hitExitStarted)
             {
                 eliminate_from(teamA, responderA);
