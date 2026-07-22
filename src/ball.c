@@ -22,6 +22,7 @@ void ball_init(Ball *b, u8 spriteSlot, s16 x, s16 y, BallState heldState)
     b->looseFarSide = FALSE;
     b->state = heldState;
     b->spriteSlot = spriteSlot;
+    b->shadowSlot = spriteSlot + 1;
 }
 
 void ball_startThrow(Ball *b, s16 toX, s16 toY, BallState flightState, s8 spin)
@@ -208,7 +209,9 @@ void ball_draw(Ball *b)
     /* Court half, not ball state, decides divider occlusion. A near-side held
      * ball must clear the board with its owner; sprite-table order still lets
      * the player's body cover the ball at the rear hand anchor. */
-    u16 netPriority = ((b->y - (b->x >> 2)) >= COURT_CENTER_DEPTH) ? 1 : 0;
+    u16 netPriority = (b->state == BALL_HELD_A) ? 1 :
+                      (b->state == BALL_HELD_B) ? 0 :
+                      (((b->y - (b->x >> 2)) >= COURT_CENTER_DEPTH) ? 1 : 0);
 
     if (inFlight)
     {
@@ -231,31 +234,31 @@ void ball_draw(Ball *b)
          * the ball will actually land. Links on to spriteSlot+2, the
          * controlled-player ground star (see scene_match.c) - the shadow is
          * no longer the last sprite in the chain. */
-        VDP_setSpriteFull(b->spriteSlot + 1, b->x - 4, b->y - 4, SPRITE_SIZE(1, 1),
+        VDP_setSpriteFull(b->shadowSlot, b->x - 4, b->y - 4, SPRITE_SIZE(1, 1),
                            TILE_ATTR_FULL(PAL_BALL, netPriority, FALSE, FALSE,
                                (height > 12) ? TILE_BALL_SHADOW_AIR : TILE_BALL_SHADOW),
-                           b->spriteSlot + 2);
+                           b->shadowSlot + 1);
     }
     else if (b->state == BALL_LOOSE)
     {
         s16 looseHeight = b->height >> 8;
         drawY = b->y - looseHeight;
         ballTile += (((b->x + b->y) >> 2) & 3) * 4;
-        VDP_setSpriteFull(b->spriteSlot + 1, b->x - 4, b->y - 4, SPRITE_SIZE(1, 1),
+        VDP_setSpriteFull(b->shadowSlot, b->x - 4, b->y - 4, SPRITE_SIZE(1, 1),
                            TILE_ATTR_FULL(PAL_BALL, netPriority, FALSE, FALSE,
                                looseHeight > 4 ? TILE_BALL_SHADOW_AIR : TILE_BALL_SHADOW),
-                           b->spriteSlot + 2);
+                           b->shadowSlot + 1);
     }
     else if (held)
     {
-        /* Held: no shadow needed, park it off-screen rather than
-         * leaving a stray dot under the holding player. */
-        ballTile = TILE_BALL_HELD;
-        ballSize = SPRITE_SIZE(1, 1);
-        ballOffset = 4;
-        VDP_setSpriteFull(b->spriteSlot + 1, -16, -16, SPRITE_SIZE(1, 1),
+        /* Held, airborne and loose states must share one apparent diameter.
+         * The former 8x8 held tile visibly grew into a 16x16 ball at release
+         * and shrank again on pickup. Keep the same compact silhouette in the
+         * same 16x16 container; only airborne/loose seam frames rotate. */
+        ballTile = TILE_BALL16_FRAME_0;
+        VDP_setSpriteFull(b->shadowSlot, -16, -16, SPRITE_SIZE(1, 1),
                            TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL_SHADOW),
-                           b->spriteSlot + 2);
+                           b->shadowSlot + 1);
     }
 
     /* The ball links to the shadow, which now links on to the ground star

@@ -14,7 +14,7 @@
 
 #define SLOT_TEAM_A   0    /* initial slots; reassigned by projected depth each frame */
 #define SLOT_TEAM_B   3    /* initial slots; reassigned by projected depth each frame */
-#define SLOT_BALL     6    /* ball uses slots 6 (ball) and 7 (shadow) */
+#define SLOT_BALL     6    /* initial ball slot; reassigned with player depth */
 #define SLOT_MARKER   8    /* coloured ground star (see draw_control_marker) */
 #define SLOT_SHADOWS  9    /* six grounded player shadows use slots 9..14 */
 
@@ -49,6 +49,7 @@ static u16 aiDelay;
 static u16 roundEndTimer;
 static u8  windupTimer;
 static u8  impactTimer;
+static u8  hitstopTimer;    /* brief freeze makes a successful strike read with weight */
 static bool hitExitStarted;
 static s8  hitKnockX;       /* signed screen-space direction of the incoming ball */
 static s8  hitKnockY;
@@ -153,34 +154,65 @@ static s16 lane_x(u8 i)
     return COURT_LEFT_X + (s16)((i + 1) * (COURT_RIGHT_X - COURT_LEFT_X) / (TEAM_SIZE + 1));
 }
 
-/* Same-priority Mega Drive sprites with a lower table index win an overlap.
- * Rank all players from nearest to farthest using their ground-contact point,
- * not their team, so crossed silhouettes read correctly on the isometric court. */
-static bool player_is_nearer(const Player *a, const Player *b)
+typedef struct {
+    Player *player;
+    s16 groundX;
+    s16 groundY;
+    bool isBall;
+} DepthActor;
+
+static bool actor_is_nearer(const DepthActor *a, const DepthActor *b)
 {
-    if (a->y != b->y) return a->y > b->y;
-    return a->x > b->x;
+    if (a->groundY != b->groundY) return a->groundY > b->groundY;
+    return a->groundX > b->groundX;
 }
 
-static void assign_player_depth_slots(void)
+static void assign_actor_depth_slots(void)
 {
-    Player *order[TEAM_SIZE * 2];
+    DepthActor order[TEAM_SIZE * 2 + 1];
     u8 i;
 
     for (i = 0; i < TEAM_SIZE; i++)
     {
-        order[i] = &teamA[i];
-        order[TEAM_SIZE + i] = &teamB[i];
+        order[i].player = &teamA[i];
+        order[i].groundX = teamA[i].x;
+        order[i].groundY = teamA[i].y;
+        order[i].isBall = FALSE;
+        order[TEAM_SIZE + i].player = &teamB[i];
+        order[TEAM_SIZE + i].groundX = teamB[i].x;
+        order[TEAM_SIZE + i].groundY = teamB[i].y;
+        order[TEAM_SIZE + i].isBall = FALSE;
     }
 
-    /* Six entries only: a stable insertion sort is cheaper and clearer than
+    /* Sort the ball from its ground track, never its airborne screen Y.
+     * A held near-side ball sits just behind its rear-facing owner; the
+     * far-side/front-facing holder presents it just in front of the torso. */
+    order[TEAM_SIZE * 2].player = NULL;
+    order[TEAM_SIZE * 2].isBall = TRUE;
+    if (ball.state == BALL_HELD_A)
+    {
+        order[TEAM_SIZE * 2].groundX = teamA[holderA].x;
+        order[TEAM_SIZE * 2].groundY = teamA[holderA].y - 1;
+    }
+    else if (ball.state == BALL_HELD_B)
+    {
+        order[TEAM_SIZE * 2].groundX = teamB[holderB].x;
+        order[TEAM_SIZE * 2].groundY = teamB[holderB].y + 1;
+    }
+    else
+    {
+        order[TEAM_SIZE * 2].groundX = ball.x;
+        order[TEAM_SIZE * 2].groundY = ball.y;
+    }
+
+    /* Seven entries only: a stable insertion sort is cheaper and clearer than
      * carrying a general-purpose sorter into the ROM. Exact ties retain their
      * previous team/player order, preventing one-frame overlap flicker. */
-    for (i = 1; i < TEAM_SIZE * 2; i++)
+    for (i = 1; i < TEAM_SIZE * 2 + 1; i++)
     {
-        Player *key = order[i];
+        DepthActor key = order[i];
         u8 j = i;
-        while ((j > 0) && player_is_nearer(key, order[j - 1]))
+        while ((j > 0) && actor_is_nearer(&key, &order[j - 1]))
         {
             order[j] = order[j - 1];
             j--;
@@ -188,7 +220,11 @@ static void assign_player_depth_slots(void)
         order[j] = key;
     }
 
-    for (i = 0; i < TEAM_SIZE * 2; i++) order[i]->spriteSlot = i;
+    for (i = 0; i < TEAM_SIZE * 2 + 1; i++)
+    {
+        if (order[i].isBall) ball.spriteSlot = i;
+        else order[i].player->spriteSlot = i;
+    }
 }
 
 static u8 count_in_play(Player team[])
@@ -288,14 +324,20 @@ static bool move_ambient(Player *p, u8 slot)
 
 static void place_ball_in_hand(Player *p, bool windup)
 {
+    static const s8 frontHandX[4] = { 10, 10, 11, 10 };
+    static const s8 frontHandY[4] = { -9, -10, -9, -10 };
+    static const s8 rearHandX[4]  = { 7, 7, 8, 7 };
+    static const s8 rearHandY[4]  = { -11, -12, -11, -12 };
+    u8 frame = p->animFrame & 3;
     s16 direction = p->facingLeft ? -1 : 1;
     s16 bodyCenterX = p->x + 8;
-    /* Ball coordinates are true visual centres. The front-facing CPU holder
-     * carries it a full hand-width outside the shoulder; the rear-facing
-     * human keeps it slightly closer so it reads against the raised arm. */
-    s16 handReach = p->farSide ? 10 : 7;
-    ball.x = bodyCenterX + direction * (handReach + (windup ? 4 : 0));
-    ball.y = p->y - (p->farSide ? 9 : 11) - (windup ? 5 : 0);
+    s16 handX = p->farSide ? frontHandX[frame] : rearHandX[frame];
+    s16 handY = p->farSide ? frontHandY[frame] : rearHandY[frame];
+
+    /* Explicit wrist anchors keep the ball attached to the authored pose.
+     * Wind-up extends the same anchor instead of scaling or snapping the ball. */
+    ball.x = bodyCenterX + direction * (handX + (windup ? 4 : 0));
+    ball.y = p->y + handY - (windup ? 5 : 0);
 }
 
 /* A/B/C address the visible left/middle/right opponent lanes. If that
@@ -470,6 +512,7 @@ void scene_match_enter(void)
 
     flashTimer = 0;
     shakeTimer = 0;
+    hitstopTimer = 0;
     looseTimer = 0;
     worldOffsetY = 0;
     matchSeconds = 0;
@@ -488,6 +531,7 @@ static void go_round_end(u8 winnerIsA)
 
     roundWinnerIsA = winnerIsA;
     sound_mgr_score();
+    sound_mgr_crowdVictory();
 
     if (winnerIsA) gScoreA++;
     else gScoreB++;
@@ -575,6 +619,7 @@ static void resolve_throw_to_B(void)
     player_setPose(&teamB[responderB], POSE_HIT, HIT_RECOIL_FRAMES);
     player_setPose(&teamA[holderA], POSE_CELEBRATE, HIT_TOTAL_FRAMES);
     impactTimer = HIT_TOTAL_FRAMES;
+    hitstopTimer = 4;
     hitExitStarted = FALSE;
     state = MS_HIT_B;
 }
@@ -606,6 +651,7 @@ static void resolve_throw_to_A(void)
     player_setPose(&teamA[responderA], POSE_HIT, HIT_RECOIL_FRAMES);
     player_setPose(&teamB[holderB], POSE_CELEBRATE, HIT_TOTAL_FRAMES);
     impactTimer = HIT_TOTAL_FRAMES;
+    hitstopTimer = 4;
     hitExitStarted = FALSE;
     state = MS_HIT_A;
 }
@@ -850,13 +896,20 @@ void scene_match_update(void)
         }
 
         case MS_HIT_B:
+            /* Freeze the world action for four frames while the palette flash
+             * and shake continue. This is short enough to stay responsive but
+             * gives the contact frame a deliberate arcade impact. */
+            if (hitstopTimer > 0) { hitstopTimer--; break; }
             if (ball_updateLoose(&ball)) sound_mgr_bounce();
             if (impactTimer > 0)
             {
                 impactTimer--;
                 advance_hit_recoil(&teamB[responderB]);
                 if (impactTimer == HIT_FALL_FRAMES)
+                {
                     player_setPose(&teamB[responderB], POSE_FALL, HIT_FALL_FRAMES);
+                    sound_mgr_crowdKnockout();
+                }
             }
             else if (!hitExitStarted)
             {
@@ -867,13 +920,17 @@ void scene_match_update(void)
             break;
 
         case MS_HIT_A:
+            if (hitstopTimer > 0) { hitstopTimer--; break; }
             if (ball_updateLoose(&ball)) sound_mgr_bounce();
             if (impactTimer > 0)
             {
                 impactTimer--;
                 advance_hit_recoil(&teamA[responderA]);
                 if (impactTimer == HIT_FALL_FRAMES)
+                {
                     player_setPose(&teamA[responderA], POSE_FALL, HIT_FALL_FRAMES);
+                    sound_mgr_crowdKnockout();
+                }
             }
             else if (!hitExitStarted)
             {
@@ -913,7 +970,7 @@ void scene_match_update(void)
 
     /* Sprite table order is visual depth on equal-priority hardware sprites.
      * Rebuild it after movement so the nearer feet always cover farther bodies. */
-    assign_player_depth_slots();
+    assign_actor_depth_slots();
 
     /* Animate + draw every player on both sides (eliminated ones are parked
      * off-screen; draw call order no longer controls their overlap). */

@@ -6,9 +6,10 @@
  * invisible plastic surround; it is never teleported to a player.
  *
  * The ball uses TWO hardware sprite slots: spriteSlot for the ball
- * itself (which moves up off its true y while airborne) and
- * spriteSlot+1 for a shadow that stays on the ground track, giving a
- * clear visual read on where the ball will land.
+ * itself (dynamically depth-sorted with the players) and shadowSlot for
+ * a shadow that stays on the ground track. Keeping the slots separate
+ * lets the ball pass in front of or behind bodies without breaking the
+ * fixed sprite-list position of its ground shadow.
  */
 #ifndef _BALL_H_
 #define _BALL_H_
@@ -36,6 +37,7 @@ typedef struct {
     bool looseFarSide;     /* receiving half owns the rebound box */
     BallState state;
     u8  spriteSlot;
+    u8  shadowSlot;
 } Ball;
 
 #define BALL_STEP   9   /* progress added per frame; ~28 frames per flight */
