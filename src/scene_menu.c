@@ -58,6 +58,8 @@ static void draw_selector(void)
     sprites_data_apply_teams(gTeamAIndex, gTeamBIndex);
     player_init(&previewA, 258, PREVIEW_Y, SLOT_PREVIEW_A, PAL_TEAM_A);
     player_init(&previewB, 298, PREVIEW_Y, SLOT_PREVIEW_B, PAL_TEAM_B);
+    previewA.farSide = TRUE;
+    previewB.farSide = TRUE;
     previewA.facingLeft = FALSE;
     previewB.facingLeft = TRUE;
     if (phase == MENU_TEAM_A)
@@ -86,6 +88,8 @@ static void enter_matchup(void)
     flag_data_draw_matchup(gTeamAIndex, gTeamBIndex);
     player_init(&previewA, 106, 152, SLOT_PREVIEW_A, PAL_TEAM_A);
     player_init(&previewB, 214, 152, SLOT_PREVIEW_B, PAL_TEAM_B);
+    previewA.farSide = FALSE;
+    previewB.farSide = TRUE;
     previewA.facingLeft = FALSE;
     previewB.facingLeft = TRUE;
     bobCounter = 0;

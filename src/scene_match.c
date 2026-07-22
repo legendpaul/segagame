@@ -207,6 +207,7 @@ static u8 closest_in_play(Player team[], s16 x, s16 y)
 static bool move_toward_ball(Player *p)
 {
     bool moved = FALSE;
+    s16 oldX = p->x;
     s16 targetX = ball.x - 4;
     s16 targetY = ball.y - 5;
     if (p->x < targetX - 1) { p->x += PLAYER_SPEED; moved = TRUE; }
@@ -214,6 +215,7 @@ static bool move_toward_ball(Player *p)
     if (p->y < targetY - 1) { p->y++; moved = TRUE; }
     else if (p->y > targetY + 1) { p->y--; moved = TRUE; }
     player_clampToCourt(p);
+    if (p->x != oldX) p->facingLeft = (p->x < oldX);
     return moved;
 }
 
@@ -225,6 +227,7 @@ static bool move_ambient(Player *p, u8 slot)
     s16 targetX = p->homeX + offsetX[beat];
     s16 targetY = p->homeY + offsetY[beat];
     bool moved = FALSE;
+    s16 oldX = p->x;
 
     /* One-pixel corrections make players look alert without turning their
      * idle movement into constant high-speed chasing. */
@@ -236,7 +239,18 @@ static bool move_ambient(Player *p, u8 slot)
         else if (p->y > targetY) { p->y--; moved = TRUE; }
     }
     player_clampToCourt(p);
+    if (p->x != oldX) p->facingLeft = (p->x < oldX);
     return moved;
+}
+
+static void place_ball_in_hand(Player *p, bool windup)
+{
+    s16 direction = p->facingLeft ? -1 : 1;
+    /* Both camera banks use the outward throwing hand. Rear-view holders
+     * keep the ball beyond the shoulder rather than pasted over the chest;
+     * front-view holders carry it just in front of the torso. */
+    ball.x = p->x + (p->facingLeft ? -3 : 9) + (windup ? direction * 4 : 0);
+    ball.y = p->y - (p->farSide ? 8 : 11) - (windup ? 5 : 0);
 }
 
 /* A/B/C address the visible left/middle/right opponent lanes. If that
@@ -283,7 +297,7 @@ static void eliminate_from(Player team[], u8 idx)
     player_eliminate(&team[idx]);
 }
 
-static void reset_team(Player team[], u8 baseSlot, u8 pal, s16 baseDepth, bool facingLeft)
+static void reset_team(Player team[], u8 baseSlot, u8 pal, s16 baseDepth, bool farSide)
 {
     static const s8 depthOffset[TEAM_SIZE] = { -8, 10, 0 };
     u8 i;
@@ -292,8 +306,8 @@ static void reset_team(Player team[], u8 baseSlot, u8 pal, s16 baseDepth, bool f
         s16 x = lane_x(i);
         s16 y = baseDepth + depthOffset[i] + (x >> 2);
         player_init(&team[i], x, y, baseSlot + i, pal);
-        team[i].farSide = facingLeft;
-        team[i].facingLeft = facingLeft;
+        team[i].farSide = farSide;
+        team[i].facingLeft = farSide;
     }
 }
 
@@ -369,12 +383,14 @@ static void begin_announce(void)
     if (server == 0)
     {
         holderA = activeA;
-        ball_init(&ball, SLOT_BALL, teamA[holderA].x + 9, teamA[holderA].y - 11, BALL_HELD_A);
+        ball_init(&ball, SLOT_BALL, 0, 0, BALL_HELD_A);
+        place_ball_in_hand(&teamA[holderA], FALSE);
     }
     else
     {
         holderB = first_in_play_from(teamB, ai_pickSlot(TEAM_SIZE));
-        ball_init(&ball, SLOT_BALL, teamB[holderB].x - 3, teamB[holderB].y - 8, BALL_HELD_B);
+        ball_init(&ball, SLOT_BALL, 0, 0, BALL_HELD_B);
+        place_ball_in_hand(&teamB[holderB], FALSE);
     }
 }
 
@@ -626,8 +642,7 @@ void scene_match_update(void)
 
         case MS_A_HOLD:
         {
-            ball.x = teamA[holderA].x + 9;
-            ball.y = teamA[holderA].y - 11;
+            place_ball_in_hand(&teamA[holderA], FALSE);
 
             if (activeA == holderA &&
                 (input_pressed(BUTTON_A) || input_pressed(BUTTON_B) ||
@@ -648,8 +663,7 @@ void scene_match_update(void)
 
         case MS_A_WINDUP:
         {
-            ball.x = teamA[holderA].x + (windupTimer < 4 ? 13 : 9);
-            ball.y = teamA[holderA].y - (windupTimer < 4 ? 17 : 11);
+            place_ball_in_hand(&teamA[holderA], windupTimer < 4);
             if (windupTimer > 0) windupTimer--;
             else
             {
@@ -663,6 +677,7 @@ void scene_match_update(void)
 
         case MS_B_HOLD:
         {
+            place_ball_in_hand(&teamB[holderB], FALSE);
             if (aiDelay > 0) aiDelay--;
             else
             {
@@ -683,8 +698,7 @@ void scene_match_update(void)
 
         case MS_B_WINDUP:
         {
-            ball.x = teamB[holderB].x - (windupTimer < 4 ? 7 : 3);
-            ball.y = teamB[holderB].y - (windupTimer < 4 ? 14 : 8);
+            place_ball_in_hand(&teamB[holderB], windupTimer < 4);
             if (windupTimer > 0) windupTimer--;
             else
             {
@@ -730,8 +744,8 @@ void scene_match_update(void)
             {
                 sound_mgr_pickup();
                 player_setPose(&teamB[holderB], POSE_PICKUP, 10);
-                ball_init(&ball, SLOT_BALL, teamB[holderB].x - 3,
-                          teamB[holderB].y - 8, BALL_HELD_B);
+                ball_init(&ball, SLOT_BALL, 0, 0, BALL_HELD_B);
+                place_ball_in_hand(&teamB[holderB], FALSE);
                 aiDelay = ai_pickThrowDelay();
                 state = MS_B_HOLD;
             }
@@ -746,8 +760,8 @@ void scene_match_update(void)
                 holderA = activeA;
                 sound_mgr_pickup();
                 player_setPose(&teamA[holderA], POSE_PICKUP, 10);
-                ball_init(&ball, SLOT_BALL, teamA[holderA].x + 9,
-                          teamA[holderA].y - 11, BALL_HELD_A);
+                ball_init(&ball, SLOT_BALL, 0, 0, BALL_HELD_A);
+                place_ball_in_hand(&teamA[holderA], FALSE);
                 state = MS_A_HOLD;
             }
             break;

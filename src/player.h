@@ -32,7 +32,7 @@ typedef struct {
     u8  animCounter;  /* frame counter that paces the run cycle */
     u8  small;        /* TRUE = render the dedicated 24x24 far-side size */
     bool farSide;     /* gameplay half, independent of visual sprite scale */
-    bool facingLeft;  /* stable team direction: every player faces opposition */
+    bool facingLeft;  /* horizontal travel direction; mirrors current front/rear bank */
 } Player;
 
 void player_init(Player *p, s16 startX, s16 y, u8 spriteSlot, u8 pal);

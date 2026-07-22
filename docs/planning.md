@@ -1017,3 +1017,23 @@ now provides repeatable focused-window input and lossless emulator captures for 
 Clean SGDK rebuild and Fusion capture QA confirmed the matchup preview, correct rear anatomy,
 smaller held ball, far-side net occlusion, animated off-ball positioning, realistic grandstand and
 uncorrupted HUD. The hardware capture is preserved as `assets/fusion_match_v3_qa.png`.
+
+---
+
+## Directional two-leg run cycle and hand anchoring (2026-07-22)
+
+- Replaced the procedural lower-row leg reflection with a dedicated four-pose run source:
+  front contact/opposite-contact and rear contact/opposite-contact. Every frame has exactly two
+  thighs, two connected lower legs and two feet, removing the four-leg/ghost-limb transition.
+- `Player.farSide` now exclusively selects true front versus true rear animation artwork.
+  `Player.facingLeft` exclusively mirrors that artwork according to actual horizontal movement,
+  including human input, loose-ball pursuit, ambient repositioning and right-side elimination runs.
+- Held-ball and wind-up placement now share one hand-anchor function. The anchor changes sides when
+  the player turns, sits beyond the shoulder on rear-view players, in front of the torso on
+  front-view players, and extends outward/upward during the release anticipation.
+- Held balls use player-level priority rather than the loose-ball net-depth priority, preventing a
+  near-side held ball from being pasted indiscriminately over the rear-view torso.
+
+The authored run reference is preserved as `assets/player_run_cycle_v2.png`; the deterministic
+converter output and preview are regenerated from it. Clean SGDK build and Fusion QA confirmed
+front/rear matchup previews, stable live held-ball placement and uncorrupted match rendering.

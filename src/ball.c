@@ -202,7 +202,8 @@ void ball_draw(Ball *b)
     bool inFlight = (b->state == BALL_FLYING_TO_A) || (b->state == BALL_FLYING_TO_B);
     s16 drawY = b->y;
     u16 ballTile = TILE_BALL16_FRAME_0;
-    u16 netPriority = ((b->y - (b->x >> 2)) >= COURT_CENTER_DEPTH) ? 1 : 0;
+    bool held = (b->state == BALL_HELD_A) || (b->state == BALL_HELD_B);
+    u16 netPriority = !held && ((b->y - (b->x >> 2)) >= COURT_CENTER_DEPTH) ? 1 : 0;
 
     if (inFlight)
     {

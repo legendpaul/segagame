@@ -17,6 +17,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "assets" / "player_isometric_sheet.png"
 BACK_SOURCE = ROOT / "assets" / "player_isometric_back_sheet_v2.png"
+RUN_SOURCE = ROOT / "assets" / "player_run_cycle_v2.png"
 OUTPUT = ROOT / "src" / "player_isometric_tiles.inc"
 PREVIEW = ROOT / "assets" / "player_isometric_preview.png"
 
@@ -34,14 +35,6 @@ PALETTE = {
 KIT = (2, 5, 6, 7, 12, 13, 14)
 FIXED = (1, 3, 4, 8, 9, 10, 11, 15)
 POSES = ("stand", "run", "throw", "catch")
-
-
-def alternate_stride(canvas):
-    """Swap the legs without reversing the player's upper-body facing."""
-    result = [row[:] for row in canvas]
-    for y in range(22, 32):
-        result[y] = list(reversed(canvas[y]))
-    return result
 
 
 def remove_green_key(image):
@@ -137,13 +130,13 @@ def encode_far(canvas):
     return tiles
 
 
-def build_canvases(image):
+def build_canvases(image, pose_names=POSES):
     boxes = sorted((box for _, box in components(image.getchannel("A"))), key=lambda b: b[0])
-    if len(boxes) != 4:
-        raise SystemExit(f"Expected four player components, found {len(boxes)}")
+    if len(boxes) != len(pose_names):
+        raise SystemExit(f"Expected {len(pose_names)} player components, found {len(boxes)}")
 
     pose_canvases = {}
-    for pose, box in zip(POSES, boxes):
+    for pose, box in zip(pose_names, boxes):
         sprite = image.crop(box)
         sw, sh = sprite.size
         scale = min(30 / sw, 32 / sh)
@@ -160,9 +153,13 @@ def build_canvases(image):
 
 def main():
     front = build_canvases(Image.open(SOURCE).convert("RGBA"))
-    front["run_alt"] = alternate_stride(front["run"])
     back = build_canvases(remove_green_key(Image.open(BACK_SOURCE)))
-    back["run_alt"] = alternate_stride(back["run"])
+    runs = build_canvases(remove_green_key(Image.open(RUN_SOURCE)),
+                          ("front_run", "front_run_alt", "back_run", "back_run_alt"))
+    front["run"] = runs["front_run"]
+    front["run_alt"] = runs["front_run_alt"]
+    back["run"] = runs["back_run"]
+    back["run_alt"] = runs["back_run_alt"]
 
     preview = Image.new("RGB", (5 * 40, 2 * 40), (24, 40, 72))
     for row, canvases in enumerate((front, back)):

@@ -46,6 +46,7 @@ bool player_updateExit(Player *p)
      * the run belongs to the same isometric ground plane as normal play. */
     p->x += 3;
     p->y += 1;
+    p->facingLeft = FALSE;
     if (p->x > SCREEN_W + 24)
     {
         p->x = OFFSCREEN_X;
@@ -68,6 +69,7 @@ void player_restore(Player *p)
 
 void player_moveHuman(Player *p)
 {
+    s16 oldX = p->x;
     /* Both world axes project diagonally in the reference camera.
      * This makes every d-pad direction change screen X and Y instead
      * of sliding players along one flat horizontal baseline. */
@@ -77,6 +79,7 @@ void player_moveHuman(Player *p)
     if (input_held(BUTTON_DOWN))  { p->x -= 1; p->y += 2; }
 
     player_clampToCourt(p);
+    if (p->x != oldX) p->facingLeft = (p->x < oldX);
 
     /* Animation is advanced once, centrally, after the match state update.
      * Ticking here as well made the controlled player run at double cadence. */
@@ -148,15 +151,18 @@ void player_draw(Player *p)
     /* Hardware sprites form a linked list starting at slot 0; a sprite
      * whose slot isn't reachable via some other sprite's "link" is never
      * rendered. We keep a fixed chain: slot N links to slot N+1. */
-    bool backView = !p->facingLeft;
+    /* Court side selects the camera-facing animation bank; horizontal
+     * movement only mirrors that bank. This preserves true front/rear
+     * anatomy while letting runners face their actual travel direction. */
+    bool backView = !p->farSide;
     u16 base = backView ? TILE_PLAYER_BACK_STAND : TILE_PLAYER_FRONT_STAND;
-    bool flip = FALSE;
+    bool flip = p->facingLeft;
     s16 poseOffsetX = 0;
     s16 poseOffsetY = 0;
     s16 direction = p->facingLeft ? -1 : 1;
 
-    /* Animation never changes team facing. The second run beat is a subtle
-     * body bob, so the silhouette keeps looking toward the opposition. */
+    /* RUN and RUN_ALT are separately authored contact poses with exactly
+     * two legs each; no partial-row reflection or ghost limbs. */
     if (p->pose == POSE_RUN)
     {
         static const s8 runX[4] = { -1, 0, 1, 0 };
