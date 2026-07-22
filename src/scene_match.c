@@ -12,8 +12,8 @@
 #include "ui_data.h"
 #include "flag_data.h"
 
-#define SLOT_TEAM_A   0    /* teamA uses sprite slots 0,1,2 */
-#define SLOT_TEAM_B   3    /* teamB uses sprite slots 3,4,5 */
+#define SLOT_TEAM_A   0    /* initial slots; reassigned by projected depth each frame */
+#define SLOT_TEAM_B   3    /* initial slots; reassigned by projected depth each frame */
 #define SLOT_BALL     6    /* ball uses slots 6 (ball) and 7 (shadow) */
 #define SLOT_MARKER   8    /* coloured ground star (see draw_control_marker) */
 #define SLOT_SHADOWS  9    /* six grounded player shadows use slots 9..14 */
@@ -146,6 +146,44 @@ static void hide_unselected_player_dots(void)
 static s16 lane_x(u8 i)
 {
     return COURT_LEFT_X + (s16)((i + 1) * (COURT_RIGHT_X - COURT_LEFT_X) / (TEAM_SIZE + 1));
+}
+
+/* Same-priority Mega Drive sprites with a lower table index win an overlap.
+ * Rank all players from nearest to farthest using their ground-contact point,
+ * not their team, so crossed silhouettes read correctly on the isometric court. */
+static bool player_is_nearer(const Player *a, const Player *b)
+{
+    if (a->y != b->y) return a->y > b->y;
+    return a->x > b->x;
+}
+
+static void assign_player_depth_slots(void)
+{
+    Player *order[TEAM_SIZE * 2];
+    u8 i;
+
+    for (i = 0; i < TEAM_SIZE; i++)
+    {
+        order[i] = &teamA[i];
+        order[TEAM_SIZE + i] = &teamB[i];
+    }
+
+    /* Six entries only: a stable insertion sort is cheaper and clearer than
+     * carrying a general-purpose sorter into the ROM. Exact ties retain their
+     * previous team/player order, preventing one-frame overlap flicker. */
+    for (i = 1; i < TEAM_SIZE * 2; i++)
+    {
+        Player *key = order[i];
+        u8 j = i;
+        while ((j > 0) && player_is_nearer(key, order[j - 1]))
+        {
+            order[j] = order[j - 1];
+            j--;
+        }
+        order[j] = key;
+    }
+
+    for (i = 0; i < TEAM_SIZE * 2; i++) order[i]->spriteSlot = i;
 }
 
 static u8 count_in_play(Player team[])
@@ -817,8 +855,12 @@ void scene_match_update(void)
         return;
     }
 
-    /* Animate + draw every player on both sides (eliminated ones are
-     * parked off-screen by player_eliminate() so this stays simple). */
+    /* Sprite table order is visual depth on equal-priority hardware sprites.
+     * Rebuild it after movement so the nearer feet always cover farther bodies. */
+    assign_player_depth_slots();
+
+    /* Animate + draw every player on both sides (eliminated ones are parked
+     * off-screen; draw call order no longer controls their overlap). */
     for (i = 0; i < TEAM_SIZE; i++)
     {
         bool aMoving = teamA[i].exiting || ambientMovedA[i] ||

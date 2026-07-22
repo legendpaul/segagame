@@ -1037,3 +1037,18 @@ uncorrupted HUD. The hardware capture is preserved as `assets/fusion_match_v3_qa
 The authored run reference is preserved as `assets/player_run_cycle_v2.png`; the deterministic
 converter output and preview are regenerated from it. Clean SGDK build and Fusion QA confirmed
 front/rear matchup previews, stable live held-ball placement and uncorrupted match rendering.
+
+---
+
+## Per-player isometric overlap sorting (2026-07-22)
+
+- Removed the fixed team-A-before-team-B overlap rule. All six athletes are now depth-ranked every
+  frame from their feet position after movement, so the player nearer the camera correctly covers
+  the farther player when their 32px silhouettes cross.
+- Equal-depth ties use horizontal position and a stable insertion order, avoiding rapid sprite
+  swapping or flicker when players briefly share a projected line.
+- The sorted players still occupy hardware slots 0-5 and preserve the continuous sprite link into
+  the ball, marker and hidden-shadow slots; no additional VRAM or sprite budget is consumed.
+
+Clean SGDK compilation and live Fusion match capture confirmed all six dynamically assigned player
+sprites remain visible with an intact court, net, ball and HUD.

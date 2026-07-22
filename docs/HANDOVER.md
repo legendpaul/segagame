@@ -125,8 +125,9 @@ tools/build_stadium_tiles.py       - reproducible source-to-VDP converter
 
 - **Sprite hardware link chain** (`scene_match.c`): Genesis hardware sprites form a linked list
   starting at slot 0; each `VDP_setSpriteFull()` call's last argument is the *next* slot in the
-  chain, not sprite data. Current chain: `SLOT_TEAM_A=0` (slots 0,1,2) → `SLOT_TEAM_B=3` (slots
-  3,4,5) → `SLOT_BALL=6` (ball at 6, shadow at 7) → `SLOT_MARKER=8` → player shadows in
+  chain, not sprite data. Current chain: six depth-sorted players in slots 0-5 (slot ownership is
+  reassigned every frame from projected feet position) → `SLOT_BALL=6` (ball at 6, shadow at 7)
+  → `SLOT_MARKER=8` → player shadows in
   slots 9-14 (slot 14 terminates, link=0). If you
   add another persistent on-screen sprite, you must extend this chain (see how `ball.c`'s
   shadow was changed from `link=0` to `link=b->spriteSlot+2` this session to make room for the

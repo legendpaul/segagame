@@ -148,9 +148,9 @@ void player_setPose(Player *p, u8 pose, u8 timer)
 
 void player_draw(Player *p)
 {
-    /* Hardware sprites form a linked list starting at slot 0; a sprite
-     * whose slot isn't reachable via some other sprite's "link" is never
-     * rendered. We keep a fixed chain: slot N links to slot N+1. */
+    /* Hardware sprites form a linked list starting at slot 0; match play
+     * assigns player slots by ground depth every frame, while the link itself
+     * remains the continuous slot N -> N+1 chain. */
     /* Court side selects the camera-facing animation bank; horizontal
      * movement only mirrors that bank. This preserves true front/rear
      * anatomy while letting runners face their actual travel direction. */
