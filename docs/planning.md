@@ -1096,5 +1096,18 @@ round scoring, a 3-0 match finish and the dedicated champion pose without gamepl
 
 Clean SGDK compilation confirmed the expanded player bank and shifted court allocation remain
 within the existing ROM/VRAM layout.
+
+---
+
+## Held-ball shape and hand-anchor correction (2026-07-22)
+
+- Added a dedicated symmetric 8x8 held-ball tile instead of showing the 16x16 rotating flight
+  artwork against a player's torso. Its 2/4/6/8/8/6/4/2 outline remains circular at native scale.
+- Ball coordinates are now treated consistently as visual centres: 16x16 flight/loose frames use
+  an 8px origin offset, 8x8 held frames and shadows use 4px. This removes the old four-pixel
+  down-right displacement between collision position and visible art.
+- Recalculated front/rear hand anchors from the player's visual centre. Player 2 now carries the
+  ball a full hand-width beyond the outside shoulder rather than across the chest, with wind-up
+  extension continuing in the player's facing direction.
 - This removes the board stripe that previously cut across a near player's head and torso without
   weakening the correct far-side occlusion or changing the authored stadium tiles.

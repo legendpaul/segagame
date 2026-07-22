@@ -192,6 +192,20 @@ static const u32 tile_ball_shadow_air[8] = {
     0x00033000, 0x00333300, 0x00033000, 0x00000000
 };
 
+/* A compact, mathematically symmetric held ball. Keeping it separate from
+ * the large flight frames prevents a teammate's torso from clipping the
+ * outline into an irregular white blob. */
+static const u32 tile_ball_held[8] = {
+    0x00033000,
+    0x00311300,
+    0x03111130,
+    0x31121113,
+    0x31112113,
+    0x03111130,
+    0x00311300,
+    0x00033000
+};
+
 /* Native 16x16 ball frames. Tiles are column-major for SPRITE_SIZE(2,2). */
 static const u32 tile_ball16[16][8] = {
     {0x00000000,0x00000000,0x00000000,0x00000033,0x00003111,0x00031121,0x00031112,0x00311111},
@@ -369,6 +383,7 @@ void sprites_data_init(void)
     VDP_loadTileData(tile_iso_back_celebrate[0], TILE_PLAYER_BACK_CELEBRATE, 16, DMA);
     VDP_loadTileData(tile_iso_front_run_pass[0], TILE_PLAYER_FRONT_RUN_PASS, 16, DMA);
     VDP_loadTileData(tile_iso_back_run_pass[0], TILE_PLAYER_BACK_RUN_PASS, 16, DMA);
+    VDP_loadTileData(tile_ball_held, TILE_BALL_HELD, 1, DMA);
     /* Pickup still shares the established low silhouette; impact, grounded
      * fall and celebration now use their own front/rear authored blocks. */
     VDP_loadTileData(tile_ball_shadow, TILE_BALL_SHADOW,  1, DMA);

@@ -200,8 +200,11 @@ s16 ball_visualY(const Ball *b)
 void ball_draw(Ball *b)
 {
     bool inFlight = (b->state == BALL_FLYING_TO_A) || (b->state == BALL_FLYING_TO_B);
+    bool held = (b->state == BALL_HELD_A) || (b->state == BALL_HELD_B);
     s16 drawY = b->y;
     u16 ballTile = TILE_BALL16_FRAME_0;
+    u8 ballSize = SPRITE_SIZE(2, 2);
+    s16 ballOffset = 8;
     /* Court half, not ball state, decides divider occlusion. A near-side held
      * ball must clear the board with its owner; sprite-table order still lets
      * the player's body cover the ball at the rear hand anchor. */
@@ -228,7 +231,7 @@ void ball_draw(Ball *b)
          * the ball will actually land. Links on to spriteSlot+2, the
          * controlled-player ground star (see scene_match.c) - the shadow is
          * no longer the last sprite in the chain. */
-        VDP_setSpriteFull(b->spriteSlot + 1, b->x, b->y, SPRITE_SIZE(1, 1),
+        VDP_setSpriteFull(b->spriteSlot + 1, b->x - 4, b->y - 4, SPRITE_SIZE(1, 1),
                            TILE_ATTR_FULL(PAL_BALL, netPriority, FALSE, FALSE,
                                (height > 12) ? TILE_BALL_SHADOW_AIR : TILE_BALL_SHADOW),
                            b->spriteSlot + 2);
@@ -238,15 +241,18 @@ void ball_draw(Ball *b)
         s16 looseHeight = b->height >> 8;
         drawY = b->y - looseHeight;
         ballTile += (((b->x + b->y) >> 2) & 3) * 4;
-        VDP_setSpriteFull(b->spriteSlot + 1, b->x, b->y, SPRITE_SIZE(1, 1),
+        VDP_setSpriteFull(b->spriteSlot + 1, b->x - 4, b->y - 4, SPRITE_SIZE(1, 1),
                            TILE_ATTR_FULL(PAL_BALL, netPriority, FALSE, FALSE,
                                looseHeight > 4 ? TILE_BALL_SHADOW_AIR : TILE_BALL_SHADOW),
                            b->spriteSlot + 2);
     }
-    else
+    else if (held)
     {
         /* Held: no shadow needed, park it off-screen rather than
          * leaving a stray dot under the holding player. */
+        ballTile = TILE_BALL_HELD;
+        ballSize = SPRITE_SIZE(1, 1);
+        ballOffset = 4;
         VDP_setSpriteFull(b->spriteSlot + 1, -16, -16, SPRITE_SIZE(1, 1),
                            TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL_SHADOW),
                            b->spriteSlot + 2);
@@ -254,7 +260,7 @@ void ball_draw(Ball *b)
 
     /* The ball links to the shadow, which now links on to the ground star
      * (see scene_match.c) so all three stay reachable from slot 0. */
-    VDP_setSpriteFull(b->spriteSlot, b->x - 4, drawY - 4, SPRITE_SIZE(2, 2),
+    VDP_setSpriteFull(b->spriteSlot, b->x - ballOffset, drawY - ballOffset, ballSize,
                        TILE_ATTR_FULL(PAL_BALL, netPriority, FALSE, FALSE, ballTile),
                        b->spriteSlot + 1);
 }

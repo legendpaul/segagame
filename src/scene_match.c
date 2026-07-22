@@ -287,11 +287,13 @@ static bool move_ambient(Player *p, u8 slot)
 static void place_ball_in_hand(Player *p, bool windup)
 {
     s16 direction = p->facingLeft ? -1 : 1;
-    /* Both camera banks use the outward throwing hand. Rear-view holders
-     * keep the ball beyond the shoulder rather than pasted over the chest;
-     * front-view holders carry it just in front of the torso. */
-    ball.x = p->x + (p->facingLeft ? -3 : 9) + (windup ? direction * 4 : 0);
-    ball.y = p->y - (p->farSide ? 8 : 11) - (windup ? 5 : 0);
+    s16 bodyCenterX = p->x + 8;
+    /* Ball coordinates are true visual centres. The front-facing CPU holder
+     * carries it a full hand-width outside the shoulder; the rear-facing
+     * human keeps it slightly closer so it reads against the raised arm. */
+    s16 handReach = p->farSide ? 10 : 7;
+    ball.x = bodyCenterX + direction * (handReach + (windup ? 4 : 0));
+    ball.y = p->y - (p->farSide ? 9 : 11) - (windup ? 5 : 0);
 }
 
 /* A/B/C address the visible left/middle/right opponent lanes. If that
