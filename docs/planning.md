@@ -1124,3 +1124,33 @@ within the existing ROM/VRAM layout.
   the eliminated player turn right to perform the established off-court exit.
 - This removes the board stripe that previously cut across a near player's head and torso without
   weakening the correct far-side occlusion or changing the authored stadium tiles.
+
+---
+
+## Continuation under Claude while Codex is rate-limited (2026-07-22)
+
+Codex (which had been driving the last ~20 commits of isometric rebuild, national
+teams, physical rebound rallies, illustrated title, stadium/crowd art, etc.) hit its
+usage limit; the account resets 2026-07-28. Picking up from its last state so the
+project keeps moving:
+
+- Verified the working tree Codex left uncommitted (ball/player depth-sort unified,
+  16x16 ball across held/airborne/loose states, per-frame hand anchors, hitstop,
+  sound priority) actually builds clean (`Build OK: out\rom.bin`) and committed it as
+  `04f530b`.
+- Implemented the last open item from the ChatGPT critique backlog (§8 in
+  `docs/HANDOVER.md`): the ball carrier now moves at half speed while holding/winding
+  up (`player_moveHuman()` gates position updates to every other frame when
+  `activeA_has_ball()` is true, preserving the exact 2:1 diagonal ratio instead of
+  scaling deltas). Marker colour and the movement penalty now share one
+  `activeA_has_ball()` check instead of two copies of the same condition drifting
+  apart. Committed as `8b29308`.
+- Both verified live: clean rebuild, `FusionAutomator` ROM load, full menu flow
+  (title → Spain select → Argentina select → matchup card → match), and a played
+  rally with no crash or tile corruption.
+
+With that, every item on the ChatGPT critique list (§8) is done. Remaining open
+backlog is the older Qwen-sourced items (squash/stretch frame variants, dust
+particles on landing/pivots) and task #41 (game modes/depth), still deprioritized.
+See `docs/HANDOVER.md` for full tooling/process notes - update its §8 checklist
+alongside this entry so the two docs don't drift.

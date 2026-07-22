@@ -394,9 +394,10 @@ you're asked to do.
    (the flash mechanism already exists — `sprites_data_flash_team()`) on a successful hit.
 7. **Simplify the HUD** to a single ~16px strip; small icons for remaining-player count instead
    of "IN 3" text.
-8. **Player spacing/AI**: diagonal staggered depth lanes are **done**. A dedicated slower ball-
-   carrier movement speed remains open.
-   Ball carrier should have a visibly different stance and ideally move slightly slower.
+8. ~~Player spacing/AI~~ — **done**. Diagonal staggered depth lanes, plus (2026-07-22) the ball
+   carrier now moves at half speed while holding/winding up (`activeA_has_ball()` gates
+   `player_moveHuman()` to every other frame) - see `docs/planning.md`'s "Continuation under
+   Claude while Codex is rate-limited" section. Every item on this list is now done.
 
 ### Carried over from an earlier Qwen critique (see `planning.md`'s earlier dated sections):
 - ~~Real run-cycle art~~ — **done** this session.
