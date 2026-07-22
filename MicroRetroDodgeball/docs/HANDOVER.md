@@ -12,10 +12,11 @@ A 2-team, 3-players-per-side dodgeball game for the Sega Genesis/Mega Drive, bui
 FM synth music, AI-generated pixel art sprites run through a custom quantization pipeline to fit
 Genesis hardware constraints.
 
-**Repo:** `C:\svn\git\segagame` (this repo). **Docs:** `docs/planning.md` is the living design
-log — dated sections at the bottom document every major pass in detail, more granular than this
-file. Read the last 2-3 dated sections in `planning.md` for recent technical detail this file
-summarizes.
+**Repo:** `C:\svn\git\segagame\MicroRetroDodgeball` (this game folder — `segagame` is a monorepo
+of several Sega games; this is one of them, see the top-level `README.md`). **Docs:**
+`docs/planning.md` is the living design log — dated sections at the bottom document every major
+pass in detail, more granular than this file. Read the last 2-3 dated sections in `planning.md`
+for recent technical detail this file summarizes.
 
 **Companion repo:** `C:\svn\git\LPUtils25` — contains `FlaUIAutoRunner`, a separate .NET project
 with the `FusionAutomator` class used to drive the Fusion emulator via real UI Automation
@@ -26,7 +27,7 @@ instead of blind screen-coordinate clicking. Details in §4.
 ## 2. Build / run loop (do this first, verify your environment works)
 
 ```
-cd C:\svn\git\segagame
+cd C:\svn\git\segagame\MicroRetroDodgeball
 .\build.bat
 ```
 Output: `out\rom.bin`. A clean build currently produces zero warnings. If you see warnings you
@@ -171,7 +172,7 @@ C:\svn\git\LPUtils25\FlaUIAutoRunner\FusionRunner\  (Program.cs, FusionRunner.cs
 **To load a ROM and verify the title bar:**
 ```powershell
 cd 'C:\svn\git\LPUtils25\FlaUIAutoRunner\FusionRunner'
-dotnet run --no-build -- 'C:\svn\git\segagame\out\rom.bin'
+dotnet run --no-build -- 'C:\svn\git\segagame\MicroRetroDodgeball\out\rom.bin'
 ```
 This launches/attaches to Fusion, sends `Ctrl+G` (the real menu accelerator — menu-tree
 navigation was tried and found unreliable, see the FlaUIAutoRunner commit message for why),

@@ -1,5 +1,7 @@
-# SGDK build output - regenerate with build.bat
+# SGDK build output - regenerate with build.bat. Every game subfolder gets
+# its own out/, e.g. MicroRetroDodgeball/out/.
 out/
 
-# Auto-copied by the SGDK build from C:\SGDK\src\boot\sega.s - not authored here
-src/boot/sega.s
+# Auto-copied by the SGDK build from C:\SGDK\src\boot\sega.s - not authored
+# here. Matches this file under any game subfolder's src/boot/.
+**/src/boot/sega.s

@@ -1154,3 +1154,30 @@ backlog is the older Qwen-sourced items (squash/stretch frame variants, dust
 particles on landing/pivots) and task #41 (game modes/depth), still deprioritized.
 See `docs/HANDOVER.md` for full tooling/process notes - update its §8 checklist
 alongside this entry so the two docs don't drift.
+
+---
+
+## Monorepo restructure: moved into MicroRetroDodgeball/ (2026-07-22)
+
+`segagame` is now a monorepo top level meant to hold multiple Sega Mega Drive games,
+sharing tooling/conventions where it makes sense. This game (previously living at the
+repo root) was moved wholesale into `MicroRetroDodgeball/` via `git mv` (history
+preserved - `git log --follow` on any file still shows its full history through the
+move).
+
+Everything game-specific moved together: `src/`, `assets/`, `tools/`, `docs/` (this
+file plus `HANDOVER.md`, `hardware.md`, `MOTIVATIONAPP_SUMMARY.md`), `build.bat`,
+`review_packet/`, the QA screenshots, and this project's own `README.md`. The
+top-level `README.md` is now a short monorepo index; `.gitignore` was generalized
+(`**/src/boot/sega.s` instead of an unanchored root-relative pattern) so the same
+ignore rules cover every future game folder's own `out/` and SGDK-copied boot file.
+
+Nothing inside `src/`, `tools/` or `build.bat` needed code changes - they all already
+used paths relative to their own location (`build.bat` does `cd /d %~dp0`; the Python
+tile pipelines read/write `assets/...`/`src/...` relative to cwd). Only the docs that
+hardcoded the old absolute path (`docs/HANDOVER.md`) needed updating to
+`C:\svn\git\segagame\MicroRetroDodgeball\...`.
+
+If a second game ends up sharing real code with this one (sprite/tile pipeline, UI
+font, physics), promote that code into a top-level `shared/` folder at that point
+rather than duplicating or prematurely abstracting it now.
