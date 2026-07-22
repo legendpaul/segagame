@@ -108,14 +108,22 @@ static void trigger_shake(void)
     shakeTimer = 6;
 }
 
+/* TRUE while the human-controlled slot is the one actually carrying the
+ * ball (held or mid-windup), shared by the ground marker colour and the
+ * carrying movement penalty so the two never drift out of sync. */
+static bool activeA_has_ball(void)
+{
+    return (activeA == holderA) &&
+           (state == MS_A_HOLD || state == MS_A_WINDUP ||
+            (state == MS_ANNOUNCE && server == 0));
+}
+
 /* Wide ground ring under the controlled player: yellow while defending or
  * moving without the ball, red while holding/winding up a throw. */
 static void draw_control_marker(void)
 {
     Player *p = &teamA[activeA];
-    bool hasBall = (activeA == holderA) &&
-                   (state == MS_A_HOLD || state == MS_A_WINDUP ||
-                    (state == MS_ANNOUNCE && server == 0));
+    bool hasBall = activeA_has_ball();
     u16 markerTile = hasBall ? TILE_RING_RED : TILE_RING_YELLOW;
     if (p->eliminated)
     {
@@ -721,7 +729,7 @@ void scene_match_update(void)
     if (!teamA[activeA].eliminated &&
         state != MS_A_WINDUP && state != MS_HIT_A &&
         state != MS_HIT_B && state != MS_ROUND_END)
-        player_moveHuman(&teamA[activeA]);
+        player_moveHuman(&teamA[activeA], activeA_has_ball());
 
     /* Watchdog: force whatever this state is waiting on to complete if
      * it's gone on far longer than any real delay ever should. */

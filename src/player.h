@@ -46,7 +46,9 @@ void player_eliminate(Player *p);
 bool player_updateExit(Player *p);
 /* Brings an eliminated player back into play at their home lane. */
 void player_restore(Player *p);
-void player_moveHuman(Player *p);
+/* hasBall slows movement (see player.c) so the carrier reads as
+ * slightly more vulnerable/committed than an off-ball defender. */
+void player_moveHuman(Player *p, bool hasBall);
 /* Keeps a player inside their half of the projected isometric court. */
 void player_clampToCourt(Player *p);
 /* Advances all action animation and, once any transient pose has timed

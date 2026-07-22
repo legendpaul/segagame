@@ -67,16 +67,34 @@ void player_restore(Player *p)
     p->poseTimer = 0;
 }
 
-void player_moveHuman(Player *p)
+void player_moveHuman(Player *p, bool hasBall)
 {
     s16 oldX = p->x;
-    /* Both world axes project diagonally in the reference camera.
-     * This makes every d-pad direction change screen X and Y instead
-     * of sliding players along one flat horizontal baseline. */
-    if (input_held(BUTTON_LEFT))  { p->x -= 2; p->y -= 1; }
-    if (input_held(BUTTON_RIGHT)) { p->x += 2; p->y += 1; }
-    if (input_held(BUTTON_UP))    { p->x += 1; p->y -= 2; }
-    if (input_held(BUTTON_DOWN))  { p->x -= 1; p->y += 2; }
+    /* Carrying the ball costs a step: position only advances on every
+     * other frame instead of scaling the per-frame delta down. That
+     * keeps the exact 2:1 diagonal ratio (so facing/clamping math never
+     * sees a fractional pixel) while still reading as a real speed
+     * penalty rather than input lag. The run animation itself is paced
+     * from input_held() in scene_match.c, not from this gate, so the
+     * carrier's legs keep moving smoothly instead of stuttering. */
+    static u8 carryGate = 0;
+    bool canStep = TRUE;
+    if (hasBall)
+    {
+        carryGate ^= 1;
+        canStep = (carryGate != 0);
+    }
+
+    if (canStep)
+    {
+        /* Both world axes project diagonally in the reference camera.
+         * This makes every d-pad direction change screen X and Y instead
+         * of sliding players along one flat horizontal baseline. */
+        if (input_held(BUTTON_LEFT))  { p->x -= 2; p->y -= 1; }
+        if (input_held(BUTTON_RIGHT)) { p->x += 2; p->y += 1; }
+        if (input_held(BUTTON_UP))    { p->x += 1; p->y -= 2; }
+        if (input_held(BUTTON_DOWN))  { p->x -= 1; p->y += 2; }
+    }
 
     player_clampToCourt(p);
     if (p->x != oldX) p->facingLeft = (p->x < oldX);
