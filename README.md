@@ -8,7 +8,7 @@ Design brief: [docs/planning.md](docs/planning.md).
 ## What's implemented
 
 - **Boot**: standard Mega Drive/SGDK boot sequence (TMSS "SEGA" check) into the game.
-- **Menu**: authored title, separate Player 1/Player 2 selection from 10 national
+- **Menu**: full-screen illustrated 16-bit title, separate Player 1/Player 2 selection from 10 national
   teams, large flags, kit previews and a broadcast matchup screen.
 - **Match**: full dodgeball gameplay -
   - D-Pad movement across each projected court half.
@@ -49,7 +49,7 @@ built and tested against an SGDK install at `C:\SGDK`).
 build.bat
 ```
 
-This produces `out\rom.bin` - a 128KB, checksummed, real Mega Drive ROM image.
+This produces `out\rom.bin` - a 256KB, checksummed, real Mega Drive ROM image.
 
 ## Running it
 

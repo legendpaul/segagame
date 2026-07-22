@@ -33,6 +33,7 @@ typedef enum {
 static MenuPhase phase;
 static Player previewA, previewB;
 static u16 blinkCounter;
+static bool promptVisible;
 static u16 bobCounter;
 static s16 bobOffset;
 
@@ -43,6 +44,7 @@ static void draw_title(void)
     VDP_clearSprites();
     title_data_draw();
     blinkCounter = 0;
+    promptVisible = TRUE;
 }
 
 static void draw_selector(void)
@@ -114,16 +116,16 @@ void scene_menu_update(void)
         if (++blinkCounter >= BLINK_PERIOD)
         {
             blinkCounter = 0;
-            /* A restrained palette pulse keeps the title alive without
-             * erasing text tiles and producing opaque black flashes. */
-            PAL_setColor(0 * 16 + 4,
-                (GET_HVCOUNTER & 1) ? RGB24_TO_VDPCOLOR(0xF8D828)
-                                    : RGB24_TO_VDPCOLOR(0xF09818));
+            promptVisible = !promptVisible;
+            title_data_set_prompt(promptVisible);
         }
 
         if (input_pressed(BUTTON_START) || input_pressed(BUTTON_A))
         {
             sound_mgr_confirm();
+            /* The full-screen title temporarily occupies the UI font's
+             * VRAM region. Restore it before drawing either selector. */
+            ui_data_init();
             enter_selector(MENU_TEAM_A);
         }
         return;

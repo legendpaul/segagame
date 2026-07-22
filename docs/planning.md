@@ -933,3 +933,29 @@ the complete loop across repeated exchanges: throw -> hit/miss -> bounce/roll ->
 retrieval -> pickup -> counter-throw -> physical human retrieval -> scoring. Captures confirmed
 the airborne ball/shadow separation, loose ball at the projected divider, pickup silhouette and
 continued round progression without a stall.
+
+---
+
+## Illustrated artist title screen (2026-07-22)
+
+Replaced the former three rows of block letters with a single authored sports-key-art
+composition: an enormous gold/orange `MICRO RETRO DODGEBALL` logo, spinning ball and energy ring,
+equal-scale red/blue athletes, floodlights, crowd depth and a stadium tunnel. The selected source
+is preserved as `assets/title_source_v2.png`; the exact hardware conversion is
+`assets/title_screen_v2_preview.png`.
+
+`tools/build_title_tiles.py` now performs the complete reproducible conversion:
+
+- crops the illustration to the Mega Drive's 320x224 composition;
+- chooses one 16-colour palette and snaps it to 3-bit-per-channel Genesis colours;
+- forces the darkest navy into CRAM index 0 so PAL overscan/backdrop bars remain dark;
+- uses whole-8x8-tile MiniBatchKMeans clustering to retain detailed logo/player silhouettes in
+  475 reusable tiles. A naive exact conversion required 1,099 tiles and visibly corrupted real
+  Fusion output by entering the default VDP window-plane map region;
+- emits the tile bank, 40x28 map, palette and a separate eight-glyph `> PRESS START <` tile-font
+  bank into `src/title_tiles.inc`.
+
+The title bank intentionally overlays the large UI-font VRAM range only while the title is shown.
+`scene_menu.c` reloads `ui_data_init()` on the title-to-selector transition. Fusion QA verified
+both the clean full-screen title and the restored national-team selector, then the temporary
+direct-selector QA hook was removed and normal `GS_BOOT` entry restored.

@@ -464,6 +464,27 @@ Sound callers use the returned contact flag to trigger the plastic-wall bounce c
 
 The automated Fusion rally used for QA temporarily forced throws and retrieval on both sides.
 Those hooks were removed and the normal `GS_BOOT` entry restored before the final ROM build.
+
+---
+
+## 12. Illustrated title VRAM bank (2026-07-22)
+
+The current title is a 475-tile full-screen illustration generated from
+`assets/title_source_v2.png`, not the old per-letter `MICRO` / `RETRO` / `DODGEBALL` renderer.
+Regenerate it with `python tools/build_title_tiles.py` (requires Pillow, NumPy and scikit-learn).
+The fixed random seed makes the MiniBatchKMeans whole-tile clustering deterministic. The exact
+console-colour preview is `assets/title_screen_v2_preview.png`.
+
+Critical VRAM rule: do not raise the title bank above roughly 500 tiles at its current
+`TILE_TITLE_BASE`. The first exact 1,099-tile attempt compiled but crossed into the default
+0xB000 window-plane map region and rendered as large corrupt blocks in Fusion. The converter's
+`MAX_TILES` guard prevents repeating that failure.
+
+The title illustration temporarily overlaps `TILE_UI_BASE`; this is deliberate. `title_data_draw()`
+loads the scene-local title bank, and the title-confirm path in `scene_menu.c` must call
+`ui_data_init()` before `enter_selector()` to restore the UI glyph tiles. Fusion hardware capture
+verified the selector is clean after this swap. The prompt is its own tiny title glyph bank and
+blinks by changing tilemap entries, never by pulsing the illustration palette.
 - `docs/planning.md`'s dated sections are the source of truth for implementation detail; this
   file is the map to get you oriented fast, not a replacement for reading the actual code and
   the last couple of `planning.md` entries.
