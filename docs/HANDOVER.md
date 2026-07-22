@@ -8,7 +8,7 @@ code. It's organized so you can skim the headers and dive into whichever section
 ## 1. What this project is
 
 A 2-team, 3-players-per-side dodgeball game for the Sega Genesis/Mega Drive, built with SGDK
-(C, m68k-elf-gcc). Elevated pseudo-isometric court view, real elimination + catch-return rules,
+(C, m68k-elf-gcc). Elevated pseudo-isometric court view, hit/elimination and loose-ball rallies,
 FM synth music, AI-generated pixel art sprites run through a custom quantization pipeline to fit
 Genesis hardware constraints.
 
@@ -60,7 +60,7 @@ src/
   scene_match.c          - THE BIG ONE: match state machine, player/ball draw loop, AI hooks
   scene_gameover.c
   player.c / player.h    - player entity: pose state machine, animation, draw
-  ball.c / ball.h         - ball entity: flight arc, shadow, draw
+  ball.c / ball.h         - flight arc, spin, shadow, damped loose-ball rebound physics
   ai_mgr.c                 - CPU team behavior
   input_mgr.c                - joypad wrapper (BUTTON_LEFT/RIGHT/A/START etc via SGDK)
   sound_mgr.c / music_mgr.c / fm_synth.c  - audio (real YM2612 FM synth, not PSG beeps)
@@ -86,14 +86,14 @@ tools/build_stadium_tiles.py       - reproducible source-to-VDP converter
   ```
   TILE_PLAYER_STAND   +0    (16 tiles, 4x4 block = 32x32px, max HW sprite size)
   TILE_PLAYER_THROW   +16   (16 tiles)
-  TILE_PLAYER_CATCH   +32   (16 tiles)
+  TILE_PLAYER_PICKUP  +32   (16 tiles)
   TILE_PLAYER_RUN     +48   (16 tiles)
   TILE_BALL           +64   (4 seam-rotation tiles, 8x8)
   TILE_BALL_SHADOW    +68   (normal + compact airborne shadow at +69)
   TILE_PLAYER_FAR_STAND +70   (9 tiles, 3x3)
   TILE_PLAYER_FAR_RUN   +79   (9 tiles)
   TILE_PLAYER_FAR_THROW +88   (9 tiles)
-  TILE_PLAYER_FAR_CATCH +97   (9 tiles)
+  TILE_PLAYER_FAR_PICKUP +97   (9 tiles)
   TILE_MARKER_YELLOW   +106   (2 tiles — controlled-player ground star)
   TILE_MARKER_RED      +108   (2 tiles — possession ground star)
   TILE_COURT_BASE      +110   (481 generated stadium tiles; 488 reserved)
@@ -133,14 +133,19 @@ tools/build_stadium_tiles.py       - reproducible source-to-VDP converter
   marker) — a sprite not reachable via the chain from slot 0 is simply never rendered, with no
   error.
 
-- **Player pose system** (`player.c`): `POSE_STAND` / `POSE_RUN` / `POSE_THROW` / `POSE_CATCH` /
+- **Player pose system** (`player.c`): `POSE_STAND` / `POSE_RUN` / `POSE_THROW` / `POSE_PICKUP` /
   `POSE_HIT`.
   `player_draw()` picks the tile block from the current pose and gets `hflip` only from the
   player's stable `facingLeft` team direction. RUN uses its own real art (`TILE_PLAYER_RUN`)
-  plus a one-pixel animation bob; it never flips the player away from the opposition.
+  with a four-beat body path; actions use anticipation, contact and recovery offsets without
+  ever flipping the player away from the opposition.
 
 - **Far-side art**: four `TILE_PLAYER_FAR_*` blocks remain available as separately encoded 24x24
   versions, but the actual match deliberately renders both teams at equal 32x32 size.
+
+- **Team half is not sprite scale**: `Player.farSide` controls court clamping independently of
+  `Player.small`. This separation is essential now that both teams intentionally use equal-sized
+  sprites. Do not revert clamping to `small`.
 
 ---
 
@@ -438,6 +443,27 @@ Verified reference footage:
 
 - FIFA International Soccer (Mega-CD): https://www.youtube.com/watch?v=68TFHQlugiY
 - Virtua Striker 2 (Dreamcast): https://www.youtube.com/watch?v=3lSwlIjwhVY
+
+---
+
+## 11. Current rally rules and physics (2026-07-22)
+
+Ignore older historical sections which describe catches; they document superseded iterations.
+The live rule is now strictly `throw -> hit or miss -> loose rebound -> physical pickup`.
+
+`scene_match.c` owns two explicit loose states: `MS_LOOSE_A` and `MS_LOOSE_B`. A human-side
+loose ball assigns control to the closest surviving player but waits for the player to enter the
+pickup box. A CPU-side loose ball assigns the closest survivor and visibly drives that player to
+the moving ball. Do not replace either path with `ball_init(... BALL_HELD_*)`; that would restore
+the teleporting possession change this pass deliberately removed.
+
+`ball_startRicochet()` converts the completed throw vector to 8.8 fixed-point rebound velocity.
+`ball_updateLoose()` applies friction, two diminishing floor bounces and damped reflection at the
+projected side/back/center walls. `Ball.looseFarSide` records which receiving half owns that box.
+Sound callers use the returned contact flag to trigger the plastic-wall bounce cue.
+
+The automated Fusion rally used for QA temporarily forced throws and retrieval on both sides.
+Those hooks were removed and the normal `GS_BOOT` entry restored before the final ROM build.
 - `docs/planning.md`'s dated sections are the source of truth for implementation detail; this
   file is the map to get you oriented fast, not a replacement for reading the actual code and
   the last couple of `planning.md` entries.

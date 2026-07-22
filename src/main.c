@@ -3,7 +3,7 @@
  *
  * A Sega Mega Drive dodgeball game built with SGDK. See docs/planning.md
  * for the original design brief this implements: menu with team select,
- * a full match with movement/throw/catch/scoring, and a game-over scene.
+ * a full match with movement, throws, loose-ball pickups and scoring.
  */
 #include "genesis.h"
 #include "game_state.h"

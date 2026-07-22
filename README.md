@@ -1,30 +1,29 @@
-# MEGA DODGEBALL
+# MICRO RETRO DODGEBALL
 
 A complete Sega Mega Drive (Genesis) dodgeball game, built with [SGDK](https://github.com/Stephane-D/SGDK).
-Pick your team, throw and catch the ball against the CPU, and win the match.
+Pick a national team, throw, dodge, chase rebounds and win the match.
 
 Design brief: [docs/planning.md](docs/planning.md).
 
 ## What's implemented
 
 - **Boot**: standard Mega Drive/SGDK boot sequence (TMSS "SEGA" check) into the game.
-- **Menu**: title screen with team select (4 teams, cycle with Left/Right) and a
-  "PRESS START" prompt. The CPU is automatically assigned a rival team.
+- **Menu**: authored title, separate Player 1/Player 2 selection from 10 national
+  teams, large flags, kit previews and a broadcast matchup screen.
 - **Match**: full dodgeball gameplay -
-  - Left/Right to move along your baseline.
-  - Press **A** to throw when you're holding the ball (you aim by where you're standing).
-  - Press and hold **A** while lined up with an incoming ball to catch it (a catch turns
-    the ball over to you); miss the timing/position and you take a hit and lose a life.
-  - 3 lives per side per round; lose all 3 and the other side scores a point.
+  - D-Pad movement across each projected court half.
+  - **A/B/C** throw to the left/middle/right opponent lane; hold Left or Right for spin.
+  - There is no catch action: an airborne collision is always a hit.
+  - Missed and deflected throws ricochet inside a damped projected rebound box.
+  - The ball remains loose until a player physically runs to it; it never teleports into a hand.
+  - 3 players per side per round; eliminate all 3 to score a point.
   - First to 3 points wins the match.
-  - A basic CPU opponent moves to intercept, has a random catch chance, and throws back
-    at your position with some inaccuracy.
-- **Scoring/HUD**: team names, live score and lives shown on screen throughout the match.
-- **Sound**: PSG sound effects for menu moves, throws, catches, hits and scoring.
+  - The CPU chooses targets, retrieves loose rebounds and throws back with some inaccuracy.
+- **Scoring/HUD**: compact flag/name/clock/score broadcast strip.
+- **Sound**: YM2612 music plus PSG cues for menus, throws, pickups, bounces, hits and scoring.
 - **Game over**: winner announcement with final score, returns to the menu.
 
-All graphics are hand-authored 8x8 tiles defined directly in C (no image pipeline/resource
-compiler needed), so the whole game builds from source with nothing external to fetch.
+The repository contains the generated tile data needed to build the complete ROM offline.
 
 ## Project layout
 

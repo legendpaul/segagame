@@ -1,6 +1,6 @@
 # Running MICRO RETRO DODGEBALL on real Mega Drive hardware
 
-`out/rom.bin` (built by `build.bat`) is a standard 128KB, checksummed Mega Drive ROM
+`out/rom.bin` (built by `build.bat`) is a standard 256KB, checksummed Mega Drive ROM
 image - no special handling needed beyond what any homebrew/flash-cart ROM requires.
 
 ## What you need
@@ -41,7 +41,10 @@ the ROM itself needs no further conversion.
 | Button       | Action                                  |
 | ------------ | ---------------------------------------- |
 | D-Pad        | Move on court; hold Left/Right with a throw button to add spin |
-| A            | Throw to left lane / hold to catch an incoming ball |
+| A            | Throw to left lane                     |
 | B            | Throw to middle lane                    |
 | C            | Throw to right lane                     |
 | Start        | Confirm menu selection / begin match / return to menu after game over |
+
+There is no catch button. Dodge incoming throws, then walk the marked player to the loose
+ball to pick it up. The CPU follows the same physical retrieval rule on its side.

@@ -1,5 +1,6 @@
 #include "ball.h"
 #include "sprites_data.h"
+#include "game_state.h"
 
 void ball_init(Ball *b, u8 spriteSlot, s16 x, s16 y, BallState heldState)
 {
@@ -11,6 +12,14 @@ void ball_init(Ball *b, u8 spriteSlot, s16 x, s16 y, BallState heldState)
     b->targetY = y;
     b->progress = 0;
     b->spin = 0;
+    b->preciseX = (s32)x << 8;
+    b->preciseY = (s32)y << 8;
+    b->velocityX = 0;
+    b->velocityY = 0;
+    b->height = 0;
+    b->velocityZ = 0;
+    b->bounceCount = 0;
+    b->looseFarSide = FALSE;
     b->state = heldState;
     b->spriteSlot = spriteSlot;
 }
@@ -49,14 +58,102 @@ bool ball_update(Ball *b)
     if (b->spin)
     {
         s32 t = b->progress;
-        s32 curve = (12L * 4L * t * (255 - t)) / (255L * 255L);
+        s32 curve = (16L * 4L * t * (255 - t)) / (255L * 255L);
         b->x += (s16)(curve * b->spin);
     }
 
     return (b->progress >= 255) ? TRUE : FALSE;
 }
 
-#define ARC_HEIGHT   22   /* px, peak visual lift at the midpoint of a throw */
+void ball_startRicochet(Ball *b)
+{
+    s16 incomingX = b->targetX - b->startX;
+    s16 incomingY = b->targetY - b->startY;
+
+    b->looseFarSide = (b->state == BALL_FLYING_TO_B);
+    b->state = BALL_LOOSE;
+    b->preciseX = (s32)b->x << 8;
+    b->preciseY = (s32)b->y << 8;
+    /* Reverse a restrained portion of the incoming motion. The extra
+     * lateral component preserves the chosen spin after the throw lands. */
+    b->velocityX = (s16)(-(incomingX * 256L) / 56L + b->spin * 96);
+    b->velocityY = (s16)(-(incomingY * 256L) / 56L);
+    b->height = 3 << 8;
+    b->velocityZ = 2 << 8;
+    b->bounceCount = 0;
+}
+
+bool ball_updateLoose(Ball *b)
+{
+    bool contact = FALSE;
+    s16 depth;
+    const s16 minDepth = b->looseFarSide ? COURT_FAR_DEPTH + 10
+                                         : COURT_CENTER_DEPTH + 6;
+    const s16 maxDepth = b->looseFarSide ? COURT_CENTER_DEPTH - 6
+                                         : COURT_NEAR_DEPTH - 10;
+
+    if (b->state != BALL_LOOSE) return FALSE;
+
+    b->preciseX += b->velocityX;
+    b->preciseY += b->velocityY;
+    b->x = (s16)(b->preciseX >> 8);
+    b->y = (s16)(b->preciseY >> 8);
+
+    /* Four damped walls follow the same projected box as the players. */
+    if (b->x < COURT_LEFT_X + 8)
+    {
+        b->x = COURT_LEFT_X + 8;
+        b->preciseX = (s32)b->x << 8;
+        b->velocityX = (s16)(-b->velocityX * 3 / 4);
+        contact = TRUE;
+    }
+    else if (b->x > COURT_RIGHT_X - 8)
+    {
+        b->x = COURT_RIGHT_X - 8;
+        b->preciseX = (s32)b->x << 8;
+        b->velocityX = (s16)(-b->velocityX * 3 / 4);
+        contact = TRUE;
+    }
+
+    depth = b->y - (b->x >> 2);
+    if (depth < minDepth)
+    {
+        b->y = minDepth + (b->x >> 2);
+        b->preciseY = (s32)b->y << 8;
+        b->velocityY = (s16)(-b->velocityY * 3 / 4);
+        contact = TRUE;
+    }
+    else if (depth > maxDepth)
+    {
+        b->y = maxDepth + (b->x >> 2);
+        b->preciseY = (s32)b->y << 8;
+        b->velocityY = (s16)(-b->velocityY * 3 / 4);
+        contact = TRUE;
+    }
+
+    b->velocityX = (s16)(b->velocityX * 31 / 32);
+    b->velocityY = (s16)(b->velocityY * 31 / 32);
+    if (abs(b->velocityX) < 24) b->velocityX = 0;
+    if (abs(b->velocityY) < 24) b->velocityY = 0;
+
+    b->height += b->velocityZ;
+    b->velocityZ -= 64;
+    if (b->height <= 0)
+    {
+        b->height = 0;
+        if (b->bounceCount < 2)
+        {
+            b->velocityZ = (b->bounceCount == 0) ? 288 : 144;
+            b->bounceCount++;
+            contact = TRUE;
+        }
+        else b->velocityZ = 0;
+    }
+
+    return contact;
+}
+
+#define ARC_HEIGHT   28   /* px, strong arcade arc at the midpoint */
 
 void ball_draw(Ball *b)
 {
@@ -77,7 +174,7 @@ void ball_draw(Ball *b)
         /* Four authored seam positions now make rotation readable. Spin
          * reverses their order instead of merely flipping a symmetric ball. */
         {
-            u16 frame = (b->progress >> 4) & 3;
+            u16 frame = (b->progress >> 3) & 3;
             if (b->spin < 0) frame = (4 - frame) & 3;
             ballTile += frame;
         }
@@ -89,6 +186,16 @@ void ball_draw(Ball *b)
         VDP_setSpriteFull(b->spriteSlot + 1, b->x, b->y, SPRITE_SIZE(1, 1),
                            TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE,
                                (height > 12) ? TILE_BALL_SHADOW_AIR : TILE_BALL_SHADOW),
+                           b->spriteSlot + 2);
+    }
+    else if (b->state == BALL_LOOSE)
+    {
+        s16 looseHeight = b->height >> 8;
+        drawY = b->y - looseHeight;
+        ballTile += ((b->x + b->y) >> 2) & 3;
+        VDP_setSpriteFull(b->spriteSlot + 1, b->x, b->y, SPRITE_SIZE(1, 1),
+                           TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE,
+                               looseHeight > 4 ? TILE_BALL_SHADOW_AIR : TILE_BALL_SHADOW),
                            b->spriteSlot + 2);
     }
     else

@@ -1,7 +1,6 @@
 /*
- * ai_mgr.h - CPU opponent decision-making: throw timing/aim and catch
- * success chance. Kept separate from scene_match so difficulty can be
- * tuned in one place.
+ * ai_mgr.h - CPU opponent decision-making: throw timing, aim and lane
+ * selection. Kept separate so difficulty can be tuned in one place.
  */
 #ifndef _AI_MGR_H_
 #define _AI_MGR_H_
@@ -10,7 +9,6 @@
 
 u16  ai_pickThrowDelay(void);
 s16  ai_pickTargetX(s16 playerX);
-bool ai_willCatch(void);
 /* Picks which of "count" in-play teammates/opponents an action applies
  * to (a thrower choosing who to aim at, or which in-play slot fills a
  * returning-player pick) - returns 0..count-1. */

@@ -25,8 +25,10 @@
 
 /* --- Gameplay tuning --- */
 #define PLAYER_SPEED        2       /* px per frame */
-#define CATCH_WINDOW_X      16      /* horizontal alignment needed to catch */
-#define CATCH_WINDOW_Y      12      /* screen-depth alignment needed to catch */
+#define HIT_WINDOW_X        13      /* airborne torso collision half-width */
+#define HIT_WINDOW_Y        10      /* airborne torso collision half-height */
+#define PICKUP_WINDOW_X     11      /* feet must physically reach loose ball */
+#define PICKUP_WINDOW_Y      9
 #define AI_REACTION_MIN     20      /* frames CPU waits before throwing */
 #define AI_REACTION_VAR     30
 

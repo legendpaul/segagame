@@ -36,7 +36,7 @@
  * use for team swaps), baked into pal_team_red/blue/green/gold[16]
  * below.
  * RUN still reuses this block with hflip for a cheap side-to-side sway.
- * THROW and CATCH now have their own separate 16-tile blocks below,
+ * THROW and PICKUP now have their own separate 16-tile blocks below,
  * generated the same way from prompts describing the actual action -
  * see the note above tile_player_throw for why they didn't exist until
  * this pass (a request-encoding bug, not a modeling one). */
@@ -63,7 +63,7 @@ static const u32 tile_player_stand[16][8] = {
 /* THROW pose - a real separate Pixel-Art-XL generation ("arm raised
  * overhead about to release the ball, leaning forward, dynamic athletic
  * pose"), run through the same pipeline as the stand pose above. The
- * ComfyUI request that finally produced this (and CATCH below) had been
+ * ComfyUI request that finally produced this (and PICKUP below) had been
  * failing with a bare 500 for every prompt, including trivial unrelated
  * ones - not a model/GPU problem as first suspected, but PowerShell's
  * `Out-File -Encoding utf8` silently prepending a UTF-8 BOM to the JSON
@@ -96,14 +96,14 @@ static const u32 tile_player_throw[16][8] = {
     { 0x3d000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x30000000 },
 };
 
-/* CATCH pose - a diving/leaping reach for the ball, same pipeline again.
+/* PICKUP pose - a diving/leaping reach for the loose ball.
  * The first attempt at this pose came back as a static standing-holding-
  * the-ball shot (too close to STAND to read as a distinct animation) -
  * rejected and regenerated with a stronger prompt ("deep crouch, knees
  * bent wide, both arms stretched forward... off-balance dynamic action
  * pose") before quantizing, rather than shipping the weaker first
  * result. */
-static const u32 tile_player_catch[16][8] = {
+static const u32 tile_player_pickup[16][8] = {
     { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
     { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
     { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x000000b2, 0x000000d1, 0x0000003b, 0x000000e0 },
@@ -126,7 +126,7 @@ static const u32 tile_player_catch[16][8] = {
  * player_draw() just reused STAND with hflip, which Qwen flagged as the
  * single highest-leverage graphics fix - "reads as placeholder... probably
  * costing 80% of perceived polish"). Same Pixel-Art-XL pipeline as THROW/
- * CATCH, with one addition: the source render's background wasn't a flat
+ * PICKUP, with one addition: the source render's background wasn't a flat
  * card - it had an outer neutral-gray frame around a white interior, and
  * the enclosed white gaps between the striding legs don't touch the image
  * border, so the existing border-seeded flood-fill couldn't reach them
@@ -316,11 +316,10 @@ static const u16 pal_ball[16] = {
 
 void sprites_data_init(void)
 {
-    /* RUN reuses STAND's tiles (hflip only); THROW and CATCH are now
-     * genuinely separate 16-tile blocks, each uploaded on its own. */
+    /* THROW, PICKUP and RUN are genuinely separate tile blocks. */
     VDP_loadTileData(tile_iso_stand[0], TILE_PLAYER_STAND, 16, DMA);
     VDP_loadTileData(tile_iso_throw[0], TILE_PLAYER_THROW, 16, DMA);
-    VDP_loadTileData(tile_iso_catch[0], TILE_PLAYER_CATCH, 16, DMA);
+    VDP_loadTileData(tile_iso_pickup[0], TILE_PLAYER_PICKUP, 16, DMA);
     VDP_loadTileData(tile_iso_run[0],   TILE_PLAYER_RUN,   16, DMA);
 
     VDP_loadTileData(tile_ball[0],     TILE_BALL,        4, DMA);
@@ -329,7 +328,7 @@ void sprites_data_init(void)
     VDP_loadTileData(tile_iso_far_stand[0], TILE_PLAYER_FAR_STAND, 9, DMA);
     VDP_loadTileData(tile_iso_far_run[0],   TILE_PLAYER_FAR_RUN,   9, DMA);
     VDP_loadTileData(tile_iso_far_throw[0], TILE_PLAYER_FAR_THROW, 9, DMA);
-    VDP_loadTileData(tile_iso_far_catch[0], TILE_PLAYER_FAR_CATCH, 9, DMA);
+    VDP_loadTileData(tile_iso_far_pickup[0], TILE_PLAYER_FAR_PICKUP, 9, DMA);
     VDP_loadTileData(tile_marker_yellow[0], TILE_MARKER_YELLOW, 2, DMA);
     VDP_loadTileData(tile_marker_red[0], TILE_MARKER_RED, 2, DMA);
 
@@ -352,7 +351,7 @@ void sprites_data_flash_team(u8 palLine)
     /* Whites-out every non-transparent index on the line so the whole
      * sprite reads as a bright flash for a couple of frames - cheap
      * (one DMA palette write, no tile re-upload) and instantly readable
-     * impact feedback for a catch/hit. */
+     * impact feedback for a hit. */
     u16 i;
     for (i = 1; i < 16; i++)
         PAL_setColor(palLine * 16 + i, RGB24_TO_VDPCOLOR(0xF8F8F8));

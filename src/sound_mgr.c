@@ -59,7 +59,7 @@ void sound_mgr_blip(void)  { sound_mgr_play(SFX_CH_UI, 1800, 3); }
 void sound_mgr_confirm(void) { sound_mgr_play(SFX_CH_UI, 1200, 2); }
 void sound_mgr_cancel(void)  { sound_mgr_play(SFX_CH_UI, 620, 3); }
 void sound_mgr_throw(void) { sound_mgr_play(SFX_CH_ACTION, 780, 2); }
-void sound_mgr_catch(void) { sound_mgr_play(SFX_CH_ACTION, 1500, 2); }
+void sound_mgr_pickup(void){ sound_mgr_play(SFX_CH_ACTION, 1320, 2); }
 void sound_mgr_hit(void)   { sound_mgr_play(SFX_CH_ACTION, 300, 1); sound_mgr_noise(PSG_NOISE_FREQ_CLOCK4, 2); }
 void sound_mgr_bounce(void){ sound_mgr_play(SFX_CH_ACTION, 460, 3); sound_mgr_noise(PSG_NOISE_FREQ_CLOCK8, 3); }
 void sound_mgr_whistle(void){ sound_mgr_play(SFX_CH_SCORE, 1700, 1); }

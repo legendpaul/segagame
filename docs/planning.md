@@ -24,24 +24,24 @@
 | --------------------- | -------------- | ----- |
 | Game loop             | ✅ Done         | `src/main.c`, scene dispatcher |
 | Scene: Menu           | ✅ Done         | `src/scene_menu.c` - team select |
-| Scene: Match          | ✅ Done         | `src/scene_match.c` - full throw/catch/score loop |
+| Scene: Match          | ✅ Done         | `src/scene_match.c` - throw/hit/ricochet/pickup loop |
 | Scene: Gameover       | ✅ Done         | `src/scene_gameover.c` |
 | Input manager         | ✅ Done         | `src/input_mgr.c` |
 | Player entity         | ✅ Done         | `src/player.c` |
 | Ball entity           | ✅ Done         | `src/ball.c` |
-| Collision manager     | ✅ Done         | catch/hit resolution inline in `scene_match.c` |
+| Collision manager     | ✅ Done         | airborne hit and grounded pickup resolution inline in `scene_match.c` |
 | AI manager            | ✅ Done         | `src/ai_mgr.c` |
-| Graphics assets       | ✅ Done         | STAND/THROW/CATCH each have real, distinct AI-generated (Pixel-Art-XL via ComfyUI) 32x32 sprite art in `src/sprites_data.c`; pitch in `src/court_bg.c` still hand-authored |
+| Graphics assets       | ✅ Done         | STAND/RUN/THROW/PICKUP pose blocks plus authored stadium and UI |
 | Court background      | ✅ Done         | `src/court_bg.c` - striped green pitch on BG_B, tapered sideline for an elevated/perspective camera feel, stand bands |
 | Team colors           | ✅ Done         | `sprites_data_apply_teams()` recolors the shared player sprite per the team actually picked, instead of a fixed color per side |
 | Music & SFX           | ✅ Done         | PSG SFX in `src/sound_mgr.c` + a looping menu jingle in `src/music_mgr.c` (see note below) |
-| Player animation       | ✅ Done         | `src/player.c` - idle/run/throw/catch poses, mirrored 2-frame run cycle |
-| Ball physics           | ✅ Done         | `src/ball.c` - parabolic arc + ground shadow, not a flat 2D lerp |
+| Player animation       | ✅ Done         | four-beat idle/run motion plus staged throw/pickup/hit actions |
+| Ball physics           | ✅ Done         | parabolic spin throw, projected shadow and damped loose-ball rebounds |
 | Test Mode framework   | 🔲 Not started | deferred - shipped gameplay took priority; see Open Questions |
 
 Builds clean with SGDK (`build.bat`) to a real, checksummed `out/rom.bin`. Verified live in
-the Fusion emulator: boot (TMSS splash), menu + team select, full match (movement, throw,
-catch, hits, scoring, round reset, game over) all confirmed working, including a full match
+the Fusion emulator: boot (TMSS splash), menu + team select, full match (movement, throws,
+hits, rebound retrieval, scoring, round reset, game over) all confirmed working, including a full match
 played to completion (score incremented correctly every round, lives reset each round, serve
 alternated to the losing side, and the game-over screen showed the correct winner and final
 score). Not yet tested on real Mega Drive hardware.
@@ -901,3 +901,35 @@ Implemented in this pass:
 
 Fusion capture verification confirmed the flag-led matchup screen, stadium establishing card and
 compact in-match scoreboard render correctly at 320x224.
+
+---
+
+## Loose-ball enclosed-court gameplay pass (2026-07-22)
+
+The catch system has been completely removed from current gameplay. There is no catch input,
+probability roll, catch reward or returning eliminated player. An airborne torso overlap is
+always a hit; a throw which does not overlap is a miss.
+
+Every hit or miss now enters a physical loose-ball phase:
+
+- The incoming vector reverses into a damped ricochet, retaining a lateral contribution from
+  throw spin. Two decreasing vertical bounces, faster seam rotation and a 28px flight apex make
+  the ball read as a thrown object rather than a sliding cursor.
+- Fixed-point velocity and friction keep low-speed movement smooth. Projected X/depth walls
+  contain the rebound inside the receiving team's half, including a center divider, creating
+  the requested invisible-plastic-box/hockey response.
+- The nearest surviving receiver is selected as retriever. CPU players visibly run to the moving
+  ball. On the human side control moves to the nearest survivor, but pickup happens only when the
+  player is walked into the grounded pickup box. No possession transition teleports the ball.
+- `Player.farSide` now defines gameplay half separately from sprite scale. This fixes far-team
+  clamping after the earlier decision to render both teams at equal 32x32 size.
+- Catch art and naming were repurposed as the grounded `PICKUP` action. Catch AI/SFX/constants
+  and all live catch branches were removed.
+- Player presentation now uses four-beat run and idle motion, staged anticipation/release/recovery
+  for throws, a lowering pickup motion, stronger hit recoil and a visible raised-ball wind-up.
+
+Fusion QA used a temporary deterministic rally driver, removed before the final build. It proved
+the complete loop across repeated exchanges: throw -> hit/miss -> bounce/roll -> physical CPU
+retrieval -> pickup -> counter-throw -> physical human retrieval -> scoring. Captures confirmed
+the airborne ball/shadow separation, loose ball at the projected divider, pickup silhouette and
+continued round progression without a stall.

@@ -3,7 +3,8 @@
 #include "sprites_data.h"
 #include "game_state.h"
 
-#define RUN_FRAME_LEN   6   /* frames between run-cycle toggles */
+#define RUN_FRAME_LEN   4   /* frames between four-beat run phases */
+#define IDLE_FRAME_LEN  28  /* restrained breathing cadence */
 
 #define OFFSCREEN_X   -100
 #define OFFSCREEN_Y   -100
@@ -22,6 +23,7 @@ void player_init(Player *p, s16 startX, s16 y, u8 spriteSlot, u8 pal)
     p->animFrame = 0;
     p->animCounter = 0;
     p->small = FALSE;
+    p->farSide = FALSE;
     p->facingLeft = FALSE;
 }
 
@@ -60,8 +62,8 @@ void player_moveHuman(Player *p)
 void player_clampToCourt(Player *p)
 {
     s16 depth = p->y - (p->x >> 2);
-    s16 minDepth = p->small ? (COURT_FAR_DEPTH + 6) : (COURT_CENTER_DEPTH + 8);
-    s16 maxDepth = p->small ? (COURT_CENTER_DEPTH - 8) : (COURT_NEAR_DEPTH - 6);
+    s16 minDepth = p->farSide ? (COURT_FAR_DEPTH + 6) : (COURT_CENTER_DEPTH + 8);
+    s16 maxDepth = p->farSide ? (COURT_CENTER_DEPTH - 8) : (COURT_NEAR_DEPTH - 6);
 
     if (depth < minDepth) p->y += minDepth - depth;
     if (depth > maxDepth) p->y -= depth - maxDepth;
@@ -78,6 +80,14 @@ void player_tickAnim(Player *p, bool isMoving)
 {
     if (p->poseTimer > 0)
     {
+        /* Three readable beats for every action: anticipation/contact,
+         * commitment, then recovery. Even with one authored silhouette
+         * per action, offsets and timing now create actual motion. */
+        if (++p->animCounter >= 4)
+        {
+            p->animCounter = 0;
+            if (p->animFrame < 3) p->animFrame++;
+        }
         p->poseTimer--;
         return;
     }
@@ -89,12 +99,16 @@ void player_tickAnim(Player *p, bool isMoving)
         if (++p->animCounter >= RUN_FRAME_LEN)
         {
             p->animCounter = 0;
-            p->animFrame ^= 1;
+            p->animFrame = (p->animFrame + 1) & 3;
         }
     }
     else
     {
-        p->animCounter = 0;
+        if (++p->animCounter >= IDLE_FRAME_LEN)
+        {
+            p->animCounter = 0;
+            p->animFrame = (p->animFrame + 1) & 3;
+        }
     }
 }
 
@@ -102,6 +116,8 @@ void player_setPose(Player *p, u8 pose, u8 timer)
 {
     p->pose = pose;
     p->poseTimer = timer;
+    p->animFrame = 0;
+    p->animCounter = 0;
 }
 
 void player_draw(Player *p)
@@ -117,28 +133,40 @@ void player_draw(Player *p)
          * preserve the same visual center and feet baseline. */
         u16 farBase = TILE_PLAYER_FAR_STAND;
         bool farFlip = p->facingLeft;
+        s16 farOffsetX = 0;
         s16 farOffsetY = 0;
+        s16 direction = p->facingLeft ? -1 : 1;
         if (p->pose == POSE_RUN)
         {
+            static const s8 runX[4] = { -1, 0, 1, 0 };
             farBase = TILE_PLAYER_FAR_RUN;
-            farOffsetY = p->animFrame ? -1 : 0;
+            static const s8 runY[4] = { 0, -2, -1, 1 };
+            farOffsetX = runX[p->animFrame & 3];
+            farOffsetY = runY[p->animFrame & 3];
         }
         else if (p->pose == POSE_THROW)
         {
             farBase = TILE_PLAYER_FAR_THROW;
-            farOffsetY = -2;
+            farOffsetX = ((p->animFrame == 0) ? -1 :
+                         (p->animFrame < 3 ? 2 : 1)) * direction;
+            farOffsetY = (p->animFrame == 0) ? 0 :
+                         (p->animFrame < 3 ? -3 : -1);
         }
-        else if (p->pose == POSE_CATCH)
+        else if (p->pose == POSE_PICKUP)
         {
-            farBase = TILE_PLAYER_FAR_CATCH;
-            farOffsetY = 1;
+            farBase = TILE_PLAYER_FAR_PICKUP;
+            farOffsetX = (p->animFrame < 2) ? 0 : direction;
+            farOffsetY = (p->animFrame < 2) ? 0 : 3;
         }
         else if (p->pose == POSE_HIT)
         {
-            farBase = TILE_PLAYER_FAR_CATCH;
-            farOffsetY = 3;
+            farBase = TILE_PLAYER_FAR_PICKUP;
+            farOffsetX = -direction * (2 + (p->animFrame & 1));
+            farOffsetY = 3 + (p->animFrame & 1);
         }
-        VDP_setSpriteFull(p->spriteSlot, p->x - 4, p->y - 8 + farOffsetY, SPRITE_SIZE(3, 3),
+        else farOffsetY = (p->animFrame == 3) ? -1 : 0;
+        VDP_setSpriteFull(p->spriteSlot, p->x - 4 + farOffsetX,
+                           p->y - 8 + farOffsetY, SPRITE_SIZE(3, 3),
                            TILE_ATTR_FULL(p->pal, 0, FALSE, farFlip, farBase),
                            p->spriteSlot + 1);
         return;
@@ -146,33 +174,45 @@ void player_draw(Player *p)
 
     u16 base = TILE_PLAYER_STAND;
     bool flip = p->facingLeft;
+    s16 poseOffsetX = 0;
     s16 poseOffsetY = 0;
+    s16 direction = p->facingLeft ? -1 : 1;
 
     /* Animation never changes team facing. The second run beat is a subtle
      * body bob, so the silhouette keeps looking toward the opposition. */
     if (p->pose == POSE_RUN)
     {
+        static const s8 runX[4] = { -1, 0, 1, 0 };
         base = TILE_PLAYER_RUN;
-        poseOffsetY = p->animFrame ? -1 : 0;
+        static const s8 runY[4] = { 0, -2, -1, 1 };
+        poseOffsetX = runX[p->animFrame & 3];
+        poseOffsetY = runY[p->animFrame & 3];
     }
     else if (p->pose == POSE_THROW)
     {
         base = TILE_PLAYER_THROW;
-        poseOffsetY = -3;
+        poseOffsetX = ((p->animFrame == 0) ? -1 :
+                      (p->animFrame < 3 ? 3 : 1)) * direction;
+        poseOffsetY = (p->animFrame == 0) ? 0 :
+                      (p->animFrame < 3 ? -4 : -1);
     }
-    else if (p->pose == POSE_CATCH)
+    else if (p->pose == POSE_PICKUP)
     {
-        base = TILE_PLAYER_CATCH;
-        poseOffsetY = 2;
+        base = TILE_PLAYER_PICKUP;
+        poseOffsetX = (p->animFrame < 2) ? 0 : direction;
+        poseOffsetY = (p->animFrame < 2) ? 0 : 4;
     }
     else if (p->pose == POSE_HIT)
     {
-        /* Reuse the dynamic catch silhouette as a lowered recoil frame. */
-        base = TILE_PLAYER_CATCH;
-        poseOffsetY = 4;
+        /* Reuse the low dynamic silhouette as a three-beat recoil. */
+        base = TILE_PLAYER_PICKUP;
+        poseOffsetX = -direction * (3 + (p->animFrame & 1));
+        poseOffsetY = 3 + (p->animFrame & 1);
     }
+    else poseOffsetY = (p->animFrame == 3) ? -1 : 0;
 
-    VDP_setSpriteFull(p->spriteSlot, p->x - 8, p->y - 16 + poseOffsetY, SPRITE_SIZE(4, 4),
+    VDP_setSpriteFull(p->spriteSlot, p->x - 8 + poseOffsetX,
+                       p->y - 16 + poseOffsetY, SPRITE_SIZE(4, 4),
                        TILE_ATTR_FULL(p->pal, 0, FALSE, flip, base),
                        p->spriteSlot + 1);
 }

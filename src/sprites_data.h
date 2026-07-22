@@ -14,9 +14,9 @@
  * one base index - you cannot mix tiles from different blocks at
  * runtime, so the full 16-tile block is uploaded as one unit.
  *
- * STAND, RUN, THROW and CATCH each have their own AI-derived 32x32 block.
+ * STAND, RUN, THROW and PICKUP each have their own 32x32 block.
  * RUN mirrors its dedicated stride pose for a cheap second phase, while
- * THROW and CATCH use separate Pixel-Art-XL generations
+ * THROW and PICKUP use separate Pixel-Art-XL generations
  * (a real wind-up reach and a real diving/leaping grab), run through the
  * same flood-fill/crop/pad/quantize pipeline as the stand pose. Fixing
  * a ComfyUI request-encoding bug (PowerShell was writing a UTF-8 BOM
@@ -34,12 +34,12 @@
 /* Player pose tile blocks - each a full 16 consecutive tiles (4x4, 32x32px) */
 #define TILE_PLAYER_STAND   (TILE_USER_INDEX + 0)
 #define TILE_PLAYER_THROW   (TILE_USER_INDEX + 16)
-#define TILE_PLAYER_CATCH   (TILE_USER_INDEX + 32)
+#define TILE_PLAYER_PICKUP  (TILE_USER_INDEX + 32)
 /* RUN used to alias STAND+hflip as a cheap sway - Qwen's top-ranked
  * graphics critique flagged that as reading like a placeholder ("probably
  * costing 80% of perceived polish"). It's now its own genuine 32x32 block:
  * a real Pixel-Art-XL mid-stride running pose run through the same
- * pipeline as THROW/CATCH (see docs/planning.md). player_draw() now keeps
+ * pipeline as the other actions (see docs/planning.md). player_draw() now keeps
  * the team-facing direction stable and uses a one-pixel body bob, while the base
  * silhouette itself is now real running art, not the idle pose. */
 #define TILE_PLAYER_RUN     (TILE_USER_INDEX + 48)
@@ -54,7 +54,7 @@
 #define TILE_PLAYER_FAR_STAND (TILE_USER_INDEX + 70)
 #define TILE_PLAYER_FAR_RUN   (TILE_USER_INDEX + 79)
 #define TILE_PLAYER_FAR_THROW (TILE_USER_INDEX + 88)
-#define TILE_PLAYER_FAR_CATCH (TILE_USER_INDEX + 97)
+#define TILE_PLAYER_FAR_PICKUP (TILE_USER_INDEX + 97)
 
 /* Two-tile ground stars: yellow identifies the controlled player and red
  * identifies possession/wind-up. They use PAL_BALL so kit recolouring
@@ -80,8 +80,7 @@ void sprites_data_init(void);
  * first player_draw(). */
 void sprites_data_apply_teams(u8 teamAIndex, u8 teamBIndex);
 
-/* Briefly whites-out a team's kit-ramp colors for an impact "flash" on
- * catches/hits, the same visual feedback trick real sports games use.
+/* Briefly whites-out a team's kit-ramp colors for an impact flash.
  * Only 4 palette lines exist total (PAL0 court/font, PAL1/PAL2 teams,
  * PAL3 ball) so this flashes the whole team's shared palette, not just
  * the one player involved - an honest hardware-budget tradeoff, not a

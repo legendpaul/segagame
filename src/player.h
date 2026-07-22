@@ -2,7 +2,7 @@
  * player.h - A court-side entity (human or CPU side), rendered as a
  * 32x32 near-side or 24x24 far-side hardware sprite, recolored per team
  * via its "pal" palette slot, with a small pose/animation system: idle, a
- * 2-frame run cycle, and brief throw/catch poses.
+ * four-beat run/idle motion and brief throw, pickup and hit poses.
  */
 #ifndef _PLAYER_H_
 #define _PLAYER_H_
@@ -13,7 +13,7 @@ typedef enum {
     POSE_STAND = 0,
     POSE_RUN,
     POSE_THROW,
-    POSE_CATCH,
+    POSE_PICKUP,
     POSE_HIT
 } PlayerPose;
 
@@ -26,10 +26,11 @@ typedef struct {
     u8  spriteSlot;
     u8  pal;
     u8  pose;
-    u8  poseTimer;    /* frames left before a transient pose (throw/catch) reverts */
-    u8  animFrame;    /* 0/1 - drives a small run-cycle body bob */
+    u8  poseTimer;    /* frames left before a transient pose reverts */
+    u8  animFrame;    /* 0..3 - run, idle and action animation phase */
     u8  animCounter;  /* frame counter that paces the run cycle */
     u8  small;        /* TRUE = render the dedicated 24x24 far-side size */
+    bool farSide;     /* gameplay half, independent of visual sprite scale */
     bool facingLeft;  /* stable team direction: every player faces opposition */
 } Player;
 
@@ -42,11 +43,11 @@ void player_restore(Player *p);
 void player_moveHuman(Player *p);
 /* Keeps a player inside their half of the projected isometric court. */
 void player_clampToCourt(Player *p);
-/* Advances the run-cycle animation and, once any transient pose (throw/
- * catch) has timed out, settles back to running or standing based on
+/* Advances all action animation and, once any transient pose has timed
+ * out, settles back to running or standing based on
  * "isMoving". Called every frame for both the human and the CPU side. */
 void player_tickAnim(Player *p, bool isMoving);
-/* Forces a transient pose (POSE_THROW / POSE_CATCH) for "timer" frames. */
+/* Forces a transient action pose for "timer" frames. */
 void player_setPose(Player *p, u8 pose, u8 timer);
 void player_draw(Player *p);
 
