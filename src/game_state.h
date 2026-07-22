@@ -23,6 +23,11 @@
 #define COURT_LEFT_X         8
 #define COURT_RIGHT_X        304
 
+/* Projected side rails used by players, loose-ball physics and authored art. */
+#define COURT_MIN_X_AT_DEPTH(d) (64 - (((d) - COURT_FAR_DEPTH) >> 1))
+#define COURT_MAX_X_AT_DEPTH(d) (312 - (((d) - COURT_FAR_DEPTH) >> 1))
+#define COURT_Y_AT_DEPTH_X(d, x) ((d) + ((x) >> 2))
+
 /* --- Gameplay tuning --- */
 #define PLAYER_SPEED        2       /* px per frame */
 #define HIT_WINDOW_X        13      /* airborne torso collision half-width */

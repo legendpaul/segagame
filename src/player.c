@@ -16,6 +16,7 @@ void player_init(Player *p, s16 startX, s16 y, u8 spriteSlot, u8 pal)
     p->homeX = startX;
     p->homeY = y;
     p->eliminated = FALSE;
+    p->exiting = FALSE;
     p->spriteSlot = spriteSlot;
     p->pal = pal;
     p->pose = POSE_STAND;
@@ -30,13 +31,35 @@ void player_init(Player *p, s16 startX, s16 y, u8 spriteSlot, u8 pal)
 void player_eliminate(Player *p)
 {
     p->eliminated = TRUE;
-    p->x = OFFSCREEN_X;
-    p->y = OFFSCREEN_Y;
+    p->exiting = TRUE;
+    p->pose = POSE_RUN;
+    p->poseTimer = 0;
+    p->animCounter = 0;
+}
+
+bool player_updateExit(Player *p)
+{
+    if (!p->exiting) return TRUE;
+
+    /* A defeated player leaves along the projected touchline rather than
+     * popping out of existence on contact. Keep the shallow diagonal so
+     * the run belongs to the same isometric ground plane as normal play. */
+    p->x += 3;
+    p->y += 1;
+    if (p->x > SCREEN_W + 24)
+    {
+        p->x = OFFSCREEN_X;
+        p->y = OFFSCREEN_Y;
+        p->exiting = FALSE;
+        return TRUE;
+    }
+    return FALSE;
 }
 
 void player_restore(Player *p)
 {
     p->eliminated = FALSE;
+    p->exiting = FALSE;
     p->x = p->homeX;
     p->y = p->homeY;
     p->pose = POSE_STAND;
@@ -70,8 +93,8 @@ void player_clampToCourt(Player *p)
 
     depth = p->y - (p->x >> 2);
     /* The parallel sidelines drift left toward the near edge. */
-    s16 minX = 64 - ((depth - COURT_FAR_DEPTH) >> 1) + 8;
-    s16 maxX = 312 - ((depth - COURT_FAR_DEPTH) >> 1) - 8;
+    s16 minX = COURT_MIN_X_AT_DEPTH(depth) + 8;
+    s16 maxX = COURT_MAX_X_AT_DEPTH(depth) - 8;
     if (p->x < minX) p->x = minX;
     if (p->x > maxX) p->x = maxX;
 }
@@ -125,55 +148,9 @@ void player_draw(Player *p)
     /* Hardware sprites form a linked list starting at slot 0; a sprite
      * whose slot isn't reachable via some other sprite's "link" is never
      * rendered. We keep a fixed chain: slot N links to slot N+1. */
-    if (p->small)
-    {
-        /* The far side uses a separately authored 24x24 reduction: big
-         * enough to preserve pose/team readability while remaining a
-         * distinct depth step from the near side's 32x32 art. Offsets
-         * preserve the same visual center and feet baseline. */
-        u16 farBase = TILE_PLAYER_FAR_STAND;
-        bool farFlip = p->facingLeft;
-        s16 farOffsetX = 0;
-        s16 farOffsetY = 0;
-        s16 direction = p->facingLeft ? -1 : 1;
-        if (p->pose == POSE_RUN)
-        {
-            static const s8 runX[4] = { -1, 0, 1, 0 };
-            farBase = TILE_PLAYER_FAR_RUN;
-            static const s8 runY[4] = { 0, -2, -1, 1 };
-            farOffsetX = runX[p->animFrame & 3];
-            farOffsetY = runY[p->animFrame & 3];
-        }
-        else if (p->pose == POSE_THROW)
-        {
-            farBase = TILE_PLAYER_FAR_THROW;
-            farOffsetX = ((p->animFrame == 0) ? -1 :
-                         (p->animFrame < 3 ? 2 : 1)) * direction;
-            farOffsetY = (p->animFrame == 0) ? 0 :
-                         (p->animFrame < 3 ? -3 : -1);
-        }
-        else if (p->pose == POSE_PICKUP)
-        {
-            farBase = TILE_PLAYER_FAR_PICKUP;
-            farOffsetX = (p->animFrame < 2) ? 0 : direction;
-            farOffsetY = (p->animFrame < 2) ? 0 : 3;
-        }
-        else if (p->pose == POSE_HIT)
-        {
-            farBase = TILE_PLAYER_FAR_PICKUP;
-            farOffsetX = -direction * (2 + (p->animFrame & 1));
-            farOffsetY = 3 + (p->animFrame & 1);
-        }
-        else farOffsetY = (p->animFrame == 3) ? -1 : 0;
-        VDP_setSpriteFull(p->spriteSlot, p->x - 4 + farOffsetX,
-                           p->y - 8 + farOffsetY, SPRITE_SIZE(3, 3),
-                           TILE_ATTR_FULL(p->pal, 0, FALSE, farFlip, farBase),
-                           p->spriteSlot + 1);
-        return;
-    }
-
-    u16 base = TILE_PLAYER_STAND;
-    bool flip = p->facingLeft;
+    bool backView = !p->facingLeft;
+    u16 base = backView ? TILE_PLAYER_BACK_STAND : TILE_PLAYER_FRONT_STAND;
+    bool flip = FALSE;
     s16 poseOffsetX = 0;
     s16 poseOffsetY = 0;
     s16 direction = p->facingLeft ? -1 : 1;
@@ -183,14 +160,17 @@ void player_draw(Player *p)
     if (p->pose == POSE_RUN)
     {
         static const s8 runX[4] = { -1, 0, 1, 0 };
-        base = TILE_PLAYER_RUN;
+        if (backView)
+            base = (p->animFrame & 1) ? TILE_PLAYER_BACK_RUN_ALT : TILE_PLAYER_BACK_RUN;
+        else
+            base = (p->animFrame & 1) ? TILE_PLAYER_FRONT_RUN_ALT : TILE_PLAYER_FRONT_RUN;
         static const s8 runY[4] = { 0, -2, -1, 1 };
         poseOffsetX = runX[p->animFrame & 3];
         poseOffsetY = runY[p->animFrame & 3];
     }
     else if (p->pose == POSE_THROW)
     {
-        base = TILE_PLAYER_THROW;
+        base = backView ? TILE_PLAYER_BACK_THROW : TILE_PLAYER_FRONT_THROW;
         poseOffsetX = ((p->animFrame == 0) ? -1 :
                       (p->animFrame < 3 ? 3 : 1)) * direction;
         poseOffsetY = (p->animFrame == 0) ? 0 :
@@ -198,14 +178,14 @@ void player_draw(Player *p)
     }
     else if (p->pose == POSE_PICKUP)
     {
-        base = TILE_PLAYER_PICKUP;
+        base = backView ? TILE_PLAYER_BACK_STAND : TILE_PLAYER_FRONT_PICKUP;
         poseOffsetX = (p->animFrame < 2) ? 0 : direction;
         poseOffsetY = (p->animFrame < 2) ? 0 : 4;
     }
     else if (p->pose == POSE_HIT)
     {
         /* Reuse the low dynamic silhouette as a three-beat recoil. */
-        base = TILE_PLAYER_PICKUP;
+        base = backView ? TILE_PLAYER_BACK_STAND : TILE_PLAYER_FRONT_PICKUP;
         poseOffsetX = -direction * (3 + (p->animFrame & 1));
         poseOffsetY = 3 + (p->animFrame & 1);
     }

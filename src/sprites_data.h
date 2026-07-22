@@ -32,9 +32,23 @@
 #include "genesis.h"
 
 /* Player pose tile blocks - each a full 16 consecutive tiles (4x4, 32x32px) */
-#define TILE_PLAYER_STAND   (TILE_USER_INDEX + 0)
-#define TILE_PLAYER_THROW   (TILE_USER_INDEX + 16)
-#define TILE_PLAYER_PICKUP  (TILE_USER_INDEX + 32)
+#define TILE_PLAYER_FRONT_STAND    (TILE_USER_INDEX + 0)
+#define TILE_PLAYER_FRONT_RUN      (TILE_USER_INDEX + 16)
+#define TILE_PLAYER_FRONT_RUN_ALT  (TILE_USER_INDEX + 32)
+#define TILE_PLAYER_FRONT_THROW    (TILE_USER_INDEX + 48)
+#define TILE_PLAYER_FRONT_PICKUP   (TILE_USER_INDEX + 64)
+
+/* Separate rear three-quarter silhouettes let the near team genuinely face
+ * up-court.  These are authored pixel blocks, not horizontal flips of faces. */
+#define TILE_PLAYER_BACK_STAND     (TILE_USER_INDEX + 80)
+#define TILE_PLAYER_BACK_RUN       (TILE_USER_INDEX + 96)
+#define TILE_PLAYER_BACK_RUN_ALT   (TILE_USER_INDEX + 112)
+#define TILE_PLAYER_BACK_THROW     (TILE_USER_INDEX + 128)
+
+/* Compatibility names for non-match previews. */
+#define TILE_PLAYER_STAND   TILE_PLAYER_FRONT_STAND
+#define TILE_PLAYER_THROW   TILE_PLAYER_FRONT_THROW
+#define TILE_PLAYER_PICKUP  TILE_PLAYER_FRONT_PICKUP
 /* RUN used to alias STAND+hflip as a cheap sway - Qwen's top-ranked
  * graphics critique flagged that as reading like a placeholder ("probably
  * costing 80% of perceived polish"). It's now its own genuine 32x32 block:
@@ -42,28 +56,24 @@
  * pipeline as the other actions (see docs/planning.md). player_draw() now keeps
  * the team-facing direction stable and uses a one-pixel body bob, while the base
  * silhouette itself is now real running art, not the idle pose. */
-#define TILE_PLAYER_RUN     (TILE_USER_INDEX + 48)
+#define TILE_PLAYER_RUN     TILE_PLAYER_FRONT_RUN
 
-#define TILE_BALL           (TILE_USER_INDEX + 64) /* four seam-rotation frames */
-#define TILE_BALL_SHADOW    (TILE_USER_INDEX + 68)
-#define TILE_BALL_SHADOW_AIR (TILE_USER_INDEX + 69)
+#define TILE_BALL_SHADOW     (TILE_USER_INDEX + 144)
+#define TILE_BALL_SHADOW_AIR (TILE_USER_INDEX + 145)
 
-/* Dedicated 24x24 (3x3 tile) far-side size. Genesis sprites cannot be
- * hardware-scaled, so this is a separately encoded reduction of the
- * real STAND artwork rather than a runtime transform. */
-#define TILE_PLAYER_FAR_STAND (TILE_USER_INDEX + 70)
-#define TILE_PLAYER_FAR_RUN   (TILE_USER_INDEX + 79)
-#define TILE_PLAYER_FAR_THROW (TILE_USER_INDEX + 88)
-#define TILE_PLAYER_FAR_PICKUP (TILE_USER_INDEX + 97)
+/* Four complete 16x16 rotation frames (four tiles each), ready for the ball
+ * renderer to select without mirroring a symmetrical image. */
+#define TILE_BALL16_FRAME_0 (TILE_USER_INDEX + 146)
+#define TILE_BALL16_FRAME_1 (TILE_USER_INDEX + 150)
+#define TILE_BALL16_FRAME_2 (TILE_USER_INDEX + 154)
+#define TILE_BALL16_FRAME_3 (TILE_USER_INDEX + 158)
 
-/* Two-tile ground stars: yellow identifies the controlled player and red
- * identifies possession/wind-up. They use PAL_BALL so kit recolouring
- * never changes their meaning. */
-#define TILE_MARKER_YELLOW  (TILE_USER_INDEX + 106) /* two 8x8 tiles */
-#define TILE_MARKER_RED     (TILE_USER_INDEX + 108) /* two 8x8 tiles */
+/* 24x16 elliptical selection rings (3x2 hardware tiles). */
+#define TILE_RING_YELLOW    (TILE_USER_INDEX + 162)
+#define TILE_RING_RED       (TILE_USER_INDEX + 168)
 
 /* First tile index free for court_bg.c to use */
-#define TILE_COURT_BASE     (TILE_USER_INDEX + 110)
+#define TILE_COURT_BASE     (TILE_USER_INDEX + 174)
 
 /* Palette lines: PAL0 is used by the system font + pitch background,
  * so sprites use 1-3. PAL1/PAL2 are *slots*, not fixed teams - which

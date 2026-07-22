@@ -160,8 +160,7 @@ static const u32 tile_player_run[16][8] = {
 
 #include "player_isometric_tiles.inc"
 
-/* Ball: white with a soft shadow (2) and a dark outline (3) so it reads
- * clearly against the green pitch. */
+#if 0 /* Retired 8x8 ball; retained here only as art-source history. */
 static const u32 tile_ball[4][8] = {
     { 0x00333000, 0x03131130, 0x31121213, 0x31121213,
       0x31212113, 0x31212113, 0x03232230, 0x00333000 },
@@ -172,6 +171,7 @@ static const u32 tile_ball[4][8] = {
     { 0x00333000, 0x03111130, 0x31132213, 0x31213213,
       0x31221313, 0x31122113, 0x03222230, 0x00333000 }
 };
+#endif
 
 /* Ground shadow cast by the ball while it's airborne - a soft dark
  * blob, not a full circle, so it reads as "on the grass" rather than a
@@ -190,6 +190,42 @@ static const u32 tile_ball_shadow[8] = {
 static const u32 tile_ball_shadow_air[8] = {
     0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x00033000, 0x00333300, 0x00033000, 0x00000000
+};
+
+/* Native 16x16 ball frames. Tiles are column-major for SPRITE_SIZE(2,2). */
+static const u32 tile_ball16[16][8] = {
+    {0x00000000,0x00000033,0x00003311,0x00031111,0x00311111,0x00311111,0x03111112,0x03111112},
+    {0x03111112,0x03111122,0x00311122,0x00311222,0x00031221,0x00003311,0x00000033,0x00000000},
+    {0x00000000,0x33000000,0x11330000,0x12213000,0x22211300,0x22111300,0x22111130,0x21111130},
+    {0x21111130,0x21111130,0x11111300,0x11111300,0x11113000,0x11330000,0x33000000,0x00000000},
+    {0x00000000,0x00000033,0x00003311,0x00031111,0x00311111,0x00322111,0x03122221,0x03112222},
+    {0x03111122,0x03111111,0x00311111,0x00311111,0x00031111,0x00003311,0x00000033,0x00000000},
+    {0x00000000,0x33000000,0x11330000,0x11113000,0x11111300,0x11111300,0x11111130,0x22111130},
+    {0x22221130,0x12222130,0x11122300,0x11111300,0x11113000,0x11330000,0x33000000,0x00000000},
+    {0x00000000,0x00000033,0x00003311,0x00031111,0x00311111,0x00311111,0x03111112,0x03111112},
+    {0x03111112,0x03111122,0x00311122,0x00311222,0x00031221,0x00003311,0x00000033,0x00000000},
+    {0x00000000,0x33000000,0x11330000,0x12213000,0x22211300,0x22111300,0x22111130,0x21111130},
+    {0x21111130,0x21111130,0x11111300,0x11111300,0x11113000,0x11330000,0x33000000,0x00000000},
+    {0x00000000,0x00000033,0x00003311,0x00031111,0x00311111,0x00322111,0x03122221,0x03112222},
+    {0x03111122,0x03111111,0x00311111,0x00311111,0x00031111,0x00003311,0x00000033,0x00000000},
+    {0x00000000,0x33000000,0x11330000,0x11113000,0x11111300,0x11111300,0x11111130,0x22111130},
+    {0x22221130,0x12222130,0x11122300,0x11111300,0x11113000,0x11330000,0x33000000,0x00000000}
+};
+
+/* 24x16 rings; unlike the old solid star these leave the feet readable. */
+static const u32 tile_ring_yellow[6][8] = {
+    {0x00000000,0x00000000,0x00000033,0x00033444,0x00344400,0x03440000,0x34400000,0x34400000},
+    {0x34400000,0x34400000,0x03440000,0x00344400,0x00033444,0x00000033,0x00000000,0x00000000},
+    {0x00000000,0x00033000,0x44444444,0,0,0,0,0},{0,0,0,0,0,0x44444444,0x00033000,0},
+    {0,0,0x33000000,0x44433000,0x00444300,0x00004430,0x00000443,0x00000443},
+    {0x00000443,0x00000443,0x00004430,0x00444300,0x44433000,0x33000000,0,0}
+};
+static const u32 tile_ring_red[6][8] = {
+    {0,0,0x00000033,0x00033555,0x00355500,0x03550000,0x35500000,0x35500000},
+    {0x35500000,0x35500000,0x03550000,0x00355500,0x00033555,0,0,0},
+    {0,0x00033000,0x55555555,0,0,0,0,0},{0,0,0,0,0,0x55555555,0x00033000,0},
+    {0,0,0x33000000,0x55533000,0x00555300,0x00005530,0x00000553,0x00000553},
+    {0x00000553,0x00000553,0x00005530,0x00555300,0x55533000,0x33000000,0,0}
 };
 
 #if 0 /* Replaced by tile_iso_far from the generated isometric sheet. */
@@ -214,8 +250,7 @@ static const u32 tile_player_far[9][8] = {
 
 #endif
 
-/* Two-tile ground stars. Yellow identifies the controlled player; red
- * replaces it while that player holds the ball. */
+#if 0 /* Retired solid markers; the open 24x16 rings replace them. */
 static const u32 tile_marker_yellow[2][8] = {
     { 0x00000003, 0x00000334, 0x00333444, 0x03444444,
       0x33444444, 0x03444444, 0x00333444, 0x00000334 },
@@ -228,6 +263,7 @@ static const u32 tile_marker_red[2][8] = {
     { 0x30000000, 0x53300000, 0x55533300, 0x55555530,
       0x55555533, 0x55555530, 0x55533300, 0x53300000 }
 };
+#endif
 
 /* Per-team jersey palettes. Indices 2,5,6,7,12,13,14 are the "kit ramp"
  * - hue-rotated per team while preserving each shade's original
@@ -316,21 +352,22 @@ static const u16 pal_ball[16] = {
 
 void sprites_data_init(void)
 {
-    /* THROW, PICKUP and RUN are genuinely separate tile blocks. */
-    VDP_loadTileData(tile_iso_stand[0], TILE_PLAYER_STAND, 16, DMA);
-    VDP_loadTileData(tile_iso_throw[0], TILE_PLAYER_THROW, 16, DMA);
-    VDP_loadTileData(tile_iso_pickup[0], TILE_PLAYER_PICKUP, 16, DMA);
-    VDP_loadTileData(tile_iso_run[0],   TILE_PLAYER_RUN,   16, DMA);
-
-    VDP_loadTileData(tile_ball[0],     TILE_BALL,        4, DMA);
+    VDP_loadTileData(tile_iso_front_stand[0], TILE_PLAYER_FRONT_STAND, 16, DMA);
+    VDP_loadTileData(tile_iso_front_run[0], TILE_PLAYER_FRONT_RUN, 16, DMA);
+    VDP_loadTileData(tile_iso_front_run_alt[0], TILE_PLAYER_FRONT_RUN_ALT, 16, DMA);
+    VDP_loadTileData(tile_iso_front_throw[0], TILE_PLAYER_FRONT_THROW, 16, DMA);
+    VDP_loadTileData(tile_iso_front_pickup[0], TILE_PLAYER_FRONT_PICKUP, 16, DMA);
+    VDP_loadTileData(tile_iso_back_stand[0], TILE_PLAYER_BACK_STAND, 16, DMA);
+    VDP_loadTileData(tile_iso_back_run[0], TILE_PLAYER_BACK_RUN, 16, DMA);
+    VDP_loadTileData(tile_iso_back_run_alt[0], TILE_PLAYER_BACK_RUN_ALT, 16, DMA);
+    VDP_loadTileData(tile_iso_back_throw[0], TILE_PLAYER_BACK_THROW, 16, DMA);
+    /* Back-facing pickup/hit reuse the strong back stand silhouette, saving
+     * one full 16-tile block for the enlarged ball and court art. */
     VDP_loadTileData(tile_ball_shadow, TILE_BALL_SHADOW,  1, DMA);
     VDP_loadTileData(tile_ball_shadow_air, TILE_BALL_SHADOW_AIR, 1, DMA);
-    VDP_loadTileData(tile_iso_far_stand[0], TILE_PLAYER_FAR_STAND, 9, DMA);
-    VDP_loadTileData(tile_iso_far_run[0],   TILE_PLAYER_FAR_RUN,   9, DMA);
-    VDP_loadTileData(tile_iso_far_throw[0], TILE_PLAYER_FAR_THROW, 9, DMA);
-    VDP_loadTileData(tile_iso_far_pickup[0], TILE_PLAYER_FAR_PICKUP, 9, DMA);
-    VDP_loadTileData(tile_marker_yellow[0], TILE_MARKER_YELLOW, 2, DMA);
-    VDP_loadTileData(tile_marker_red[0], TILE_MARKER_RED, 2, DMA);
+    VDP_loadTileData(tile_ball16[0], TILE_BALL16_FRAME_0, 16, DMA);
+    VDP_loadTileData(tile_ring_yellow[0], TILE_RING_YELLOW, 6, DMA);
+    VDP_loadTileData(tile_ring_red[0], TILE_RING_RED, 6, DMA);
 
     PAL_setPalette(PAL_BALL, pal_ball, DMA);
 }

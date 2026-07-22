@@ -22,7 +22,8 @@ typedef struct {
     s16 y;
     s16 homeX;        /* lane position this slot returns to when brought back into play */
     s16 homeY;
-    bool eliminated;  /* TRUE = out of the round; parked off-screen, no longer targetable */
+    bool eliminated;  /* TRUE = out of the round and no longer targetable */
+    bool exiting;     /* eliminated player is still visibly running off to the right */
     u8  spriteSlot;
     u8  pal;
     u8  pose;
@@ -35,9 +36,11 @@ typedef struct {
 } Player;
 
 void player_init(Player *p, s16 startX, s16 y, u8 spriteSlot, u8 pal);
-/* Removes the player from the round: parks them off-screen and marks
- * them un-targetable. */
+/* Removes the player from targeting and starts their visible run-off. */
 void player_eliminate(Player *p);
+/* Advances an eliminated player's run to the right. Returns TRUE once
+ * the complete sprite has cleared the screen and can be forgotten. */
+bool player_updateExit(Player *p);
 /* Brings an eliminated player back into play at their home lane. */
 void player_restore(Player *p);
 void player_moveHuman(Player *p);

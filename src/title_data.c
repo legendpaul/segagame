@@ -14,9 +14,9 @@ static s16 prompt_index(char c)
 
 void title_data_init(void)
 {
-    /* The illustration shares VRAM with the large UI font. Loading it at
-     * title entry—after boot-time UI setup—makes the 1099-tile artwork fit
-     * without reducing the stadium or player art budget. */
+    /* The illustration shares VRAM with the large UI font. Loading its
+     * clustered scene-local bank at title entry keeps the detailed source
+     * art clear without crossing the VDP plane-map region. */
 }
 
 void title_data_set_prompt(bool visible)

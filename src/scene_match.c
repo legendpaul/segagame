@@ -49,6 +49,7 @@ static u16 aiDelay;
 static u16 roundEndTimer;
 static u8  windupTimer;
 static u8  impactTimer;
+static bool hitExitStarted;
 static u8  looseTimer;      /* prevents instant pickup at the impact point */
 static s8  pendingSpin;
 static s16 pendingTargetX;
@@ -100,7 +101,7 @@ static void trigger_shake(void)
     shakeTimer = 6;
 }
 
-/* Ground star under the controlled player: yellow while defending or
+/* Wide ground ring under the controlled player: yellow while defending or
  * moving without the ball, red while holding/winding up a throw. */
 static void draw_control_marker(void)
 {
@@ -108,23 +109,34 @@ static void draw_control_marker(void)
     bool hasBall = (activeA == holderA) &&
                    (state == MS_A_HOLD || state == MS_A_WINDUP ||
                     (state == MS_ANNOUNCE && server == 0));
-    u16 markerTile = hasBall ? TILE_MARKER_RED : TILE_MARKER_YELLOW;
-    VDP_setSpriteFull(SLOT_MARKER, p->x, p->y + 10 + worldOffsetY, SPRITE_SIZE(2, 1),
+    u16 markerTile = hasBall ? TILE_RING_RED : TILE_RING_YELLOW;
+    if (p->eliminated)
+    {
+        VDP_setSpriteFull(SLOT_MARKER, -24, -24, SPRITE_SIZE(3, 2),
+                           TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, markerTile),
+                           SLOT_SHADOWS);
+        return;
+    }
+    /* A 24px open ellipse stays readable without covering the runner's feet. */
+    VDP_setSpriteFull(SLOT_MARKER, p->x - 4, p->y + 8 + worldOffsetY, SPRITE_SIZE(3, 2),
                        TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, markerTile),
                        SLOT_SHADOWS);
 }
 
-static void draw_player_shadows(void)
+static void hide_unselected_player_dots(void)
 {
     u8 i;
     for (i = 0; i < TEAM_SIZE; i++)
     {
         u8 slotA = SLOT_SHADOWS + i;
         u8 slotB = SLOT_SHADOWS + TEAM_SIZE + i;
-        VDP_setSpriteFull(slotA, teamA[i].x + 4, teamA[i].y + 10 + worldOffsetY, SPRITE_SIZE(1, 1),
+        /* The old six one-tile shadows read as selection dots under every
+         * player. The wide two-tile control marker is the sole indicator;
+         * retain these slots only to keep the hardware sprite link intact. */
+        VDP_setSpriteFull(slotA, -16, -16, SPRITE_SIZE(1, 1),
                            TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL_SHADOW),
                            slotA + 1);
-        VDP_setSpriteFull(slotB, teamB[i].x + 4, teamB[i].y + 10 + worldOffsetY, SPRITE_SIZE(1, 1),
+        VDP_setSpriteFull(slotB, -16, -16, SPRITE_SIZE(1, 1),
                            TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL_SHADOW),
                            (i == TEAM_SIZE - 1) ? 0 : (slotB + 1));
     }
@@ -207,27 +219,34 @@ static bool move_toward_ball(Player *p)
 /* A/B/C address the visible left/middle/right opponent lanes. If that
  * exact slot is out, use the nearest surviving lane rather than silently
  * choosing a random target. */
-static u8 lane_target(Player team[], u8 requested)
-{
-    u8 distance;
-    if (!team[requested].eliminated) return requested;
-    for (distance = 1; distance < TEAM_SIZE; distance++)
-    {
-        if (requested >= distance && !team[requested - distance].eliminated)
-            return requested - distance;
-        if (requested + distance < TEAM_SIZE && !team[requested + distance].eliminated)
-            return requested + distance;
-    }
-    return first_in_play_from(team, 0);
-}
-
 static bool ball_overlaps_player(const Player *p)
 {
-    /* Continuous feet/torso box, checked every flight frame. This replaces
-     * the old endpoint-only test against the original target coordinates. */
-    return ball.progress >= 96 &&
+    /* Test the visible parabolic path, not an intended target or the
+     * invisible ground shadow. A curved throw can therefore pass cleanly. */
+    return !p->eliminated &&
            abs((p->x + 4) - ball.x) <= HIT_WINDOW_X &&
-           abs((p->y - 3) - ball.y) <= HIT_WINDOW_Y;
+           abs((p->y - 8) - ball_visualY(&ball)) <= HIT_WINDOW_Y;
+}
+
+static s8 first_ball_hit(Player team[])
+{
+    u8 i;
+    for (i = 0; i < TEAM_SIZE; i++)
+        if (ball_overlaps_player(&team[i])) return (s8)i;
+    return -1;
+}
+
+static void fixed_back_target(bool farSide, u8 lane, s16 *x, s16 *y)
+{
+    s16 depth = farSide ? (COURT_FAR_DEPTH + 12)
+                        : (COURT_NEAR_DEPTH - 12);
+    /* Derive the three back-court points from the projected side walls at
+     * this depth. The near edge is wider/shifted left; using the old flat
+     * lane_x values would not line up with the isometric court. */
+    s16 minX = COURT_MIN_X_AT_DEPTH(depth) + 8;
+    s16 maxX = COURT_MAX_X_AT_DEPTH(depth) - 8;
+    *x = minX + (s16)((maxX - minX) * lane / 2);
+    *y = depth + (*x >> 2);
 }
 
 static bool player_reached_ball(const Player *p)
@@ -397,7 +416,10 @@ static void go_round_end(u8 winnerIsA)
 static void begin_loose_for_B(void)
 {
     holderB = closest_in_play(teamB, ball.x, ball.y);
-    ball_startRicochet(&ball);
+    /* A miss is still airborne and needs its landing ricochet. After a
+     * hit, ball_dropAt() has already made a bounded loose ball at the
+     * victim's feet; do not relaunch it or change receiving halves. */
+    if (ball.state != BALL_LOOSE) ball_startRicochet(&ball);
     looseTimer = 10;
     state = MS_LOOSE_B;
 }
@@ -406,7 +428,7 @@ static void begin_loose_for_A(void)
 {
     activeA = closest_in_play(teamA, ball.x, ball.y);
     holderA = activeA;
-    ball_startRicochet(&ball);
+    if (ball.state != BALL_LOOSE) ball_startRicochet(&ball);
     looseTimer = 10;
     state = MS_LOOSE_A;
 }
@@ -415,25 +437,28 @@ static void begin_loose_for_A(void)
  * rally as a hit; possession is earned only by reaching the rebound. */
 static void resolve_throw_to_B(void)
 {
-    if (!ball_overlaps_player(&teamB[responderB]))
+    s8 hit = first_ball_hit(teamB);
+    if (hit < 0)
     {
         sound_mgr_bounce();
         begin_loose_for_B();
         return;
     }
 
+    responderB = (u8)hit;
+    ball_dropAt(&ball, teamB[responderB].x + 4, teamB[responderB].y + 5);
     sound_mgr_hit();
     trigger_flash(PAL_TEAM_B);
     trigger_shake();
     player_setPose(&teamB[responderB], POSE_HIT, 14);
     teamB[responderB].x += (ball.spin < 0) ? -6 : 6;
     impactTimer = 8;
+    hitExitStarted = FALSE;
     state = MS_HIT_B;
 }
 
 static void finish_hit_to_B(void)
 {
-    eliminate_from(teamB, responderB);
     draw_hud();
     if (count_in_play(teamB) == 0) { go_round_end(TRUE); return; }
     begin_loose_for_B();
@@ -442,25 +467,28 @@ static void finish_hit_to_B(void)
 /* Same hit-or-loose resolution mirrored for a throw at team A. */
 static void resolve_throw_to_A(void)
 {
-    if (!ball_overlaps_player(&teamA[responderA]))
+    s8 hit = first_ball_hit(teamA);
+    if (hit < 0)
     {
         sound_mgr_bounce();
         begin_loose_for_A();
         return;
     }
 
+    responderA = (u8)hit;
+    ball_dropAt(&ball, teamA[responderA].x + 4, teamA[responderA].y + 5);
     sound_mgr_hit();
     trigger_flash(PAL_TEAM_A);
     trigger_shake();
     player_setPose(&teamA[responderA], POSE_HIT, 14);
     teamA[responderA].x += (ball.spin < 0) ? -6 : 6;
     impactTimer = 8;
+    hitExitStarted = FALSE;
     state = MS_HIT_A;
 }
 
 static void finish_hit_to_A(void)
 {
-    eliminate_from(teamA, responderA);
     draw_hud();
     if (count_in_play(teamA) == 0) { go_round_end(FALSE); return; }
     begin_loose_for_A();
@@ -565,11 +593,9 @@ void scene_match_update(void)
             {
                 u8 lane = input_pressed(BUTTON_A) ? 0 :
                           input_pressed(BUTTON_B) ? 1 : 2;
-                responderB = lane_target(teamB, lane);
                 pendingSpin = input_held(BUTTON_LEFT) ? -1 :
                               input_held(BUTTON_RIGHT) ? 1 : 0;
-                pendingTargetX = teamB[responderB].x + 4;
-                pendingTargetY = teamB[responderB].y - 3;
+                fixed_back_target(TRUE, lane, &pendingTargetX, &pendingTargetY);
 
                 player_setPose(&teamA[holderA], POSE_THROW, 18);
                 windupTimer = 8;
@@ -598,12 +624,12 @@ void scene_match_update(void)
             if (aiDelay > 0) aiDelay--;
             else
             {
+                u8 lane = ai_pickSlot(TEAM_SIZE);
                 responderA = nth_in_play(teamA, ai_pickSlot(count_in_play(teamA)));
                 /* With C now reserved for right-lane throws, defence
                  * automatically hands control to the targeted player. */
                 activeA = responderA;
-                pendingTargetX = ai_pickTargetX(teamA[responderA].x);
-                pendingTargetY = teamA[responderA].y - 3;
+                fixed_back_target(FALSE, lane, &pendingTargetX, &pendingTargetY);
                 pendingSpin = (random() % 3) - 1;
 
                 player_setPose(&teamB[holderB], POSE_THROW, 18);
@@ -631,8 +657,11 @@ void scene_match_update(void)
         case MS_FLY_TO_B:
         {
             {
+                s8 hit;
                 bool arrived = ball_update(&ball);
-                if (ball_overlaps_player(&teamB[responderB]) || arrived)
+                hit = first_ball_hit(teamB);
+                if (hit >= 0) { responderB = (u8)hit; resolve_throw_to_B(); }
+                else if (arrived)
                     resolve_throw_to_B();
             }
             break;
@@ -641,8 +670,11 @@ void scene_match_update(void)
         case MS_FLY_TO_A:
         {
             {
+                s8 hit;
                 bool arrived = ball_update(&ball);
-                if (ball_overlaps_player(&teamA[responderA]) || arrived)
+                hit = first_ball_hit(teamA);
+                if (hit >= 0) { responderA = (u8)hit; resolve_throw_to_A(); }
+                else if (arrived)
                     resolve_throw_to_A();
             }
             break;
@@ -680,13 +712,25 @@ void scene_match_update(void)
         }
 
         case MS_HIT_B:
+            if (ball_updateLoose(&ball)) sound_mgr_bounce();
             if (impactTimer > 0) impactTimer--;
-            else finish_hit_to_B();
+            else if (!hitExitStarted)
+            {
+                eliminate_from(teamB, responderB);
+                hitExitStarted = TRUE;
+            }
+            else if (player_updateExit(&teamB[responderB])) finish_hit_to_B();
             break;
 
         case MS_HIT_A:
+            if (ball_updateLoose(&ball)) sound_mgr_bounce();
             if (impactTimer > 0) impactTimer--;
-            else finish_hit_to_A();
+            else if (!hitExitStarted)
+            {
+                eliminate_from(teamA, responderA);
+                hitExitStarted = TRUE;
+            }
+            else if (player_updateExit(&teamA[responderA])) finish_hit_to_A();
             break;
 
         case MS_ROUND_END:
@@ -721,15 +765,16 @@ void scene_match_update(void)
      * parked off-screen by player_eliminate() so this stays simple). */
     for (i = 0; i < TEAM_SIZE; i++)
     {
-        bool aMoving = (i == activeA) && !teamA[i].eliminated &&
+        bool aMoving = teamA[i].exiting || ((i == activeA) && !teamA[i].eliminated &&
                        (input_held(BUTTON_LEFT) || input_held(BUTTON_RIGHT) ||
-                        input_held(BUTTON_UP) || input_held(BUTTON_DOWN));
+                        input_held(BUTTON_UP) || input_held(BUTTON_DOWN)));
         player_tickAnim(&teamA[i], aMoving);
         teamA[i].y += worldOffsetY;
         player_draw(&teamA[i]);
         teamA[i].y -= worldOffsetY;
 
-        bool bMoving = cpuMoved && (i == holderB) && (state == MS_LOOSE_B);
+        bool bMoving = teamB[i].exiting ||
+                       (cpuMoved && (i == holderB) && (state == MS_LOOSE_B));
         player_tickAnim(&teamB[i], bMoving);
         teamB[i].y += worldOffsetY;
         player_draw(&teamB[i]);
@@ -740,5 +785,5 @@ void scene_match_update(void)
     ball_draw(&ball);
     ball.y -= worldOffsetY;
     draw_control_marker();
-    draw_player_shadows();
+    hide_unselected_player_dots();
 }

@@ -44,7 +44,12 @@ void ball_init(Ball *b, u8 spriteSlot, s16 x, s16 y, BallState heldState);
 void ball_startThrow(Ball *b, s16 toX, s16 toY, BallState flightState, s8 spin);
 bool ball_update(Ball *b);   /* returns TRUE the frame it reaches its target */
 void ball_startRicochet(Ball *b);
+/* Converts an airborne hit into a loose ball placed exactly at the
+ * victim's feet, retaining only a tiny spin kick and vertical bounce. */
+void ball_dropAt(Ball *b, s16 x, s16 y);
 bool ball_updateLoose(Ball *b); /* TRUE when the ball contacts floor/wall */
+/* Visible flight Y, including the parabola used by ball_draw(). */
+s16 ball_visualY(const Ball *b);
 void ball_draw(Ball *b);
 
 #endif /* _BALL_H_ */

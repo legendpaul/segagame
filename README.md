@@ -12,10 +12,12 @@ Design brief: [docs/planning.md](docs/planning.md).
   teams, large flags, kit previews and a broadcast matchup screen.
 - **Match**: full dodgeball gameplay -
   - D-Pad movement across each projected court half.
-  - **A/B/C** throw to the left/middle/right opponent lane; hold Left or Right for spin.
+  - **A/B/C** always throw to the left corner/back middle/right corner; hold Left or Right for spin.
+  - A player is hit only when the visible flight path crosses their body; enough spin can bend clear.
   - There is no catch action: an airborne collision is always a hit.
   - Missed and deflected throws ricochet inside a damped projected rebound box.
   - The ball remains loose until a player physically runs to it; it never teleports into a hand.
+  - Hit players drop the ball at their feet and visibly run off the right touchline.
   - 3 players per side per round; eliminate all 3 to score a point.
   - First to 3 points wins the match.
   - The CPU chooses targets, retrieves loose rebounds and throws back with some inaccuracy.

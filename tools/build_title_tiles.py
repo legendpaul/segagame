@@ -16,7 +16,7 @@ OUTPUT = ROOT / "src" / "title_tiles.inc"
 
 WIDTH, HEIGHT = 320, 224
 TILES_X, TILES_Y = WIDTH // 8, HEIGHT // 8
-MAX_TILES = 500  # keeps art below the default 0xB000 window-plane VRAM region
+MAX_TILES = 379  # title bank + 8 prompt tiles stays below the 0xB000 map
 
 PROMPT_FONT = {
     "<": ("00001", "00010", "00100", "01000", "00100", "00010", "00001"),
@@ -111,7 +111,7 @@ for ty in range(TILES_Y):
         indices = np.frombuffer(tile_bytes(image, tx, ty), dtype=np.uint8)
         tile_vectors.append(palette_rgb[indices].reshape(-1))
 tile_vectors = np.asarray(tile_vectors, dtype=np.float32)
-cluster_count = min(480, len(tile_vectors))
+cluster_count = min(360, len(tile_vectors))
 clusters = MiniBatchKMeans(n_clusters=cluster_count, random_state=7,
                            batch_size=len(tile_vectors), n_init=3,
                            max_iter=200).fit(tile_vectors)

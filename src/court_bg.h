@@ -4,8 +4,8 @@
 
 #include "genesis.h"
 
-/* 481 generated tiles plus a small guard band for stable downstream bases. */
-#define COURT_TILE_COUNT 488
+/* Exact generated bank size. Downstream scene banks are compile-time based. */
+#define COURT_TILE_COUNT 549
 
 void court_bg_init(void);   /* uploads tiles + pitch colors, call once at boot */
 void court_bg_draw(void);   /* paints BG_B, call from each scene's _enter() */

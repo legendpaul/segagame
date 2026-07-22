@@ -950,7 +950,7 @@ is preserved as `assets/title_source_v2.png`; the exact hardware conversion is
 - chooses one 16-colour palette and snaps it to 3-bit-per-channel Genesis colours;
 - forces the darkest navy into CRAM index 0 so PAL overscan/backdrop bars remain dark;
 - uses whole-8x8-tile MiniBatchKMeans clustering to retain detailed logo/player silhouettes in
-  475 reusable tiles. A naive exact conversion required 1,099 tiles and visibly corrupted real
+  354 reusable tiles. A naive exact conversion required 1,099 tiles and visibly corrupted real
   Fusion output by entering the default VDP window-plane map region;
 - emits the tile bank, 40x28 map, palette and a separate eight-glyph `> PRESS START <` tile-font
   bank into `src/title_tiles.inc`.
@@ -959,3 +959,32 @@ The title bank intentionally overlays the large UI-font VRAM range only while th
 `scene_menu.c` reloads `ui_data_init()` on the title-to-selector transition. Fusion QA verified
 both the clean full-screen title and the restored national-team selector, then the temporary
 direct-selector QA hook was removed and normal `GS_BOOT` entry restored.
+
+---
+
+## Projected court, directional players and fixed throw lanes (2026-07-22)
+
+This pass makes the art, movement and collision model share one isometric coordinate system:
+
+- The stadium converter now draws a striped playable quadrilateral from the exact projected
+  side/depth bounds used by player and ball physics. A cyan-edged transparent centre board visibly
+  separates the halves; old football penalty-box markings are gone.
+- A/B/C resolve to fixed projected points at the far left corner, back middle and far right corner.
+  Collision scans every opponent against the visible parabolic ball each frame. It no longer
+  grants a hit because an intended target was selected, and late throw spin can curve around a body.
+- Contact drops a bounded loose ball at the victim's feet. The victim becomes untargetable, runs
+  diagonally toward the right exit with the real run cycle, and must fully clear the screen before
+  a surviving teammate starts retrieval.
+- Players use separate front and rear three-quarter 32x32 pose banks. The near team shows the back
+  of the head while facing up-court; the opposition faces down-court. Two distinct lower-body run
+  frames replace positional bobbing as the primary leg motion.
+- The ball is now a readable 16x16 four-frame rotating sprite. The controlled player alone gets a
+  24x16 open ring (yellow normally, red with possession); the six ambiguous unselected dots are gone.
+- Static banks were compacted to end below the default `0xB000` plane map. The scene-local title was
+  reclustered to 354 tiles, retaining the illustrated composition while leaving safe VDP room for
+  the expanded directional players, ball, ring and 549-tile court.
+
+A clean SGDK rebuild produced the checksummed 256KB ROM. Fusion QA verified the title, ten-country
+selector, projected stadium, centre board, front/back players, wide possession ring, clear loose
+ball and a live scoring state after eliminations, with no tile-map corruption. `tools/fusion_qa.ps1`
+now provides repeatable focused-window input and lossless emulator captures for future passes.
