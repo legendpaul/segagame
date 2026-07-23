@@ -12,6 +12,15 @@
 #include "ui_data.h"
 #include "flag_data.h"
 
+#include "ref_tiles.inc"   /* 32x32 referee sprite (16 tiles) drawn on PAL3 */
+/* The referee tiles live in the boot-logo VRAM region: that splash is never
+ * shown again after startup, and the court base tileset ends just before it
+ * while court foreground/flags start after these 16 slots, so it's dead space
+ * during a match. */
+#define TILE_REFEREE   (TILE_COURT_BASE + COURT_TILE_COUNT)
+#define REF_SKIN_LIGHT 0xD8A878
+#define REF_SKIN_DARK  0x9C6C40
+
 #define SLOT_TEAM_A   0    /* initial slots; reassigned by projected depth each frame */
 #define SLOT_TEAM_B   3    /* initial slots; reassigned by projected depth each frame */
 #define SLOT_BALL     6    /* initial ball slot; reassigned with player depth */
@@ -30,6 +39,7 @@ typedef enum {
     MS_LOOSE_A,
     MS_HIT_B,
     MS_HIT_A,
+    MS_ESCORT,
     MS_ROUND_END
 } MatchState;
 
@@ -61,6 +71,15 @@ static u8  looseTimer;      /* prevents instant pickup at the impact point */
 static u16 pickupClock;     /* frames left, 0 = no clock running */
 static bool pickupIsA;      /* TRUE: team A (human) on the clock, FALSE: AI */
 static bool aiFumbling;     /* rare (~1/1000) AI fumble that lets its clock expire */
+
+/* Referee escort: on a shot-clock timeout the ref runs in from the right,
+ * walks the offending player off, then the ball (dropped on the spot) goes
+ * loose again for the next player - or the round/match ends if that was the
+ * team's last player. */
+static s16  refX, refY;     /* referee sprite position (screen space) */
+static u8   escortIdx;      /* which player on the escorted side is being walked off */
+static bool escortIsA;      /* TRUE: escorting a team A (human) player */
+static u8   escortPhase;    /* 0 = running in to the player, 1 = walking them out */
 #define PICKUP_CLOCK_SECS  10
 #define PICKUP_CLOCK_FRAMES (u16)((SYS_isPAL() ? 50 : 60) * PICKUP_CLOCK_SECS)
 static s8  pendingSpin;
@@ -527,6 +546,9 @@ void scene_match_enter(void)
      * hardcoded colors no matter which team you chose. */
     sprites_data_apply_teams(gTeamAIndex, gTeamBIndex);
 
+    /* Referee sprite lives in the (now-dead) boot-logo VRAM region. */
+    VDP_loadTileData(ref_tiles[0], TILE_REFEREE, REF_TILE_COUNT, DMA);
+
     flashTimer = 0;
     shakeTimer = 0;
     hitstopTimer = 0;
@@ -693,42 +715,43 @@ static void finish_hit_to_A(void)
     begin_loose_for_A();
 }
 
-/* The shot clock ran out on a loose ball - eliminate the responsible player
- * through the same hit/fall/exit sequence as a real strike (there is no
- * thrower to celebrate). Reuses MS_HIT_A/B so after the fall the ball simply
- * goes loose again for the next player on that side (or ends the round). */
+/* Draw the referee (4x4, PAL3) at the coloured-marker slot, which is unused
+ * during an escort. faceRight mirrors the left-facing run art for the walk-out.
+ * Links on to SLOT_SHADOWS exactly like the marker it replaces, so the
+ * hardware sprite chain stays intact. */
+static void draw_referee(bool faceRight)
+{
+    VDP_setSpriteFull(SLOT_MARKER, refX - 16, refY - 16 + worldOffsetY,
+                      SPRITE_SIZE(4, 4),
+                      TILE_ATTR_FULL(PAL_BALL, 1, FALSE, faceRight, TILE_REFEREE),
+                      SLOT_SHADOWS);
+}
+
+/* The shot clock ran out on a loose ball - drop the ball on the spot and send
+ * the referee on to walk the offending player off (see MS_ESCORT). */
 static void trigger_pickup_timeout(void)
 {
+    Player *v;
     pickupClock = 0;
-    hitKnockX = 0;
-    hitKnockY = 0;
+    escortIsA = pickupIsA;
+    escortIdx = pickupIsA ? activeA : holderB;
+    v = escortIsA ? &teamA[escortIdx] : &teamB[escortIdx];
 
-    if (pickupIsA)
-    {
-        responderA = activeA;
-        ball_dropAt(&ball, teamA[responderA].x + 4, teamA[responderA].y + 5);
-        sound_mgr_hit();
-        trigger_flash(PAL_TEAM_A);
-        trigger_shake();
-        player_setPose(&teamA[responderA], POSE_HIT, HIT_RECOIL_FRAMES);
-        impactTimer = HIT_TOTAL_FRAMES;
-        hitstopTimer = 4;
-        hitExitStarted = FALSE;
-        state = MS_HIT_A;
-    }
-    else
-    {
-        responderB = holderB;
-        ball_dropAt(&ball, teamB[responderB].x + 4, teamB[responderB].y + 5);
-        sound_mgr_hit();
-        trigger_flash(PAL_TEAM_B);
-        trigger_shake();
-        player_setPose(&teamB[responderB], POSE_HIT, HIT_RECOIL_FRAMES);
-        impactTimer = HIT_TOTAL_FRAMES;
-        hitstopTimer = 4;
-        hitExitStarted = FALSE;
-        state = MS_HIT_B;
-    }
+    /* Ball is dropped exactly where the player was and stays loose there. */
+    ball_dropAt(&ball, v->x + 4, v->y + 5);
+
+    /* Referee enters from just off the right edge, level with the player. */
+    refX = 340;
+    refY = v->y;
+    escortPhase = 0;
+    /* PAL3 indices 7/15 are unused by the ball art - lend them to the ref for
+     * skin tones so it can share the ball palette line during the escort. */
+    PAL_setColor(PAL_BALL * 16 + 7,  RGB24_TO_VDPCOLOR(REF_SKIN_LIGHT));
+    PAL_setColor(PAL_BALL * 16 + 15, RGB24_TO_VDPCOLOR(REF_SKIN_DARK));
+
+    player_setPose(v, POSE_STAND, 255);
+    sound_mgr_whistle();
+    state = MS_ESCORT;
 }
 
 void scene_match_update(void)
@@ -775,7 +798,7 @@ void scene_match_update(void)
     ambientTick++;
 
     if (state != MS_ANNOUNCE && state != MS_ROUND_END &&
-        state != MS_HIT_A && state != MS_HIT_B)
+        state != MS_HIT_A && state != MS_HIT_B && state != MS_ESCORT)
     {
         for (i = 0; i < TEAM_SIZE; i++)
         {
@@ -793,7 +816,7 @@ void scene_match_update(void)
      * you reposition a teammate while another exchange is in flight. */
     if (!teamA[activeA].eliminated &&
         state != MS_A_WINDUP && state != MS_HIT_A &&
-        state != MS_HIT_B && state != MS_ROUND_END)
+        state != MS_HIT_B && state != MS_ROUND_END && state != MS_ESCORT)
         player_moveHuman(&teamA[activeA], activeA_has_ball());
 
     /* Watchdog: force whatever this state is waiting on to complete if
@@ -1017,6 +1040,49 @@ void scene_match_update(void)
             else if (player_updateExit(&teamA[responderA])) finish_hit_to_A();
             break;
 
+        case MS_ESCORT:
+        {
+            Player *v = escortIsA ? &teamA[escortIdx] : &teamB[escortIdx];
+            const s16 SPD = 2;
+
+            if (ball_updateLoose(&ball)) sound_mgr_bounce();  /* keep it settled */
+
+            if (escortPhase == 0)
+            {
+                /* Referee runs in from the right until alongside the player. */
+                if (refX > v->x + 12) refX -= SPD;
+                else
+                {
+                    escortPhase = 1;
+                    player_setPose(v, POSE_RUN, 255);
+                    v->facingLeft = FALSE;
+                }
+            }
+            else
+            {
+                /* Referee and player walk out to the right together. */
+                refX += SPD;
+                v->x += SPD;
+                if ((ambientTick & 3) == 0) v->animFrame = (v->animFrame + 1) & 3;
+
+                if (v->x > 336)
+                {
+                    eliminate_from(escortIsA ? teamA : teamB, escortIdx);
+                    if (escortIsA)
+                    {
+                        if (count_in_play(teamA) == 0) { go_round_end(FALSE); break; }
+                        begin_loose_for_A();   /* ball still on the spot -> restart clock */
+                    }
+                    else
+                    {
+                        if (count_in_play(teamB) == 0) { go_round_end(TRUE); break; }
+                        begin_loose_for_B();
+                    }
+                }
+            }
+            break;
+        }
+
         case MS_ROUND_END:
         {
             if (roundEndTimer > 0) roundEndTimer--;
@@ -1073,6 +1139,7 @@ void scene_match_update(void)
     ball.y += worldOffsetY;
     ball_draw(&ball);
     ball.y -= worldOffsetY;
-    draw_control_marker();
+    if (state == MS_ESCORT) draw_referee(escortPhase == 1);
+    else draw_control_marker();
     hide_unselected_player_dots();
 }
