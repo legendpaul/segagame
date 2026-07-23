@@ -101,24 +101,27 @@ void flag_data_draw_matchup(u8 teamAIndex, u8 teamBIndex)
 
     VDP_clearPlane(BG_A, TRUE);
     ui_draw_panel(1, 1, 38, 26, FALSE);
-    ui_draw_big_center("MATCH UP", 3, UI_WHITE);
-    ui_draw_text_center("WORLD CHAMPIONSHIP", 6, UI_CYAN);
+    ui_draw_big_center("MATCH UP", 2, UI_WHITE);
 
+    /* Header row: each side's flag with its country name beneath, sitting
+     * above the big player figures (drawn separately by matchup_art). */
     for (col = 0; col < 4; col++)
         for (row = 0; row < 2; row++)
         {
             VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL0, 1, FALSE, FALSE,
-                leftBase + col * 2 + row), 7 + col, 9 + row);
+                leftBase + col * 2 + row), 4 + col, 5 + row);
             VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL0, 1, FALSE, FALSE,
-                rightBase + col * 2 + row), 29 + col, 9 + row);
+                rightBase + col * 2 + row), 32 + col, 5 + row);
         }
+    ui_draw_text(teamNames[teamAIndex], 6 - strlen(teamNames[teamAIndex]) / 2,
+                 7, UI_GOLD);
+    ui_draw_text(teamNames[teamBIndex], 34 - strlen(teamNames[teamBIndex]) / 2,
+                 7, UI_GOLD);
 
-    ui_draw_big_text("VS", 18, 9, UI_GOLD);
-    ui_draw_text(teamNames[teamAIndex], 9 - strlen(teamNames[teamAIndex]) / 2,
-                 12, UI_GOLD);
-    ui_draw_text(teamNames[teamBIndex], 31 - strlen(teamNames[teamBIndex]) / 2,
-                 12, UI_GOLD);
-    ui_draw_button("START MATCH", 13, 23, 14);
+    /* VS sits between the two figures, vertically centred on them. */
+    ui_draw_big_text("VS", 18, 14, UI_GOLD);
+
+    ui_draw_button("START MATCH", 13, 24, 14);
 }
 
 

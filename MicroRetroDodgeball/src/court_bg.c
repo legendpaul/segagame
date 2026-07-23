@@ -5,22 +5,29 @@
 
 static void restore_colors(void)
 {
-    PAL_setColor(0,  RGB24_TO_VDPCOLOR(0x000000));
-    PAL_setColor(1,  RGB24_TO_VDPCOLOR(0xF8F8F0));
-    PAL_setColor(2,  RGB24_TO_VDPCOLOR(0x42B850));
-    PAL_setColor(3,  RGB24_TO_VDPCOLOR(0x27843C));
-    PAL_setColor(4,  RGB24_TO_VDPCOLOR(0x081830));
-    PAL_setColor(5,  RGB24_TO_VDPCOLOR(0x405878));
-    PAL_setColor(6,  RGB24_TO_VDPCOLOR(0xF0C028));
-    PAL_setColor(7,  RGB24_TO_VDPCOLOR(0x35A048));
-    PAL_setColor(8,  RGB24_TO_VDPCOLOR(0x101828));
-    PAL_setColor(9,  RGB24_TO_VDPCOLOR(0xD83838));
-    PAL_setColor(10, RGB24_TO_VDPCOLOR(0xF0C838));
-    PAL_setColor(11, RGB24_TO_VDPCOLOR(0x3870C8));
-    PAL_setColor(12, RGB24_TO_VDPCOLOR(0x58D8F0));
-    PAL_setColor(13, RGB24_TO_VDPCOLOR(0x788898));
-    PAL_setColor(14, RGB24_TO_VDPCOLOR(0x283038));
-    PAL_setColor(15, RGB24_TO_VDPCOLOR(0xF8F8F8));
+    /* Court palette pass (2026-07-22). Same 16 slots, same roles - only the
+     * colour values are retuned, so no tile data changes and nothing can
+     * shift index-wise. Goals: a richer pitch with more mowing-stripe
+     * contrast (greens 2/3/7), a deeper stand backdrop so the crowd reads
+     * with depth instead of floating (8/14), and slightly less neon,
+     * more broadcast-realistic crowd dots (9/10/11). Lines stay pure white
+     * (1/15) for crispness. */
+    PAL_setColor(0,  RGB24_TO_VDPCOLOR(0x000000));  /* outline / backdrop black */
+    PAL_setColor(1,  RGB24_TO_VDPCOLOR(0xF8F8F0));  /* line off-white */
+    PAL_setColor(2,  RGB24_TO_VDPCOLOR(0x54C862));  /* grass - light stripe (brighter, cleaner) */
+    PAL_setColor(3,  RGB24_TO_VDPCOLOR(0x1E7434));  /* grass - dark stripe (deeper, richer) */
+    PAL_setColor(4,  RGB24_TO_VDPCOLOR(0x081830));  /* deep navy (HUD/shadow) */
+    PAL_setColor(5,  RGB24_TO_VDPCOLOR(0x405878));  /* slate */
+    PAL_setColor(6,  RGB24_TO_VDPCOLOR(0xF0C028));  /* gold accent */
+    PAL_setColor(7,  RGB24_TO_VDPCOLOR(0x3AA850));  /* grass - mid stripe */
+    PAL_setColor(8,  RGB24_TO_VDPCOLOR(0x0C1220));  /* stand backdrop (darker for crowd depth) */
+    PAL_setColor(9,  RGB24_TO_VDPCOLOR(0xC8443C));  /* crowd red (less neon) */
+    PAL_setColor(10, RGB24_TO_VDPCOLOR(0xE0BC50));  /* crowd gold (warmer, less neon) */
+    PAL_setColor(11, RGB24_TO_VDPCOLOR(0x3C6CB8));  /* crowd blue */
+    PAL_setColor(12, RGB24_TO_VDPCOLOR(0x58D8F0));  /* cyan accent */
+    PAL_setColor(13, RGB24_TO_VDPCOLOR(0x788898));  /* grey-blue structure */
+    PAL_setColor(14, RGB24_TO_VDPCOLOR(0x1E2630));  /* dark structure (slightly deeper) */
+    PAL_setColor(15, RGB24_TO_VDPCOLOR(0xF8F8F8));  /* pure white */
 }
 
 void court_bg_init(void)

@@ -108,4 +108,8 @@ void sprites_data_apply_teams(u8 teamAIndex, u8 teamBIndex);
  * a few frames later via sprites_data_apply_teams(). */
 void sprites_data_flash_team(u8 palLine);
 
+/* Writes the 3-shade kit ramp (light, mid, dark) for a team into out[0..2]
+ * as VDP colour words. Used by the matchup screen's recolourable figures. */
+void sprites_data_kit_ramp(u8 teamIndex, u16 *out);
+
 #endif /* _SPRITES_DATA_H_ */

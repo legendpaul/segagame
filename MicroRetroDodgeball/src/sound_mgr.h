@@ -31,5 +31,6 @@ void sound_mgr_whistle(void);
 void sound_mgr_score(void);
 void sound_mgr_crowdKnockout(void);
 void sound_mgr_crowdVictory(void);
+void sound_mgr_crowdGameOver(void);
 
 #endif /* _SOUND_MGR_H_ */

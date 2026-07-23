@@ -15,6 +15,7 @@
 #include "sprites_data.h"
 #include "player.h"
 #include "ui_data.h"
+#include "matchup_art.h"
 
 #define SLOT_PREVIEW_A  0
 #define SLOT_PREVIEW_B  1
@@ -84,14 +85,11 @@ static void enter_matchup(void)
 {
     phase = MENU_MATCHUP;
     VDP_clearSprites();
-    sprites_data_apply_teams(gTeamAIndex, gTeamBIndex);
     flag_data_draw_matchup(gTeamAIndex, gTeamBIndex);
-    player_init(&previewA, 106, 152, SLOT_PREVIEW_A, PAL_TEAM_A);
-    player_init(&previewB, 214, 152, SLOT_PREVIEW_B, PAL_TEAM_B);
-    previewA.farSide = FALSE;
-    previewB.farSide = TRUE;
-    previewA.facingLeft = FALSE;
-    previewB.facingLeft = TRUE;
+    /* Big recolourable throwing figures replace the old tiny preview
+     * sprites - upload the tile bank, then draw both sides. */
+    matchup_art_load();
+    matchup_art_draw(gTeamAIndex, gTeamBIndex);
     bobCounter = 0;
     bobOffset = 0;
 }
@@ -137,11 +135,8 @@ void scene_menu_update(void)
 
     if (phase == MENU_MATCHUP)
     {
-        if (++bobCounter >= BOB_PERIOD)
-        {
-            bobCounter = 0;
-            bobOffset = bobOffset ? 0 : -2;
-        }
+        /* Figures are static BG tiles drawn once on entry - just wait on
+         * input here. */
         if (input_pressed(BUTTON_B))
         {
             sound_mgr_cancel();
@@ -157,10 +152,6 @@ void scene_menu_update(void)
             gCurrentScene = GS_MATCH;
             return;
         }
-        previewA.y = 152 + bobOffset;
-        previewB.y = 152 - bobOffset;
-        player_draw(&previewA);
-        player_draw(&previewB);
         return;
     }
 

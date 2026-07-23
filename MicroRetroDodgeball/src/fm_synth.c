@@ -40,11 +40,33 @@ void fm_synth_initChannel(u8 ch)
     /* A simple layered/organ-ish tone: op1 the loudest fundamental,
      * op2 an octave-up harmonic (MUL=2) for brightness, op3/op4
      * quieter supporting layers. Fast attack, slow decay into a
-     * sustained level so held notes ring instead of plucking out. */
+     * sustained level so held notes ring instead of plucking out.
+     * op2 TL lowered 24->18 (2026-07-22) to bring that octave harmonic
+     * forward for a brighter, more present lead. */
     writeOp(part, chOff, 0x00, /*mul*/1, /*dt*/0, /*tl*/ 4, /*ar*/31, /*d1r*/5, /*d2r*/2, /*sl*/1, /*rr*/7);
-    writeOp(part, chOff, 0x08, /*mul*/2, /*dt*/0, /*tl*/24, /*ar*/31, /*d1r*/6, /*d2r*/2, /*sl*/2, /*rr*/7);
+    writeOp(part, chOff, 0x08, /*mul*/2, /*dt*/0, /*tl*/18, /*ar*/31, /*d1r*/6, /*d2r*/2, /*sl*/2, /*rr*/7);
     writeOp(part, chOff, 0x04, /*mul*/1, /*dt*/0, /*tl*/30, /*ar*/31, /*d1r*/6, /*d2r*/2, /*sl*/2, /*rr*/7);
     writeOp(part, chOff, 0x0C, /*mul*/1, /*dt*/0, /*tl*/16, /*ar*/31, /*d1r*/5, /*d2r*/2, /*sl*/1, /*rr*/7);
+}
+
+void fm_synth_initHarmonyChannel(u8 ch)
+{
+    u8 part  = (ch >= 3) ? 1 : 0;
+    u8 chOff = ch % 3;
+
+    /* Algorithm 7 (all carriers), same safe layout as the lead, center pan. */
+    YM2612_writeReg(part, 0xB0 + chOff, 0x07);
+    YM2612_writeReg(part, 0xB4 + chOff, 0xC0);
+
+    /* A soft, plucky arpeggio: high total levels keep it well under the
+     * lead, and a fast decay with NO sustain (sl=15) makes every note
+     * pluck and clear quickly instead of ringing into the next - so it
+     * adds motion and body without muddying the melody. op2 is the
+     * octave-up sparkle. */
+    writeOp(part, chOff, 0x00, /*mul*/1, /*dt*/0, /*tl*/26, /*ar*/31, /*d1r*/10, /*d2r*/0, /*sl*/15, /*rr*/9);
+    writeOp(part, chOff, 0x08, /*mul*/2, /*dt*/0, /*tl*/34, /*ar*/31, /*d1r*/11, /*d2r*/0, /*sl*/15, /*rr*/9);
+    writeOp(part, chOff, 0x04, /*mul*/1, /*dt*/0, /*tl*/40, /*ar*/31, /*d1r*/11, /*d2r*/0, /*sl*/15, /*rr*/9);
+    writeOp(part, chOff, 0x0C, /*mul*/3, /*dt*/0, /*tl*/38, /*ar*/31, /*d1r*/11, /*d2r*/0, /*sl*/15, /*rr*/9);
 }
 
 void fm_synth_initBassChannel(u8 ch)

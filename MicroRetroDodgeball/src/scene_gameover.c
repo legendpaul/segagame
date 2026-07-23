@@ -50,6 +50,7 @@ void scene_gameover_enter(void)
     player_draw(&champion);
 
     sound_mgr_score();
+    sound_mgr_crowdGameOver();   /* big sustained stadium roar for the win */
 }
 
 void scene_gameover_update(void)

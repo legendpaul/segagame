@@ -409,6 +409,18 @@ void sprites_data_apply_teams(u8 teamAIndex, u8 teamBIndex)
     PAL_setPalette(PAL_TEAM_B, pal_teams[teamBIndex], DMA);
 }
 
+void sprites_data_kit_ramp(u8 teamIndex, u16 *out)
+{
+    /* The three most representative kit shades (light/mid/dark) from a
+     * team's full player palette, for reuse by the matchup screen's big
+     * figures. Indices 2/6/13 are the jersey light/mid/dark across every
+     * team palette (skin/shorts indices are shared and sit elsewhere). */
+    const u16 *p = pal_teams[teamIndex];
+    out[0] = p[2];
+    out[1] = p[6];
+    out[2] = p[13];
+}
+
 void sprites_data_flash_team(u8 palLine)
 {
     /* Whites-out every non-transparent index on the line so the whole
