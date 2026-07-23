@@ -725,14 +725,12 @@ static void finish_hit_to_A(void)
  * hardware sprite chain stays intact. */
 static void draw_referee(bool faceRight)
 {
-    /* Two-frame walk: alternate the leg-swap frames every 6 ticks plus a
-     * 1px body bob, so the ref visibly strides instead of sliding. */
-    u8  frame = (refAnim / 6) & 1;
-    s16 bob   = frame ? -1 : 0;
+    /* A 2px body bob every few ticks reads as a brisk walk without the
+     * broken-looking leg swap the earlier second frame produced. */
+    s16 bob = ((refAnim / 5) & 1) ? -2 : 0;
     VDP_setSpriteFull(SLOT_MARKER, refX - 16, refY - 16 + bob + worldOffsetY,
                       SPRITE_SIZE(4, 4),
-                      TILE_ATTR_FULL(PAL_BALL, 1, FALSE, faceRight,
-                                     TILE_REFEREE + frame * REF_FRAME_TILES),
+                      TILE_ATTR_FULL(PAL_BALL, 1, FALSE, faceRight, TILE_REFEREE),
                       SLOT_SHADOWS);
 }
 
@@ -759,8 +757,11 @@ static void trigger_pickup_timeout(void)
     escortIdx = pickupIsA ? activeA : holderB;
     v = escortIsA ? &teamA[escortIdx] : &teamB[escortIdx];
 
-    /* Ball is dropped exactly where the player was and stays loose there. */
-    ball_dropAt(&ball, v->x + 4, v->y + 5);
+    /* The ball must NOT warp to the player. If it was still being held it
+     * drops straight down at its current spot; if it was already loose it is
+     * left completely untouched where it settled. */
+    if (ball.state == BALL_HELD_A || ball.state == BALL_HELD_B)
+        ball_dropAt(&ball, ball.x, ball.y);
 
     /* Referee enters from the corner on the player's own half so it never
      * appears to cross the centre net: bottom-right for a near-side team A
@@ -1090,9 +1091,14 @@ void scene_match_update(void)
             }
             else
             {
-                /* Referee and player walk out to the right together. */
+                /* Walk the player back out to the exact corner the ref came in
+                 * from (bottom-right for team A, top-right for team B), so the
+                 * ref exits where it entered and never crosses the net. */
+                s16 cornerY = escortIsA ? 206 : 60;
                 refX += SPD;
                 v->x += SPD;
+                if (v->y < cornerY) v->y++;
+                else if (v->y > cornerY) v->y--;
                 refY = v->y;
                 if ((ambientTick & 3) == 0) v->animFrame = (v->animFrame + 1) & 3;
 
