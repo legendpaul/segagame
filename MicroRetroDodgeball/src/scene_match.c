@@ -611,7 +611,10 @@ static void begin_loose_for_B(void)
      * immune in practice - the clock only actually runs for it on a rare
      * (~1 in 1000) scripted fumble, during which it won't pick the ball up. */
     aiFumbling = ((random() % 1000) == 0);
-    pickupClock = aiFumbling ? PICKUP_CLOCK_FRAMES : 0;
+    /* Run + show the clock for team 2 as well; the AI is still only actually
+     * eliminated on a fumble (see the expiry handler), so a slow approach
+     * never punishes it unfairly. */
+    pickupClock = PICKUP_CLOCK_FRAMES;
     pickupIsA = FALSE;
     state = MS_LOOSE_B;
 }
@@ -734,8 +737,9 @@ static void draw_referee(bool faceRight)
                       SLOT_SHADOWS);
 }
 
-/* On-screen loose-ball countdown (top centre, gold) while the human is on the
- * clock. Ceil to whole seconds so it reads 10..1. */
+/* Big, prominent loose-ball countdown centred just under the HUD. Ceil to
+ * whole seconds so it reads 10..1; flips to cyan for the last 3 seconds to
+ * grab attention. Shown for whichever side is on the clock. */
 static void draw_shot_clock(void)
 {
     u16 fps = SYS_isPAL() ? 50 : 60;
@@ -743,8 +747,8 @@ static void draw_shot_clock(void)
     char buf[4];
     intToStr(secs, buf, 1);
     ui_set_palette(PAL0);
-    VDP_clearTileMapRect(BG_A, 18, 3, 4, 1);
-    ui_draw_text(buf, (secs >= 10) ? 19 : 20, 3, UI_GOLD);
+    VDP_clearTileMapRect(BG_A, 16, 4, 8, 2);
+    ui_draw_big_center(buf, 4, (secs <= 3) ? UI_CYAN : UI_GOLD);
 }
 
 /* The shot clock ran out on a loose ball - drop the ball on the spot and send
@@ -820,7 +824,13 @@ void scene_match_update(void)
     if (pickupClock > 0)
     {
         pickupClock--;
-        if (pickupClock == 0) trigger_pickup_timeout();
+        if (pickupClock == 0)
+        {
+            /* Human always faces the consequence; the AI only when it fumbled,
+             * otherwise its clock simply restarts (never a cheap elimination). */
+            if (pickupIsA || aiFumbling) trigger_pickup_timeout();
+            else pickupClock = PICKUP_CLOCK_FRAMES;
+        }
     }
     ambientTick++;
 
@@ -1180,15 +1190,15 @@ void scene_match_update(void)
     else draw_control_marker();
     hide_unselected_player_dots();
 
-    /* On-screen shot clock while the human is on the loose-ball timer. */
-    if (pickupClock > 0 && pickupIsA)
+    /* On-screen shot clock for whichever side is on the loose-ball timer. */
+    if (pickupClock > 0)
     {
         draw_shot_clock();
         shotClockShown = TRUE;
     }
     else if (shotClockShown)
     {
-        VDP_clearTileMapRect(BG_A, 18, 3, 4, 1);
+        VDP_clearTileMapRect(BG_A, 16, 4, 8, 2);
         shotClockShown = FALSE;
     }
 }

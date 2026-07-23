@@ -5,7 +5,7 @@ font region, which scene_menu restores before drawing either team selector.
 """
 
 from pathlib import Path
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageEnhance, ImageFilter, ImageDraw
 import numpy as np
 
 
@@ -63,15 +63,19 @@ def crop_and_reduce(image: Image.Image) -> Image.Image:
         left = (image.width - wanted_width) // 2
         image = image.crop((left, 0, left + wanted_width, image.height))
 
-    # Readability pre-pass (2026-07-23): the BOX downscale was soft, which
-    # blurred the logo lettering (esp. "MICRO RETRO"). Keep the background the
-    # user likes - only sharpen. LANCZOS downscale preserves edges, then a
-    # strong unsharp mask crisps the letter outlines, with only a whisper of
-    # extra contrast. No brightness/darkening changes, so the scene reads the
-    # same, just sharper.
-    image = image.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
-    image = image.filter(ImageFilter.UnsharpMask(radius=2.0, percent=200, threshold=1))
-    image = ImageEnhance.Contrast(image).enhance(1.08)
+    # Readability pass (2026-07-23): sharpen the busy background (fire, players,
+    # stadium look crisper) BUT keep the logo lettering smooth. A strong
+    # unsharp turned the thin logo strokes into unreadable speckle once
+    # quantized, so over the central logo area we restore the soft BOX
+    # downscale, which preserves the fine text far better. Everything else
+    # gets the LANCZOS + unsharp treatment.
+    plain = image.resize((WIDTH, HEIGHT), Image.Resampling.BOX)
+    sharp = image.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+    sharp = sharp.filter(ImageFilter.UnsharpMask(radius=1.8, percent=170, threshold=1))
+    mask = Image.new("L", (WIDTH, HEIGHT), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([60, 38, 262, 132], radius=20, fill=255)
+    mask = mask.filter(ImageFilter.GaussianBlur(9))
+    image = Image.composite(plain, sharp, mask)   # plain where mask=white (logo)
     indexed = image.quantize(colors=16, method=Image.Quantize.MEDIANCUT,
                              dither=Image.Dither.NONE)
 
