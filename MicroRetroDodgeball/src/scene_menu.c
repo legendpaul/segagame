@@ -165,6 +165,17 @@ void scene_menu_update(void)
         move_selection(-1);
     else if (input_pressed(BUTTON_DOWN) || input_pressed(BUTTON_RIGHT))
         move_selection(1);
+    else if (input_pressed(BUTTON_C))
+    {
+        /* C cancels the whole team-select flow back to the title screen.
+         * (title_data_draw reclaims the UI font VRAM; it's restored again
+         * by ui_data_init() when START re-enters the selector.) */
+        sound_mgr_cancel();
+        VDP_clearSprites();
+        phase = MENU_TITLE;
+        draw_title();
+        return;
+    }
     else if (input_pressed(BUTTON_B) && phase == MENU_TEAM_B)
     {
         sound_mgr_cancel();
