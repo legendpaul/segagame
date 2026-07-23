@@ -80,6 +80,8 @@ static s16  refX, refY;     /* referee sprite position (screen space) */
 static u8   escortIdx;      /* which player on the escorted side is being walked off */
 static bool escortIsA;      /* TRUE: escorting a team A (human) player */
 static u8   escortPhase;    /* 0 = running in to the player, 1 = walking them out */
+static u8   refAnim;        /* walk-frame counter */
+static bool shotClockShown; /* whether the on-screen countdown is currently drawn */
 #define PICKUP_CLOCK_SECS  10
 #define PICKUP_CLOCK_FRAMES (u16)((SYS_isPAL() ? 50 : 60) * PICKUP_CLOCK_SECS)
 static s8  pendingSpin;
@@ -555,6 +557,8 @@ void scene_match_enter(void)
     looseTimer = 0;
     pickupClock = 0;
     aiFumbling = FALSE;
+    shotClockShown = FALSE;
+    refAnim = 0;
     worldOffsetY = 0;
     matchSeconds = 0;
     ambientTick = 0;
@@ -721,10 +725,28 @@ static void finish_hit_to_A(void)
  * hardware sprite chain stays intact. */
 static void draw_referee(bool faceRight)
 {
-    VDP_setSpriteFull(SLOT_MARKER, refX - 16, refY - 16 + worldOffsetY,
+    /* Two-frame walk: alternate the leg-swap frames every 6 ticks plus a
+     * 1px body bob, so the ref visibly strides instead of sliding. */
+    u8  frame = (refAnim / 6) & 1;
+    s16 bob   = frame ? -1 : 0;
+    VDP_setSpriteFull(SLOT_MARKER, refX - 16, refY - 16 + bob + worldOffsetY,
                       SPRITE_SIZE(4, 4),
-                      TILE_ATTR_FULL(PAL_BALL, 1, FALSE, faceRight, TILE_REFEREE),
+                      TILE_ATTR_FULL(PAL_BALL, 1, FALSE, faceRight,
+                                     TILE_REFEREE + frame * REF_FRAME_TILES),
                       SLOT_SHADOWS);
+}
+
+/* On-screen loose-ball countdown (top centre, gold) while the human is on the
+ * clock. Ceil to whole seconds so it reads 10..1. */
+static void draw_shot_clock(void)
+{
+    u16 fps = SYS_isPAL() ? 50 : 60;
+    u16 secs = (pickupClock + fps - 1) / fps;
+    char buf[4];
+    intToStr(secs, buf, 1);
+    ui_set_palette(PAL0);
+    VDP_clearTileMapRect(BG_A, 18, 3, 4, 1);
+    ui_draw_text(buf, (secs >= 10) ? 19 : 20, 3, UI_GOLD);
 }
 
 /* The shot clock ran out on a loose ball - drop the ball on the spot and send
@@ -740,10 +762,14 @@ static void trigger_pickup_timeout(void)
     /* Ball is dropped exactly where the player was and stays loose there. */
     ball_dropAt(&ball, v->x + 4, v->y + 5);
 
-    /* Referee enters from just off the right edge, level with the player. */
+    /* Referee enters from the corner on the player's own half so it never
+     * appears to cross the centre net: bottom-right for a near-side team A
+     * player, top-right for a far-side team B player. It then approaches the
+     * player diagonally (see MS_ESCORT). */
     refX = 340;
-    refY = v->y;
+    refY = escortIsA ? 206 : 60;
     escortPhase = 0;
+    refAnim = 0;
     /* PAL3 indices 7/15 are unused by the ball art - lend them to the ref for
      * skin tones so it can share the ball palette line during the escort. */
     PAL_setColor(PAL_BALL * 16 + 7,  RGB24_TO_VDPCOLOR(REF_SKIN_LIGHT));
@@ -1046,12 +1072,16 @@ void scene_match_update(void)
             const s16 SPD = 2;
 
             if (ball_updateLoose(&ball)) sound_mgr_bounce();  /* keep it settled */
+            refAnim++;
 
             if (escortPhase == 0)
             {
-                /* Referee runs in from the right until alongside the player. */
+                /* Diagonal approach from the corner: close in x and drift in y
+                 * onto the player's line, staying on their half of the court. */
                 if (refX > v->x + 12) refX -= SPD;
-                else
+                if (refY < v->y) refY++;
+                else if (refY > v->y) refY--;
+                if (refX <= v->x + 12 && refY == v->y)
                 {
                     escortPhase = 1;
                     player_setPose(v, POSE_RUN, 255);
@@ -1063,6 +1093,7 @@ void scene_match_update(void)
                 /* Referee and player walk out to the right together. */
                 refX += SPD;
                 v->x += SPD;
+                refY = v->y;
                 if ((ambientTick & 3) == 0) v->animFrame = (v->animFrame + 1) & 3;
 
                 if (v->x > 336)
@@ -1142,4 +1173,16 @@ void scene_match_update(void)
     if (state == MS_ESCORT) draw_referee(escortPhase == 1);
     else draw_control_marker();
     hide_unselected_player_dots();
+
+    /* On-screen shot clock while the human is on the loose-ball timer. */
+    if (pickupClock > 0 && pickupIsA)
+    {
+        draw_shot_clock();
+        shotClockShown = TRUE;
+    }
+    else if (shotClockShown)
+    {
+        VDP_clearTileMapRect(BG_A, 18, 3, 4, 1);
+        shotClockShown = FALSE;
+    }
 }
