@@ -5,9 +5,31 @@ font region, which scene_menu restores before drawing either team selector.
 """
 
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 import numpy as np
-from sklearn.cluster import MiniBatchKMeans
+
+
+def _kmeans(x, k, iters=60, seed=7):
+    """Lloyd's k-means (numpy only, no sklearn dependency). Returns per-sample
+    labels and the cluster centres."""
+    rng = np.random.default_rng(seed)
+    centres = x[rng.choice(len(x), k, replace=False)].astype(np.float64).copy()
+    x2 = (x * x).sum(1)
+    labels = np.zeros(len(x), dtype=np.int64)
+    for _ in range(iters):
+        d = x2[:, None] + (centres * centres).sum(1)[None, :] - 2.0 * x @ centres.T
+        new = d.argmin(1)
+        if (new == labels).all():
+            labels = new
+            break
+        labels = new
+        for j in range(k):
+            m = labels == j
+            if m.any():
+                centres[j] = x[m].mean(0)
+            else:
+                centres[j] = x[rng.integers(len(x))]
+    return labels, centres
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "assets" / "title_source_v2.png"
@@ -41,7 +63,15 @@ def crop_and_reduce(image: Image.Image) -> Image.Image:
         left = (image.width - wanted_width) // 2
         image = image.crop((left, 0, left + wanted_width, image.height))
 
-    image = image.resize((WIDTH, HEIGHT), Image.Resampling.BOX)
+    # Readability pre-pass (2026-07-23): the BOX downscale was soft, which
+    # blurred the logo lettering (esp. "MICRO RETRO"). Keep the background the
+    # user likes - only sharpen. LANCZOS downscale preserves edges, then a
+    # strong unsharp mask crisps the letter outlines, with only a whisper of
+    # extra contrast. No brightness/darkening changes, so the scene reads the
+    # same, just sharper.
+    image = image.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+    image = image.filter(ImageFilter.UnsharpMask(radius=2.0, percent=200, threshold=1))
+    image = ImageEnhance.Contrast(image).enhance(1.08)
     indexed = image.quantize(colors=16, method=Image.Quantize.MEDIANCUT,
                              dither=Image.Dither.NONE)
 
@@ -112,10 +142,8 @@ for ty in range(TILES_Y):
         tile_vectors.append(palette_rgb[indices].reshape(-1))
 tile_vectors = np.asarray(tile_vectors, dtype=np.float32)
 cluster_count = min(360, len(tile_vectors))
-clusters = MiniBatchKMeans(n_clusters=cluster_count, random_state=7,
-                           batch_size=len(tile_vectors), n_init=3,
-                           max_iter=200).fit(tile_vectors)
-centres = clusters.cluster_centers_.reshape(cluster_count, 64, 3)
+cluster_labels, cluster_centres = _kmeans(tile_vectors, cluster_count)
+centres = cluster_centres.reshape(cluster_count, 64, 3)
 distance = ((centres[:, :, None, :] - palette_rgb[None, None, :, :]) ** 2).sum(3)
 centre_tiles = [bytes(row) for row in distance.argmin(2).astype(np.uint8)]
 
@@ -134,7 +162,7 @@ reconstructed.putpalette(palette + [0] * (768 - 48))
 for ty in range(TILES_Y):
     row = []
     for tx in range(TILES_X):
-        label = clusters.labels_[ty * TILES_X + tx]
+        label = cluster_labels[ty * TILES_X + tx]
         tile_index = cluster_to_tile[label]
         row.append(tile_index)
         tile = Image.new("P", (8, 8))
