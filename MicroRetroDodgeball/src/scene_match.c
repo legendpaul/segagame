@@ -54,6 +54,15 @@ static bool hitExitStarted;
 static s8  hitKnockX;       /* signed screen-space direction of the incoming ball */
 static s8  hitKnockY;
 static u8  looseTimer;      /* prevents instant pickup at the impact point */
+/* Shot-clock on a loose ball: the responsible player must retrieve AND
+ * throw it before this runs out or they're eliminated. Human side is always
+ * enforced; the AI is effectively immune (it always throws in time) except
+ * for a rare scripted fumble - see begin_loose_for_B(). */
+static u16 pickupClock;     /* frames left, 0 = no clock running */
+static bool pickupIsA;      /* TRUE: team A (human) on the clock, FALSE: AI */
+static bool aiFumbling;     /* rare (~1/1000) AI fumble that lets its clock expire */
+#define PICKUP_CLOCK_SECS  10
+#define PICKUP_CLOCK_FRAMES (u16)((SYS_isPAL() ? 50 : 60) * PICKUP_CLOCK_SECS)
 static s8  pendingSpin;
 static s16 pendingTargetX;
 static s16 pendingTargetY;
@@ -522,6 +531,8 @@ void scene_match_enter(void)
     shakeTimer = 0;
     hitstopTimer = 0;
     looseTimer = 0;
+    pickupClock = 0;
+    aiFumbling = FALSE;
     worldOffsetY = 0;
     matchSeconds = 0;
     ambientTick = 0;
@@ -537,6 +548,7 @@ static void go_round_end(u8 winnerIsA)
     Player *winners;
     u8 i;
 
+    pickupClock = 0;
     roundWinnerIsA = winnerIsA;
     sound_mgr_score();
     sound_mgr_crowdVictory();
@@ -569,6 +581,12 @@ static void begin_loose_for_B(void)
      * victim's feet; do not relaunch it or change receiving halves. */
     if (ball.state != BALL_LOOSE) ball_startRicochet(&ball);
     looseTimer = 10;
+    /* The AI reliably retrieves and throws well inside the clock, so it is
+     * immune in practice - the clock only actually runs for it on a rare
+     * (~1 in 1000) scripted fumble, during which it won't pick the ball up. */
+    aiFumbling = ((random() % 1000) == 0);
+    pickupClock = aiFumbling ? PICKUP_CLOCK_FRAMES : 0;
+    pickupIsA = FALSE;
     state = MS_LOOSE_B;
 }
 
@@ -578,6 +596,10 @@ static void begin_loose_for_A(void)
     holderA = activeA;
     if (ball.state != BALL_LOOSE) ball_startRicochet(&ball);
     looseTimer = 10;
+    /* Start the human's 10s retrieve-and-throw shot clock. */
+    aiFumbling = FALSE;
+    pickupClock = PICKUP_CLOCK_FRAMES;
+    pickupIsA = TRUE;
     state = MS_LOOSE_A;
 }
 
@@ -671,6 +693,44 @@ static void finish_hit_to_A(void)
     begin_loose_for_A();
 }
 
+/* The shot clock ran out on a loose ball - eliminate the responsible player
+ * through the same hit/fall/exit sequence as a real strike (there is no
+ * thrower to celebrate). Reuses MS_HIT_A/B so after the fall the ball simply
+ * goes loose again for the next player on that side (or ends the round). */
+static void trigger_pickup_timeout(void)
+{
+    pickupClock = 0;
+    hitKnockX = 0;
+    hitKnockY = 0;
+
+    if (pickupIsA)
+    {
+        responderA = activeA;
+        ball_dropAt(&ball, teamA[responderA].x + 4, teamA[responderA].y + 5);
+        sound_mgr_hit();
+        trigger_flash(PAL_TEAM_A);
+        trigger_shake();
+        player_setPose(&teamA[responderA], POSE_HIT, HIT_RECOIL_FRAMES);
+        impactTimer = HIT_TOTAL_FRAMES;
+        hitstopTimer = 4;
+        hitExitStarted = FALSE;
+        state = MS_HIT_A;
+    }
+    else
+    {
+        responderB = holderB;
+        ball_dropAt(&ball, teamB[responderB].x + 4, teamB[responderB].y + 5);
+        sound_mgr_hit();
+        trigger_flash(PAL_TEAM_B);
+        trigger_shake();
+        player_setPose(&teamB[responderB], POSE_HIT, HIT_RECOIL_FRAMES);
+        impactTimer = HIT_TOTAL_FRAMES;
+        hitstopTimer = 4;
+        hitExitStarted = FALSE;
+        state = MS_HIT_B;
+    }
+}
+
 void scene_match_update(void)
 {
     bool cpuMoved = FALSE;
@@ -707,6 +767,11 @@ void scene_match_update(void)
     }
 
     if (looseTimer > 0) looseTimer--;
+    if (pickupClock > 0)
+    {
+        pickupClock--;
+        if (pickupClock == 0) trigger_pickup_timeout();
+    }
     ambientTick++;
 
     if (state != MS_ANNOUNCE && state != MS_ROUND_END &&
@@ -806,6 +871,7 @@ void scene_match_update(void)
                 ball_startThrow(&ball, pendingTargetX, pendingTargetY,
                                 BALL_FLYING_TO_B, pendingSpin);
                 sound_mgr_throw();
+                pickupClock = 0;   /* thrown in time - clock off */
                 state = MS_FLY_TO_B;
             }
             break;
@@ -841,6 +907,7 @@ void scene_match_update(void)
                 ball_startThrow(&ball, pendingTargetX, pendingTargetY,
                                 BALL_FLYING_TO_A, pendingSpin);
                 sound_mgr_throw();
+                pickupClock = 0;
                 state = MS_FLY_TO_A;
             }
             break;
@@ -876,7 +943,9 @@ void scene_match_update(void)
         {
             if (ball_updateLoose(&ball)) sound_mgr_bounce();
             cpuMoved = move_toward_ball(&teamB[holderB]);
-            if (looseTimer == 0 && player_reached_ball(&teamB[holderB]))
+            /* During a scripted fumble the AI deliberately never grabs it, so
+             * its shot clock runs out and it eliminates itself (rarely). */
+            if (!aiFumbling && looseTimer == 0 && player_reached_ball(&teamB[holderB]))
             {
                 sound_mgr_pickup();
                 player_setPose(&teamB[holderB], POSE_PICKUP, 10);
