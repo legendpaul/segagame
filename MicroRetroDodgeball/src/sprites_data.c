@@ -409,6 +409,21 @@ void sprites_data_apply_teams(u8 teamAIndex, u8 teamBIndex)
     PAL_setPalette(PAL_TEAM_B, pal_teams[teamBIndex], DMA);
 }
 
+void sprites_data_hide_all_sprites(void)
+{
+    /* Park every gameplay sprite slot off-screen with a self-terminating link
+     * chain. VDP_clearSprites() leaves the match's manually-set slots in the
+     * cache, so on a non-gameplay screen the old link chain (players, ball,
+     * shadows) still uploads and "bleeds" through. Rewriting slots 0..31 to a
+     * hidden 1x1 that ends the chain guarantees a clean slate; the scene then
+     * re-draws only the sprites it actually wants. */
+    u16 i;
+    for (i = 0; i < 32; i++)
+        VDP_setSpriteFull((u8)i, 0, -32, SPRITE_SIZE(1, 1),
+                          TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, 0),
+                          (u8)((i + 1) < 32 ? (i + 1) : 0));
+}
+
 void sprites_data_kit_ramp(u8 teamIndex, u16 *out)
 {
     /* The three most representative kit shades (light/mid/dark) from a

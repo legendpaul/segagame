@@ -469,6 +469,9 @@ static void draw_match_intro(void)
 {
     char roundBuf[4];
     u8 roundNumber = gScoreA + gScoreB + 1;
+    /* Navy behind the box so the round/team text isn't see-through onto the
+     * court. */
+    flag_data_fill_panel(2, 20, 36, 7);
     ui_draw_panel(2, 20, 36, 7, TRUE);
     ui_draw_text("ROUND", 16, 21, UI_CYAN);
     intToStr(roundNumber, roundBuf, 1);
@@ -550,6 +553,10 @@ void scene_match_enter(void)
 
     /* Referee sprite lives in the (now-dead) boot-logo VRAM region. */
     VDP_loadTileData(ref_tiles[0], TILE_REFEREE, REF_TILE_COUNT, DMA);
+
+    /* Solid navy behind the HUD strip so the score/clock glyphs never reveal
+     * the crowd through their transparent pixels (and no fans sit under it). */
+    flag_data_fill_panel(0, 0, 40, 4);
 
     flashTimer = 0;
     shakeTimer = 0;
@@ -740,6 +747,10 @@ static void draw_referee(bool faceRight)
 /* Big, prominent loose-ball countdown centred just under the HUD. Ceil to
  * whole seconds so it reads 10..1; flips to cyan for the last 3 seconds to
  * grab attention. Shown for whichever side is on the clock. */
+#define SC_X 16
+#define SC_Y 4
+#define SC_W 8
+#define SC_H 4
 static void draw_shot_clock(void)
 {
     u16 fps = SYS_isPAL() ? 50 : 60;
@@ -747,8 +758,10 @@ static void draw_shot_clock(void)
     char buf[4];
     intToStr(secs, buf, 1);
     ui_set_palette(PAL0);
-    VDP_clearTileMapRect(BG_A, 16, 4, 8, 2);
-    ui_draw_big_center(buf, 4, (secs <= 3) ? UI_CYAN : UI_GOLD);
+    /* Framed navy box so the countdown really stands out over the court. */
+    flag_data_fill_panel(SC_X, SC_Y, SC_W, SC_H);
+    ui_draw_panel(SC_X, SC_Y, SC_W, SC_H, TRUE);
+    ui_draw_big_center(buf, SC_Y + 1, (secs <= 3) ? UI_CYAN : UI_GOLD);
 }
 
 /* The shot clock ran out on a loose ball - drop the ball on the spot and send
@@ -1198,7 +1211,9 @@ void scene_match_update(void)
     }
     else if (shotClockShown)
     {
-        VDP_clearTileMapRect(BG_A, 16, 4, 8, 2);
+        /* Remove the box and restore the court that was behind it. */
+        VDP_clearTileMapRect(BG_A, SC_X, SC_Y, SC_W, SC_H);
+        court_bg_redraw_rect(SC_X, SC_Y, SC_W, SC_H);
         shotClockShown = FALSE;
     }
 }

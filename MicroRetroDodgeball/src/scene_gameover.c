@@ -7,6 +7,7 @@
 #include "court_bg.h"
 #include "ui_data.h"
 #include "sprites_data.h"
+#include "flag_data.h"
 #include "player.h"
 
 static Player champion;
@@ -20,6 +21,7 @@ void scene_gameover_enter(void)
     char buf[4];
 
     VDP_clearSprites();
+    sprites_data_hide_all_sprites();   /* no stray match sprites bleeding in */
     VDP_clearPlane(BG_A, TRUE);
     VDP_clearPlane(BG_B, TRUE);
     VDP_clearTextArea(0, 0, 40, 28);
@@ -28,6 +30,8 @@ void scene_gameover_enter(void)
 
     ui_set_palette(PAL0);
     ui_apply_palette();
+    /* Solid navy behind the panel so the text glyphs don't reveal the court. */
+    flag_data_fill_panel(3, 5, 34, 19);
     ui_draw_panel(3, 5, 34, 19, TRUE);
     ui_draw_big_center("GAME OVER", 7, UI_GOLD);
     ui_draw_text_center(winner, 11, UI_CYAN);
