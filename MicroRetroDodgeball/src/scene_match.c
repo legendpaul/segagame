@@ -469,9 +469,6 @@ static void draw_match_intro(void)
 {
     char roundBuf[4];
     u8 roundNumber = gScoreA + gScoreB + 1;
-    /* Navy behind the box so the round/team text isn't see-through onto the
-     * court. */
-    flag_data_fill_panel(2, 20, 36, 7);
     ui_draw_panel(2, 20, 36, 7, TRUE);
     ui_draw_text("ROUND", 16, 21, UI_CYAN);
     intToStr(roundNumber, roundBuf, 1);
