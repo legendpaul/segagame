@@ -43,6 +43,7 @@ static void draw_title(void)
     VDP_clearPlane(BG_A, TRUE);
     VDP_clearPlane(BG_B, TRUE);
     VDP_clearSprites();
+    sprites_data_hide_all_sprites();
     title_data_draw();
     blinkCounter = 0;
     promptVisible = TRUE;
@@ -76,6 +77,7 @@ static void enter_selector(MenuPhase next)
 {
     phase = next;
     VDP_clearSprites();
+    sprites_data_hide_all_sprites();
     draw_selector();
     bobCounter = 0;
     bobOffset = 0;
@@ -85,6 +87,7 @@ static void enter_matchup(void)
 {
     phase = MENU_MATCHUP;
     VDP_clearSprites();
+    sprites_data_hide_all_sprites();
     flag_data_draw_matchup(gTeamAIndex, gTeamBIndex);
     /* Big recolourable throwing figures replace the old tiny preview
      * sprites - upload the tile bank, then draw both sides. */

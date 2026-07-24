@@ -51,6 +51,19 @@ void court_bg_draw(void)
                 col, row);
 }
 
+void court_bg_redraw_rect(u16 x, u16 y, u16 w, u16 h)
+{
+    /* Restore the BG_B court tiles for a sub-rectangle - used to clean up
+     * after a transient overlay (e.g. the shot-clock box) is removed. */
+    u16 row, col;
+    for (row = y; row < y + h && row < 28; row++)
+        for (col = x; col < x + w && col < 40; col++)
+            VDP_setTileMapXY(BG_B,
+                TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
+                    TILE_COURT_BASE + stadium_tilemap[row][col]),
+                col, row);
+}
+
 void court_bg_drawForeground(void)
 {
     u16 row, col;

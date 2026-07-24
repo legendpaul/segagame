@@ -9,6 +9,7 @@
 #define FLAG_TILE_COUNT  105
 
 void flag_data_init(void);
+void flag_data_fill_panel(u16 x, u16 y, u16 w, u16 h);
 void flag_data_draw_grid(u8 selected);
 void flag_data_draw_selector(u8 selected, u8 playerNumber);
 void flag_data_draw_small(u8 teamIndex, u16 x, u16 y, u8 palette);

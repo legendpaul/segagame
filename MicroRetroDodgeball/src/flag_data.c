@@ -67,6 +67,19 @@ void flag_data_init(void)
     VDP_loadTileData(tile_flag_select, TILE_FLAG_SELECT, 1, DMA);
 }
 
+void flag_data_fill_panel(u16 x, u16 y, u16 w, u16 h)
+{
+    /* Lay the solid navy panel tile across a BG_B rectangle. Used behind UI
+     * boxes so the font glyphs' transparent pixels reveal navy (matching the
+     * box fill) instead of the court/crowd bleeding through. The panel tile
+     * is index-4 navy, exactly the colour of the UI fill on PAL0. */
+    u16 row, col;
+    for (row = 0; row < h; row++)
+        for (col = 0; col < w; col++)
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
+                TILE_FLAG_PANEL), x + col, y + row);
+}
+
 void flag_data_draw_small(u8 teamIndex, u16 x, u16 y, u8 palette)
 {
     VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(palette, 1, FALSE, FALSE,

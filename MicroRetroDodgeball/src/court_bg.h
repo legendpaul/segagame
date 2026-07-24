@@ -14,5 +14,6 @@
 void court_bg_init(void);   /* uploads tiles + pitch colors, call once at boot */
 void court_bg_draw(void);   /* paints BG_B, call from each scene's _enter() */
 void court_bg_drawForeground(void); /* transparent priority net on BG_A */
+void court_bg_redraw_rect(u16 x, u16 y, u16 w, u16 h);
 
 #endif /* _COURT_BG_H_ */

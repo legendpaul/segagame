@@ -112,4 +112,9 @@ void sprites_data_flash_team(u8 palLine);
  * as VDP colour words. Used by the matchup screen's recolourable figures. */
 void sprites_data_kit_ramp(u8 teamIndex, u16 *out);
 
+/* Parks every gameplay sprite slot off-screen with a terminating link chain,
+ * so stale match sprites (players/ball/shadows) can't bleed onto a
+ * non-gameplay screen. Call on entry to menu/matchup/game-over. */
+void sprites_data_hide_all_sprites(void);
+
 #endif /* _SPRITES_DATA_H_ */
