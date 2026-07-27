@@ -18,6 +18,7 @@
 #include "scene_menu.h"
 #include "scene_match.h"
 #include "scene_gameover.h"
+#include "scene_eliminator.h"
 
 /* Globals declared extern in game_state.h */
 GameScene gCurrentScene;
@@ -69,6 +70,7 @@ int main(bool hardReset)
             {
                 case GS_BOOT:     scene_boot_enter();     break;
                 case GS_MENU:     scene_menu_enter();     break;
+                case GS_ELIMINATOR: scene_eliminator_enter(); break;
                 case GS_MATCH:    scene_match_enter();    break;
                 case GS_GAMEOVER: scene_gameover_enter(); break;
             }
@@ -80,6 +82,7 @@ int main(bool hardReset)
         {
             case GS_BOOT:     scene_boot_update();     break;
             case GS_MENU:     scene_menu_update();     break;
+            case GS_ELIMINATOR: scene_eliminator_update(); break;
             case GS_MATCH:    scene_match_update();    break;
             case GS_GAMEOVER: scene_gameover_update(); break;
         }

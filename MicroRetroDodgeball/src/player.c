@@ -28,6 +28,7 @@ void player_init(Player *p, s16 startX, s16 y, u8 spriteSlot, u8 pal)
     p->homeY = y;
     p->eliminated = FALSE;
     p->exiting = FALSE;
+    p->freeRoam = FALSE;
     p->spriteSlot = spriteSlot;
     p->pal = pal;
     p->pose = POSE_STAND;
@@ -135,8 +136,12 @@ void player_clampToCourt(Player *p)
      * stand inside the net. */
     s16 feetX = p->x + PLAYER_FEET_DX;
     s16 depth = COURT_DEPTH_OF(feetX, p->y + PLAYER_FEET_DY);
-    s16 minDepth = p->farSide ? (COURT_FAR_DEPTH + 1) : (COURT_CENTER_DEPTH + 8);
-    s16 maxDepth = p->farSide ? (COURT_CENTER_DEPTH - 8) : (COURT_NEAR_DEPTH - 1);
+    /* Free-roam (no centre net) players own the entire court; otherwise each
+     * side is held inside its own half by the centre line. */
+    s16 minDepth = p->freeRoam ? (COURT_FAR_DEPTH + 1)
+                 : p->farSide  ? (COURT_FAR_DEPTH + 1) : (COURT_CENTER_DEPTH + 8);
+    s16 maxDepth = p->freeRoam ? (COURT_NEAR_DEPTH - 1)
+                 : p->farSide  ? (COURT_CENTER_DEPTH - 8) : (COURT_NEAR_DEPTH - 1);
 
     if (depth < minDepth) p->y += minDepth - depth;
     if (depth > maxDepth) p->y -= depth - maxDepth;

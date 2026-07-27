@@ -35,6 +35,7 @@ typedef struct {
     u8  animCounter;  /* frame counter that paces the run cycle */
     u8  small;        /* TRUE = render the dedicated 24x24 far-side size */
     bool farSide;     /* gameplay half, independent of visual sprite scale */
+    bool freeRoam;    /* TRUE = no centre net, may use the WHOLE court */
     bool facingLeft;  /* horizontal travel direction; mirrors current front/rear bank */
 } Player;
 

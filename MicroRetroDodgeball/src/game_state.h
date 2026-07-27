@@ -57,6 +57,7 @@
 typedef enum {
     GS_BOOT = 0,
     GS_MENU,
+    GS_ELIMINATOR,
     GS_MATCH,
     GS_GAMEOVER
 } GameScene;
@@ -66,7 +67,9 @@ extern GameScene gCurrentScene;
 /* --- Game modes / options --- */
 typedef enum {
     MODE_EXHIBITION = 0,   /* pick both teams, single match */
-    MODE_TOURNAMENT        /* pick your team, gauntlet the rest to be champion */
+    MODE_TOURNAMENT,       /* pick your team, gauntlet the rest to be champion */
+    MODE_ELIMINATOR,       /* every nation, one player each, no net, 3 balls */
+    MODE_COUNT
 } GameMode;
 
 typedef enum {

@@ -66,7 +66,9 @@ static void draw_mode_rows(void)
     VDP_clearTileMapRect(BG_A, 20, 14, 8, 1);
     VDP_clearTileMapRect(BG_A, 5, 20, 31, 1);
 
-    ui_draw_text(gGameMode == MODE_EXHIBITION ? "EXHIBITION" : "TOURNAMENT",
+    ui_draw_text(gGameMode == MODE_EXHIBITION ? "EXHIBITION"
+               : gGameMode == MODE_TOURNAMENT ? "TOURNAMENT"
+                                              : "ELIMINATOR",
                  20, 11, (modeRow == 0) ? UI_GOLD : UI_WHITE);
     if (modeRow == 0) { ui_draw_text(">", 18, 11, UI_GOLD); ui_draw_text("<", 31, 11, UI_GOLD); }
 
@@ -75,7 +77,9 @@ static void draw_mode_rows(void)
 
     ui_draw_text(gGameMode == MODE_EXHIBITION
                  ? "SINGLE MATCH VS ONE RIVAL"
-                 : "BEAT EVERY RIVAL TO WIN THE CUP", 5, 20, UI_CYAN);
+                 : gGameMode == MODE_TOURNAMENT
+                 ? "BEAT EVERY RIVAL TO WIN THE CUP"
+                 : "ALL NATIONS NO NET 3 BALLS", 5, 20, UI_CYAN);
 }
 
 static void draw_mode(void)
@@ -342,8 +346,10 @@ void scene_menu_update(void)
         else if (input_pressed(BUTTON_LEFT) || input_pressed(BUTTON_RIGHT))
         {
             if (modeRow == 0)
-                gGameMode = (gGameMode == MODE_EXHIBITION) ? MODE_TOURNAMENT
-                                                           : MODE_EXHIBITION;
+            {
+                s8 d = input_pressed(BUTTON_LEFT) ? (MODE_COUNT - 1) : 1;
+                gGameMode = (u8)((gGameMode + d) % MODE_COUNT);
+            }
             else
             {
                 s8 d = input_pressed(BUTTON_LEFT) ? 2 : 1;   /* -1 == +2 mod 3 */
@@ -436,6 +442,14 @@ void scene_menu_update(void)
     else if (input_pressed(BUTTON_A) || input_pressed(BUTTON_START))
     {
         sound_mgr_confirm();
+        if (phase == MENU_TEAM_A && gGameMode == MODE_ELIMINATOR)
+        {
+            /* Free-for-all: every nation is already in, so there is no second
+             * team to choose - straight onto the court. */
+            PAL_fadeOutAll(20, FALSE);
+            gCurrentScene = GS_ELIMINATOR;
+            return;
+        }
         if (phase == MENU_TEAM_A && gGameMode == MODE_TOURNAMENT)
         {
             /* Tournament: you only pick your own team, then face the whole
