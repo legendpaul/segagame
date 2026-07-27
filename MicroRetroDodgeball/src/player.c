@@ -11,8 +11,10 @@
  * the held ball and the ground marker. Boundary clamping must use THIS point,
  * not the raw origin, and keep half the stance width inside every touchline so
  * no foot or marker overhangs the line. */
+/* Middle-bottom of the 32x32 sprite (drawn at x-8, y-16): the feet/ground
+ * point the control ring already marks. All court alignment keys off this. */
 #define PLAYER_FEET_DX   8
-#define PLAYER_FEET_DY   8
+#define PLAYER_FEET_DY  16
 #define PLAYER_HALF_W   10
 
 #define OFFSCREEN_X   -100
@@ -114,21 +116,23 @@ void player_moveHuman(Player *p, bool hasBall)
 
 void player_clampToCourt(Player *p)
 {
-    s16 depth = p->y - (p->x >> 2);
+    /* Every boundary is enforced against the sprite's MIDDLE-BOTTOM (the feet /
+     * control-ring point), so the visible feet - not the sprite origin 16px
+     * above them - are what actually line up with the painted court lines.
+     * Both the near/far baselines and the sidelines use this one point. */
+    s16 feetX = p->x + PLAYER_FEET_DX;
+    s16 depth = (p->y + PLAYER_FEET_DY) - (feetX >> 2);
     s16 minDepth = p->farSide ? (COURT_FAR_DEPTH + 6) : (COURT_CENTER_DEPTH + 8);
     s16 maxDepth = p->farSide ? (COURT_CENTER_DEPTH - 8) : (COURT_NEAR_DEPTH - 6);
 
     if (depth < minDepth) p->y += minDepth - depth;
     if (depth > maxDepth) p->y -= depth - maxDepth;
 
-    /* Sideline clamp on the feet/bottom-centre point, keeping half the stance
-     * width inside each touchline. Identical for both teams. The parallel
-     * sidelines drift left toward the near edge, so evaluate the rail at the
-     * feet's projected depth. */
-    s16 feetX = p->x + PLAYER_FEET_DX;
-    s16 feetDepth = (p->y + PLAYER_FEET_DY) - (feetX >> 2);
-    s16 minX = COURT_MIN_X_AT_DEPTH(feetDepth) + PLAYER_HALF_W;
-    s16 maxX = COURT_MAX_X_AT_DEPTH(feetDepth) - PLAYER_HALF_W;
+    /* Re-project the feet depth after the baseline clamp, then keep half the
+     * stance width inside each drifting sideline. */
+    depth = (p->y + PLAYER_FEET_DY) - (feetX >> 2);
+    s16 minX = COURT_MIN_X_AT_DEPTH(depth) + PLAYER_HALF_W;
+    s16 maxX = COURT_MAX_X_AT_DEPTH(depth) - PLAYER_HALF_W;
     if (feetX < minX) p->x += (minX - feetX);
     if (feetX > maxX) p->x -= (feetX - maxX);
 }
