@@ -64,22 +64,51 @@ def prepare_image():
     # Purpose-built stadium surround: a sloped far grandstand, concrete
     # perimeter and advertising rail frame the court instead of leaving a
     # large anonymous green field outside it.
-    draw.polygon([(0, 24), (319, 24), far_r, far_l], fill=PALETTE[4])
-    for offset, colour in ((5, 5), (12, 14), (20, 5)):
-        draw.line((far_l[0], far_l[1] - offset,
-                   far_r[0], far_r[1] - offset), fill=PALETTE[colour], width=3)
-    seat_colours = (PALETTE[6], PALETTE[9], PALETTE[11], PALETTE[13])
-    # Tile-aligned repeating crowd motifs look intentionally 16-bit and
-    # deduplicate efficiently enough to leave VRAM for animation frames.
-    for ty in range(3, 12):
-        for tx in range(40):
-            x, y = tx * 8, ty * 8
-            if y + 7 >= 24 + (x + 4) // 4:
-                continue
-            colour = seat_colours[(tx + ty) & 3]
-            draw.rectangle((x + 1, y + 2, x + 3, y + 4), fill=colour)
-            draw.rectangle((x + 5, y + 5, x + 6, y + 6),
-                           fill=seat_colours[(tx + ty + 1) & 3])
+    STAND = PALETTE[4]
+    draw.polygon([(0, 24), (319, 24), far_r, far_l], fill=STAND)
+
+    # The far touchline for a given screen column: the stand fills every row
+    # above this line. Used to clip crowd, rails and aisles to the bowl.
+    def stand_bottom(x):
+        return 24 + x // 4
+
+    # Dense packed crowd. The colour depends only on (x & 7, y & 7), so the
+    # entire stand collapses to a couple of unique VDP tiles yet still reads
+    # as a colourful sell-out crowd. Index 8 (near-black) is the shadow gap
+    # between spectators, the bright indices are shirts.
+    # ~30% speckle of varied shirt colours over a dark seating mass - the way
+    # a packed stand reads from the pitch. 0 = keep the dark backing; other
+    # values are spectators. Colours are spread so no single hue dominates.
+    D = 0
+    CROWD = (
+        ( 0, 11,  0,  0,  6,  0,  0,  1),
+        ( 0,  0,  0,  9,  0,  0, 12,  0),
+        (13,  0,  0,  0, 11,  0,  0,  6),
+        ( 0,  0,  1,  0,  0,  0,  9,  0),
+        ( 0,  6,  0,  0, 12,  0,  0, 11),
+        ( 9,  0,  0, 13,  0,  0,  0,  0),
+        ( 0,  0, 11,  0,  0,  6,  0,  1),
+        ( 0, 12,  0,  0,  9,  0, 13,  0),
+    )
+    px = image.load()
+    for y in range(24, far_r[1] + 1):
+        for x in range(320):
+            if px[x, y] == STAND:
+                idx = CROWD[y & 7][x & 7]
+                if idx:
+                    px[x, y] = PALETTE[idx]
+
+    # Dark roof shadow across the very top of the bowl.
+    draw.rectangle((0, 24, 319, 27), fill=PALETTE[8])
+    # Bright concourse walkways band the crowd into tiers (clipped to bowl).
+    for ry in (37, 53, 69, 85):
+        sx = (ry - 24) * 4
+        if sx < 313:
+            draw.line((max(0, sx), ry, 313, ry), fill=PALETTE[13], width=2)
+            draw.line((max(0, sx), ry - 1, 313, ry - 1), fill=PALETTE[14], width=1)
+    # Vertical aisle steps break the decks into seating blocks.
+    for ax in range(16, 314, 40):
+        draw.line((ax, 28, ax, stand_bottom(ax)), fill=PALETTE[14], width=1)
 
     outer = [
         (far_l[0] - 10, far_l[1] - 3),
