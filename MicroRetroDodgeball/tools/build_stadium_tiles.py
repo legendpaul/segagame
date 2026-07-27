@@ -52,20 +52,15 @@ def prepare_image():
     # while the collision code still thinks they are in bounds.
     draw = ImageDraw.Draw(image)
 
-    # MUST stay in lock-step with game_state.h: FIFA-style 2:1 skew (y rises
-    # x/2) with the camera pulled back to 77% so the whole pitch fits.
-    FAR_DEPTH, NEAR_DEPTH, CENTER_DEPTH = 10, 102, 56
-    RAIL_L, RAIL_R = 70, 261
-
     def edge_x(depth, right=False):
-        return (RAIL_R if right else RAIL_L) - ((depth - FAR_DEPTH) // 2)
+        return (312 if right else 64) - ((depth - 24) // 2)
 
     def point(depth, right=False):
         x = edge_x(depth, right)
-        return (x, depth + x // 2)
+        return (x, depth + x // 4)
 
-    far_l, far_r = point(FAR_DEPTH), point(FAR_DEPTH, True)
-    near_l, near_r = point(NEAR_DEPTH), point(NEAR_DEPTH, True)
+    far_l, far_r = point(24), point(24, True)
+    near_l, near_r = point(144), point(144, True)
 
     # ---- Authored stadium that FRAMES the pitch on all sides --------------
     # Start from a flat dark fill, then lay dark stand backing around every
@@ -119,9 +114,9 @@ def prepare_image():
     # Clean, readable striped turf replaces the old football-box markings.
     # Bands follow court depth, preserving the isometric perspective.
     draw.polygon([far_l, far_r, near_r, near_l], fill=PALETTE[3])
-    for depth in range(FAR_DEPTH, NEAR_DEPTH, 12):
-        next_depth = min(depth + 12, NEAR_DEPTH)
-        colour = PALETTE[2] if ((depth - FAR_DEPTH) // 12) % 2 == 0 else PALETTE[7]
+    for depth in range(24, 144, 15):
+        next_depth = min(depth + 15, 144)
+        colour = PALETTE[2] if ((depth - 24) // 15) % 2 == 0 else PALETTE[7]
         draw.polygon([
             point(depth), point(depth, True),
             point(next_depth, True), point(next_depth)
@@ -154,7 +149,7 @@ def prepare_image():
 
     # Clear centre board: glass-blue panels with a bright top rail, base rail,
     # and visible posts. It separates the teams without becoming a solid wall.
-    board_depth = CENTER_DEPTH
+    board_depth = 84
     base_l, base_r = point(board_depth), point(board_depth, True)
     top_l = (base_l[0], base_l[1] - 12)
     top_r = (base_r[0], base_r[1] - 12)
@@ -187,12 +182,11 @@ def prepare_foreground():
     overlay.putpalette(flat_palette)
     draw = ImageDraw.Draw(overlay)
 
-    # Same projection as prepare_image()/game_state.h (FIFA 2:1 skew at 77%).
-    depth = 56
-    left_x = 70 - ((depth - 10) // 2)
-    right_x = 261 - ((depth - 10) // 2)
-    base_l = (left_x, depth + left_x // 2)
-    base_r = (right_x, depth + right_x // 2)
+    depth = 84
+    left_x = 64 - ((depth - 24) // 2)
+    right_x = 312 - ((depth - 24) // 2)
+    base_l = (left_x, depth + left_x // 4)
+    base_r = (right_x, depth + right_x // 4)
     top_l = (base_l[0], base_l[1] - 12)
     top_r = (base_r[0], base_r[1] - 12)
 

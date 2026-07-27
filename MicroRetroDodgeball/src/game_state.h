@@ -21,31 +21,24 @@
  * derives the angle from these macros, so the pitch angle is tunable in one
  * place. COURT_SKEW_SHIFT 2 == the historical x/4 shear; a smaller shift makes
  * a steeper, more FIFA-like angle. */
-/* Shift 1 == the FIFA-style steeper 2:1 view (screen-y rises x/2 across the
- * pitch). Note the human's left/right step is (x +/-2, y +/-1), which at this
- * skew runs exactly parallel to the touchline. */
-#define COURT_SKEW_SHIFT     1
+#define COURT_SKEW_SHIFT     2
 #define COURT_SKEW(x)        ((x) >> COURT_SKEW_SHIFT)
 #define COURT_DEPTH_OF(x, y) ((y) - COURT_SKEW(x))
 
 /* Sideline drift with depth (how the parallel touchlines lean). */
 #define COURT_SIDE_SHIFT     1
 
-/* The steeper angle needs the camera pulled back: the court keeps its exact
- * proportions (width:depth 2.08, was 2.07) but is drawn at 77% scale so the
- * whole pitch still fits on screen. Corners land at (70,45) (261,140)
- * (24,114) (215,209) - centred, clear of the HUD and the bottom edge. */
-#define COURT_FAR_DEPTH      10
-#define COURT_NEAR_DEPTH     102
-#define COURT_CENTER_DEPTH   56
-#define TEAM_B_DEPTH         32
-#define TEAM_A_DEPTH         80
-#define COURT_LEFT_X         24
-#define COURT_RIGHT_X        261
+#define COURT_FAR_DEPTH      24
+#define COURT_NEAR_DEPTH     144
+#define COURT_CENTER_DEPTH   84
+#define TEAM_B_DEPTH         52
+#define TEAM_A_DEPTH         116
+#define COURT_LEFT_X         8
+#define COURT_RIGHT_X        304
 
 /* Projected side rails used by players, loose-ball physics and authored art. */
-#define COURT_MIN_X_AT_DEPTH(d) (70 - (((d) - COURT_FAR_DEPTH) >> COURT_SIDE_SHIFT))
-#define COURT_MAX_X_AT_DEPTH(d) (261 - (((d) - COURT_FAR_DEPTH) >> COURT_SIDE_SHIFT))
+#define COURT_MIN_X_AT_DEPTH(d) (64 - (((d) - COURT_FAR_DEPTH) >> COURT_SIDE_SHIFT))
+#define COURT_MAX_X_AT_DEPTH(d) (312 - (((d) - COURT_FAR_DEPTH) >> COURT_SIDE_SHIFT))
 #define COURT_Y_AT_DEPTH_X(d, x) ((d) + COURT_SKEW(x))
 
 /* --- Gameplay tuning --- */
