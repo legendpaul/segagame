@@ -159,6 +159,18 @@ static void draw_cup_bracket(void)
     ui_draw_text_center(cupChampion != CUP_TBD ? "COMPLETE" : roundName[round],
                         2, UI_GOLD);
 
+    if (cupChampion != CUP_TBD)
+    {
+        /* Competition over: the cup and the winner, nothing else. The beaten
+         * finalist has no place on a completed board. */
+        ui_draw_panel(CUP_X, 9, 3, 3, TRUE);
+        ui_draw_text("CUP", CUP_X, 10, UI_GOLD);
+        bracket_plate(cupChampion, 12, 14, WIDE_W, round);
+        ui_draw_text_center("CHAMPION", 18, UI_GOLD);
+        ui_draw_text("C EXIT", 31, 26, UI_CYAN);
+        return;
+    }
+
     /* Only the teams still in the competition are shown: the full eight-team
      * draw in the quarter-final, the four survivors in the semi-final, and
      * just the two finalists in the final. Knocked-out sides drop off the
