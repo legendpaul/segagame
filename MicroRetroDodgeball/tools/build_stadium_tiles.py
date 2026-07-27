@@ -62,6 +62,9 @@ def prepare_image():
     far_l, far_r = point(24), point(24, True)
     near_l, near_r = point(144), point(144, True)
 
+    # Depth of the LED ring band in the far stand (above the far touchline).
+    FAR_BAND_DEPTH = -8
+
     # ---- Authored stadium that FRAMES the pitch on all sides --------------
     # Start from a flat dark fill, then lay dark stand backing around every
     # side of the pitch, then paint an authored "rows of seated spectators"
@@ -81,15 +84,22 @@ def prepare_image():
     # exactly right here, reads cleanly at 8x8 and dedupes to few tiles. Each
     # seat is a small red block; a dark step shadows each row; occasional blue
     # and pale seats break the red; wide dark vomitory aisles split the decks.
+    # EVERY line in the stand must run at the SAME angle as the pitch. Seat rows
+    # therefore follow lines of constant court depth (v = y - x/4, exactly the
+    # touchline slope) instead of flat horizontal rows, and the aisles run up
+    # the stand along that same projection instead of straight vertical bars.
+    # Horizontal rows / vertical aisles clashed badly against the dimetric court.
     RED, BLUE, PALE, STEP, GAP = 9, 11, 1, 14, 8
     def seat_idx(x, y):
-        if (x % 38) < 3:            # vomitory aisle (dark vertical gangway)
+        v = y - (x >> 2)            # up-the-stand axis (parallel to touchline)
+        u = x + (y >> 1)            # along-the-stand axis, sheared to match
+        if (u % 40) < 3:            # vomitory aisle, following the same angle
             return GAP
-        if y % 3 == 2:              # shadowed step under each seat row
+        if v % 3 == 2:              # shadowed step under each seat row
             return STEP
-        if x % 3 == 2:              # gap between seats along a row
+        if u % 3 == 2:              # gap between seats along a row
             return GAP
-        s = ((x // 3) * 5 + (y // 3) * 7) % 13
+        s = ((u // 3) * 5 + (v // 3) * 7) % 13
         if s == 0:  return BLUE
         if s == 8:  return PALE
         return RED
@@ -100,16 +110,25 @@ def prepare_image():
             if px[x, y] == STAND:
                 px[x, y] = PALETTE[seat_idx(x, y)]
 
-    # Roof: dark shadow band across the top with a row of bright floodlights.
+    # Roof shadow across the very top (kept flat - it is the screen edge).
     draw.rectangle((0, 24, 319, 29), fill=PALETTE[8])
     for fx in range(10, 318, 24):
         draw.rectangle((fx, 25, fx + 3, 26), fill=PALETTE[15])
-    # A blue LED advertising ring band divides the lower and upper decks.
-    draw.rectangle((0, 34, 319, 37), fill=PALETTE[11])
-    for ax in range(2, 320, 14):
-        draw.rectangle((ax, 35, ax + 2, 36), fill=PALETTE[15])
-    draw.line((0, 33, 319, 33), fill=PALETTE[14], width=1)
-    draw.line((0, 38, 319, 38), fill=PALETTE[14], width=1)
+
+    # LED advertising ring band, drawn ALONG the court angle (constant depth)
+    # so it is parallel to the touchlines, hoardings and net - not a flat bar.
+    def depth_band(depth, thickness, colour):
+        x0, x1 = -20, 340
+        draw.line((x0, depth + (x0 >> 2), x1, depth + (x1 >> 2)),
+                  fill=colour, width=thickness)
+
+    depth_band(FAR_BAND_DEPTH - 2, 1, PALETTE[14])
+    depth_band(FAR_BAND_DEPTH,     4, PALETTE[11])
+    depth_band(FAR_BAND_DEPTH + 3, 1, PALETTE[14])
+    for i in range(-1, 24):         # bright LED ticks along the same slope
+        bx = i * 14
+        draw.rectangle((bx, FAR_BAND_DEPTH + (bx >> 2) - 1,
+                        bx + 2, FAR_BAND_DEPTH + (bx >> 2)), fill=PALETTE[15])
 
     # Clean, readable striped turf replaces the old football-box markings.
     # Bands follow court depth, preserving the isometric perspective.
