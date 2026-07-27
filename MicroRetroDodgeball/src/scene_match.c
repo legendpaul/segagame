@@ -71,6 +71,7 @@ static u8  looseTimer;      /* prevents instant pickup at the impact point */
 static u16 pickupClock;     /* frames left, 0 = no clock running */
 static bool pickupIsA;      /* TRUE: team A (human) on the clock, FALSE: AI */
 static bool aiFumbling;     /* rare (~1/1000) AI fumble that lets its clock expire */
+static u16  aiLooseReact;   /* frames the CPU still waits before chasing a loose ball */
 
 /* Referee escort: on a shot-clock timeout the ref runs in from the right,
  * walks the offending player off, then the ball (dropped on the spot) goes
@@ -346,25 +347,64 @@ static bool move_toward_ball(Player *p)
     return moved;
 }
 
+/* Independent off-ball wandering: each of the six players carries its own
+ * countdown and its own randomly-chosen destination near its home spot, so
+ * they drift and pause on their own schedules instead of all twitching on a
+ * shared global beat (which read as a robotic timed update). */
+#define AMBIENT_SLOTS   6
+#define WANDER_RANGE_X  9    /* +/- px roam around the home mark */
+#define WANDER_RANGE_Y  6
+static u16 wanderTimer[AMBIENT_SLOTS];   /* frames until this player re-targets */
+static s16 wanderTX[AMBIENT_SLOTS];
+static s16 wanderTY[AMBIENT_SLOTS];
+static u8  wanderPace[AMBIENT_SLOTS];    /* 1 = ambles, 2 = brisker - per player */
+
+static void wander_pick(Player *p, u8 slot)
+{
+    wanderTX[slot] = p->homeX + (s16)(random() % (WANDER_RANGE_X * 2 + 1)) - WANDER_RANGE_X;
+    wanderTY[slot] = p->homeY + (s16)(random() % (WANDER_RANGE_Y * 2 + 1)) - WANDER_RANGE_Y;
+    /* Randomised dwell (arrive, then loiter) desynchronises the six players. */
+    wanderTimer[slot] = (u16)(35 + (random() % 85));   /* ~0.6-2.0s at 60fps */
+    wanderPace[slot]  = (u8)(1 + (random() & 1));
+}
+
+/* Seed all six with staggered, independent targets at round start. */
+static void wander_init(void)
+{
+    u8 i;
+    for (i = 0; i < TEAM_SIZE; i++)
+    {
+        wander_pick(&teamA[i], i);
+        wander_pick(&teamB[i], (u8)(i + TEAM_SIZE));
+    }
+}
+
 static bool move_ambient(Player *p, u8 slot)
 {
-    static const s8 offsetX[4] = { -6, 2, 7, -2 };
-    static const s8 offsetY[4] = { -2, -3, 2, 3 };
-    u8 beat = (u8)(((ambientTick / 48) + slot * 2) & 3);
-    s16 targetX = p->homeX + offsetX[beat];
-    s16 targetY = p->homeY + offsetY[beat];
     bool moved = FALSE;
     s16 oldX = p->x;
+    s16 tx = wanderTX[slot];
+    s16 ty = wanderTY[slot];
+    u8  pace = wanderPace[slot];
+    bool arrived;
 
-    /* One-pixel corrections make players look alert without turning their
-     * idle movement into constant high-speed chasing. */
-    if (p->x < targetX) { p->x++; moved = TRUE; }
-    else if (p->x > targetX) { p->x--; moved = TRUE; }
-    if ((ambientTick & 1) == 0)
+    if (wanderTimer[slot] > 0) wanderTimer[slot]--;
+
+    if (p->x < tx) { p->x += (p->x + pace <= tx) ? pace : 1; moved = TRUE; }
+    else if (p->x > tx) { p->x -= (p->x - pace >= tx) ? pace : 1; moved = TRUE; }
+
+    /* Y drifts at half rate, phased per slot so nobody bobs in unison. */
+    if (((ambientTick + slot * 11) & 1) == 0)
     {
-        if (p->y < targetY) { p->y++; moved = TRUE; }
-        else if (p->y > targetY) { p->y--; moved = TRUE; }
+        if (p->y < ty) { p->y++; moved = TRUE; }
+        else if (p->y > ty) { p->y--; moved = TRUE; }
     }
+
+    /* Re-target once this player has both arrived and served its dwell time -
+     * so each one independently decides when to move next and where. */
+    arrived = (p->x == tx) && (p->y == ty);
+    if (arrived && wanderTimer[slot] == 0) wander_pick(p, slot);
+
     player_clampToCourt(p);
     if (p->x != oldX) p->facingLeft = (p->x < oldX);
     return moved;
@@ -536,6 +576,7 @@ static void start_round(void)
     /* Both sides use the same 32x32 art. Perspective comes from placement,
      * shadows and the court projection—not "men versus midgets" scaling. */
 
+    wander_init();   /* independent per-player off-ball movement */
     activeA = 0;
 
     draw_hud();
@@ -631,6 +672,7 @@ static void begin_loose_for_B(void)
      * never punishes it unfairly. */
     pickupClock = PICKUP_CLOCK_FRAMES;
     pickupIsA = FALSE;
+    aiLooseReact = ai_looseReactionFrames();   /* difficulty-scaled hesitation */
     state = MS_LOOSE_B;
 }
 
@@ -995,8 +1037,22 @@ void scene_match_update(void)
             else
             {
                 clear_playfield_text();
-                if (server == 0) state = MS_A_HOLD;
-                else { state = MS_B_HOLD; aiDelay = ai_pickThrowDelay(); }
+                /* Put the server on the shot clock from the very first
+                 * possession, so the opening throw is timed too (not just
+                 * loose-ball retrievals after the first throw). */
+                pickupClock = PICKUP_CLOCK_FRAMES;
+                aiFumbling = FALSE;
+                if (server == 0)
+                {
+                    state = MS_A_HOLD;
+                    pickupIsA = TRUE;    /* human server must throw in time */
+                }
+                else
+                {
+                    state = MS_B_HOLD;
+                    aiDelay = ai_pickThrowDelay();
+                    pickupIsA = FALSE;   /* AI immune; clock just visualises */
+                }
             }
             break;
         }
@@ -1102,10 +1158,14 @@ void scene_match_update(void)
         case MS_LOOSE_B:
         {
             if (ball_updateLoose(&ball)) sound_mgr_bounce();
-            cpuMoved = move_toward_ball(&teamB[holderB]);
+            /* Hesitate for the difficulty-scaled reaction window before the CPU
+             * commits to the ball, so EASY gives the human a real head start. */
+            if (aiLooseReact > 0) aiLooseReact--;
+            else cpuMoved = move_toward_ball(&teamB[holderB]);
             /* During a scripted fumble the AI deliberately never grabs it, so
              * its shot clock runs out and it eliminates itself (rarely). */
-            if (!aiFumbling && looseTimer == 0 && player_reached_ball(&teamB[holderB]))
+            if (!aiFumbling && aiLooseReact == 0 && looseTimer == 0 &&
+                player_reached_ball(&teamB[holderB]))
             {
                 sound_mgr_pickup();
                 player_setPose(&teamB[holderB], POSE_PICKUP, 10);

@@ -3,23 +3,25 @@
 
 #define AI_AIM_SPREAD     40   /* +/- px inaccuracy at NORMAL */
 
-/* Wind-up delay before the CPU throws, scaled by difficulty: EASY dawdles,
- * HARD snaps the ball out fast. */
+/* Wind-up delay before the CPU throws, scaled hard by difficulty so the three
+ * levels feel clearly different: EASY dithers for well over a second before
+ * lobbing one out, HARD fires almost immediately. */
 u16 ai_pickThrowDelay(void)
 {
-    u16 base = AI_REACTION_MIN + (random() % AI_REACTION_VAR);
-    if (gDifficulty == DIFF_EASY)  return base + 45;
-    if (gDifficulty == DIFF_HARD)  return (base > 22) ? (base - 18) : 6;
-    return base;
+    u16 base = AI_REACTION_MIN + (random() % AI_REACTION_VAR);   /* 20..49 */
+    if (gDifficulty == DIFF_EASY)  return base + 70;             /* ~1.5-2.0s */
+    if (gDifficulty == DIFF_HARD)  return (base > 30) ? (base - 24) : 5; /* snappy */
+    return base;                                                 /* ~0.3-0.8s */
 }
 
-/* Aim inaccuracy, scaled by difficulty: EASY sprays wide, HARD is sharp. */
+/* Aim inaccuracy, scaled by difficulty: EASY sprays wide and often misses the
+ * target entirely, NORMAL is loose, HARD is near dead-on. */
 s16 ai_pickTargetX(s16 playerX)
 {
     s16 spread = AI_AIM_SPREAD;
     s16 offset, target;
-    if (gDifficulty == DIFF_EASY)  spread = AI_AIM_SPREAD + 34;
-    else if (gDifficulty == DIFF_HARD) spread = 12;
+    if (gDifficulty == DIFF_EASY)  spread = AI_AIM_SPREAD + 50;  /* very wild */
+    else if (gDifficulty == DIFF_HARD) spread = 8;              /* laser */
 
     offset = (s16)(random() % (spread * 2)) - spread;
     target = playerX + offset;
@@ -28,6 +30,16 @@ s16 ai_pickTargetX(s16 playerX)
     if (target > COURT_RIGHT_X) target = COURT_RIGHT_X;
 
     return target;
+}
+
+/* How long the CPU hesitates before chasing a loose ball. On EASY it reacts
+ * slowly, giving the human room; on HARD it pounces instantly. This is the
+ * lever that makes retrieval battles feel easy or punishing. */
+u16 ai_looseReactionFrames(void)
+{
+    if (gDifficulty == DIFF_EASY) return 48;   /* ~0.8s dither */
+    if (gDifficulty == DIFF_HARD) return 0;    /* instant */
+    return 16;                                 /* NORMAL ~0.27s */
 }
 
 u8 ai_pickSlot(u8 count)
