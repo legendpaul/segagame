@@ -52,8 +52,13 @@ static Fighter fighters[ELIM_PLAYERS];
 static Ball    balls[ELIM_BALLS];
 static u8      ballOwner[ELIM_BALLS];
 /* Who threw each ball: a ball in flight must not strike the player who let it
- * go, since it starts life inside their own hitbox. Cleared once it settles. */
+ * go, since it starts life inside their own hitbox, and they cannot instantly
+ * scoop their own throw back up. The lock is a COOLDOWN, not permanent - left
+ * permanent it deadlocked the match, with every survivor stranded on top of a
+ * ball they were never allowed to collect. */
 static u8      ballThrower[ELIM_BALLS];
+static u16     ballLock[ELIM_BALLS];
+#define BALL_LOCK_FRAMES 45
 static u8      humanIdx;
 static u8      aliveCount;
 static u16     endTimer;
@@ -110,7 +115,9 @@ static u8 closest_to_ball(u8 b)
     return best;
 }
 
-/* Nearest ball lying loose and unclaimed, or NO_BALL. */
+/* Nearest ball actually lying on the floor and unclaimed, or NO_BALL. A ball
+ * still in flight is NOT a target: chasing one meant a thrower would run after
+ * their own throw forever. */
 static u8 nearest_loose_ball(u8 self)
 {
     u8 b, best = NO_BALL;
@@ -119,6 +126,8 @@ static u8 nearest_loose_ball(u8 self)
     {
         s32 dx, dy; u32 d;
         if (ballOwner[b] != NO_OWNER) continue;
+        if (balls[b].state != BALL_LOOSE) continue;
+        if (ballThrower[b] == self) continue;   /* cannot collect own throw yet */
         dx = balls[b].x - fighters[self].p.x;
         dy = balls[b].y - fighters[self].p.y;
         d = (u32)(dx * dx + dy * dy);
@@ -144,6 +153,7 @@ static void throw_ball(u8 who, s16 targetX, s16 targetY)
     ball_startThrow(b, targetX, targetY, BALL_FLYING_TO_B, 0);
     ballOwner[f->ball] = NO_OWNER;
     ballThrower[f->ball] = who;
+    ballLock[f->ball] = BALL_LOCK_FRAMES;
     f->ball = NO_BALL;
     player_setPose(&f->p, POSE_THROW, 16);
     sound_mgr_throw();
@@ -272,6 +282,7 @@ void scene_eliminator_enter(void)
         ball_settle(&balls[i]);
         ballOwner[i] = NO_OWNER;
         ballThrower[i] = NO_OWNER;
+        ballLock[i] = 0;
     }
 
     draw_hud();
@@ -430,6 +441,10 @@ void scene_eliminator_update(void)
             else
             {
                 if (ball_updateLoose(ba)) sound_mgr_bounce();
+                /* Release the thrower's claim once the ball has settled for a
+                 * moment, so no ball can become permanently uncollectable. */
+                if (ballLock[b] > 0 && --ballLock[b] == 0)
+                    ballThrower[b] = NO_OWNER;
                 /* First player to reach a settled ball picks it up - but the
                  * thrower gets a moment's grace so they cannot instantly
                  * re-collect their own throw. */
@@ -444,6 +459,7 @@ void scene_eliminator_update(void)
                         f->ball = b;
                         ballOwner[b] = i;
                         ballThrower[b] = NO_OWNER;
+                        ballLock[b] = 0;
                         ball_settle(ba);
                         f->think = ai_pickThrowDelay();
                         player_setPose(&f->p, POSE_PICKUP, 10);
