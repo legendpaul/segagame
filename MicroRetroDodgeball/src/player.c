@@ -89,6 +89,8 @@ void player_moveHuman(Player *p, bool hasBall)
      * from input_held() in scene_match.c, not from this gate, so the
      * carrier's legs keep moving smoothly instead of stuttering. */
     static u8 carryGate = 0;
+    /* Phase for the fractional part of the court-axis steps (see below). */
+    static u8 movePhase = 0;
     bool canStep = TRUE;
     if (hasBall)
     {
@@ -98,13 +100,20 @@ void player_moveHuman(Player *p, bool hasBall)
 
     if (canStep)
     {
-        /* Both world axes project diagonally in the reference camera.
-         * This makes every d-pad direction change screen X and Y instead
-         * of sliding players along one flat horizontal baseline. */
-        if (input_held(BUTTON_LEFT))  { p->x -= 2; p->y -= 1; }
-        if (input_held(BUTTON_RIGHT)) { p->x += 2; p->y += 1; }
-        if (input_held(BUTTON_UP))    { p->x += 1; p->y -= 2; }
-        if (input_held(BUTTON_DOWN))  { p->x -= 1; p->y += 2; }
+        /* Run along the COURT's own axes, so a player tracks the painted
+         * lines instead of drifting across them:
+         *   left/right = parallel to the touchline, slope 1/4  -> (4, 1)
+         *   up/down    = parallel to the sideline,  slope -7/4 -> (4, -7)
+         * Integer steps can't express 1/4 or 7/4 per frame, so the fractional
+         * part is spread over a short phase cycle: sideways moves x by 2 every
+         * frame and y by 1 every other frame (= 4:1 over two frames), while
+         * up/down moves y by 2 three frames in four and 1 on the fourth
+         * (= 7 per 4 frames against x's 4). Average direction is exact. */
+        if (input_held(BUTTON_LEFT))  { p->x -= 2; if (movePhase & 1) p->y -= 1; }
+        if (input_held(BUTTON_RIGHT)) { p->x += 2; if (movePhase & 1) p->y += 1; }
+        if (input_held(BUTTON_UP))    { p->x += 1; p->y -= ((movePhase & 3) ? 2 : 1); }
+        if (input_held(BUTTON_DOWN))  { p->x -= 1; p->y += ((movePhase & 3) ? 2 : 1); }
+        movePhase++;
     }
 
     player_clampToCourt(p);
