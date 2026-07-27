@@ -33,9 +33,27 @@ void scene_gameover_enter(void)
     /* Solid navy behind the panel so the text glyphs don't reveal the court. */
     flag_data_fill_panel(3, 5, 34, 19);
     ui_draw_panel(3, 5, 34, 19, TRUE);
-    ui_draw_big_center("GAME OVER", 7, UI_GOLD);
-    ui_draw_text_center(winner, 11, UI_CYAN);
-    ui_draw_text_center("WORLD CHAMPIONS", 13, UI_WHITE);
+    if (gGameMode == MODE_TOURNAMENT)
+    {
+        if (aWon)
+        {
+            ui_draw_big_center("CHAMPIONS", 7, UI_GOLD);
+            ui_draw_text_center(teamNames[gTeamAIndex], 11, UI_CYAN);
+            ui_draw_text_center("WIN THE TOURNAMENT", 13, UI_WHITE);
+        }
+        else
+        {
+            ui_draw_big_center("ELIMINATED", 7, UI_GOLD);
+            ui_draw_text_center(teamNames[gTeamBIndex], 11, UI_CYAN);
+            ui_draw_text_center("KNOCK YOU OUT OF THE CUP", 13, UI_WHITE);
+        }
+    }
+    else
+    {
+        ui_draw_big_center("GAME OVER", 7, UI_GOLD);
+        ui_draw_text_center(winner, 11, UI_CYAN);
+        ui_draw_text_center("WORLD CHAMPIONS", 13, UI_WHITE);
+    }
 
     intToStr(gScoreA, buf, 1);
     ui_draw_big_text(buf, 14, 16, UI_GOLD);

@@ -50,10 +50,28 @@ typedef enum {
 
 extern GameScene gCurrentScene;
 
+/* --- Game modes / options --- */
+typedef enum {
+    MODE_EXHIBITION = 0,   /* pick both teams, single match */
+    MODE_TOURNAMENT        /* pick your team, gauntlet the rest to be champion */
+} GameMode;
+
+typedef enum {
+    DIFF_EASY = 0,
+    DIFF_NORMAL,
+    DIFF_HARD
+} Difficulty;
+
+#define CUP_STAGES  (TEAM_SIZE + 2)   /* opponents to beat to win the cup (5) */
+
 /* Persist across scenes */
 extern u8 gTeamAIndex;     /* player's team */
 extern u8 gTeamBIndex;     /* CPU's team */
 extern u8 gScoreA;
 extern u8 gScoreB;
+
+extern u8 gGameMode;       /* GameMode */
+extern u8 gDifficulty;     /* Difficulty */
+extern u8 gCupStage;       /* 0-based opponent index in tournament mode */
 
 #endif /* _GAME_STATE_H_ */

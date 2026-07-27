@@ -26,6 +26,7 @@
 
 typedef enum {
     MENU_TITLE = 0,
+    MENU_MODE,
     MENU_TEAM_A,
     MENU_TEAM_B,
     MENU_MATCHUP
@@ -37,6 +38,7 @@ static u16 blinkCounter;
 static bool promptVisible;
 static u16 bobCounter;
 static s16 bobOffset;
+static u8 modeRow;   /* 0 = mode, 1 = difficulty, on the setup screen */
 
 static void draw_title(void)
 {
@@ -47,6 +49,39 @@ static void draw_title(void)
     title_data_draw();
     blinkCounter = 0;
     promptVisible = TRUE;
+}
+
+static void draw_mode(void)
+{
+    static const char *diffName[3] = { "EASY", "NORMAL", "HARD" };
+    VDP_clearPlane(BG_A, TRUE);
+    VDP_clearSprites();
+    sprites_data_hide_all_sprites();
+    flag_data_fill_panel(0, 0, 40, 28);   /* solid navy backdrop */
+    ui_set_palette(PAL0);
+    ui_apply_palette();
+    PAL_setColor(0, RGB24_TO_VDPCOLOR(0x081830));
+
+    ui_draw_big_center("GAME SETUP", 3, UI_WHITE);
+    ui_draw_panel(6, 9, 28, 9, FALSE);
+
+    /* MODE row */
+    ui_draw_text("MODE", 9, 11, UI_CYAN);
+    ui_draw_text(gGameMode == MODE_EXHIBITION ? "EXHIBITION" : "TOURNAMENT",
+                 20, 11, (modeRow == 0) ? UI_GOLD : UI_WHITE);
+    if (modeRow == 0) { ui_draw_text(">", 18, 11, UI_GOLD); ui_draw_text("<", 31, 11, UI_GOLD); }
+
+    /* DIFFICULTY row */
+    ui_draw_text("LEVEL", 9, 14, UI_CYAN);
+    ui_draw_text(diffName[gDifficulty], 20, 14, (modeRow == 1) ? UI_GOLD : UI_WHITE);
+    if (modeRow == 1) { ui_draw_text(">", 18, 14, UI_GOLD); ui_draw_text("<", 31, 14, UI_GOLD); }
+
+    ui_draw_text(gGameMode == MODE_EXHIBITION
+                 ? "SINGLE MATCH VS ONE RIVAL"
+                 : "BEAT EVERY RIVAL TO WIN THE CUP", 5, 20, UI_CYAN);
+
+    ui_draw_text("A START", 9, 24, UI_GOLD);
+    ui_draw_text("C BACK", 24, 24, UI_CYAN);
 }
 
 static void draw_selector(void)
@@ -129,8 +164,45 @@ void scene_menu_update(void)
         {
             sound_mgr_confirm();
             /* The full-screen title temporarily occupies the UI font's
-             * VRAM region. Restore it before drawing either selector. */
+             * VRAM region. Restore it before drawing any menu text. */
             ui_data_init();
+            phase = MENU_MODE;
+            modeRow = 0;
+            draw_mode();
+        }
+        return;
+    }
+
+    if (phase == MENU_MODE)
+    {
+        if (input_pressed(BUTTON_UP) || input_pressed(BUTTON_DOWN))
+        {
+            modeRow ^= 1;
+            sound_mgr_blip();
+            draw_mode();
+        }
+        else if (input_pressed(BUTTON_LEFT) || input_pressed(BUTTON_RIGHT))
+        {
+            if (modeRow == 0)
+                gGameMode = (gGameMode == MODE_EXHIBITION) ? MODE_TOURNAMENT
+                                                           : MODE_EXHIBITION;
+            else
+            {
+                s8 d = input_pressed(BUTTON_LEFT) ? 2 : 1;   /* -1 == +2 mod 3 */
+                gDifficulty = (u8)((gDifficulty + d) % 3);
+            }
+            sound_mgr_blip();
+            draw_mode();
+        }
+        else if (input_pressed(BUTTON_C) || input_pressed(BUTTON_B))
+        {
+            sound_mgr_cancel();
+            phase = MENU_TITLE;
+            draw_title();
+        }
+        else if (input_pressed(BUTTON_A) || input_pressed(BUTTON_START))
+        {
+            sound_mgr_confirm();
             enter_selector(MENU_TEAM_A);
         }
         return;
@@ -187,10 +259,20 @@ void scene_menu_update(void)
     else if (input_pressed(BUTTON_A) || input_pressed(BUTTON_START))
     {
         sound_mgr_confirm();
+        if (phase == MENU_TEAM_A && gGameMode == MODE_TOURNAMENT)
+        {
+            /* Tournament: you only pick your own team, then face the whole
+             * gauntlet. Seed the cup and jump straight to the first matchup. */
+            gCupStage = 0;
+            gScoreA = 0;
+            gScoreB = 0;
+            gTeamBIndex = cup_opponent(gTeamAIndex, 0);
+            enter_matchup();
+            return;
+        }
         if (phase == MENU_TEAM_A)
         {
-            /* Begin the other selector on a different team by default,
-             * while still allowing any country to be chosen deliberately. */
+            /* Exhibition: pick the opponent too. Default to a different team. */
             gTeamBIndex = (gTeamAIndex + 1) % NUM_TEAMS;
             enter_selector(MENU_TEAM_B);
         }

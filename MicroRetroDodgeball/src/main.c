@@ -25,6 +25,9 @@ u8 gTeamAIndex;
 u8 gTeamBIndex;
 u8 gScoreA;
 u8 gScoreB;
+u8 gGameMode;
+u8 gDifficulty;
+u8 gCupStage;
 
 int main(bool hardReset)
 {
@@ -50,6 +53,9 @@ int main(bool hardReset)
     gTeamBIndex = 1;
     gScoreA = 0;
     gScoreB = 0;
+    gGameMode = MODE_EXHIBITION;
+    gDifficulty = DIFF_NORMAL;
+    gCupStage = 0;
 
     while (TRUE)
     {

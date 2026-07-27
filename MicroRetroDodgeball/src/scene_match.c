@@ -1147,6 +1147,20 @@ void scene_match_update(void)
             {
                 if ((gScoreA >= WIN_SCORE) || (gScoreB >= WIN_SCORE))
                 {
+                    /* Tournament: a match win advances the gauntlet to the
+                     * next opponent instead of ending the game - unless that
+                     * was the final, in which case you're crowned champion. */
+                    if (gGameMode == MODE_TOURNAMENT && gScoreA >= WIN_SCORE
+                        && (gCupStage + 1) < CUP_STAGES)
+                    {
+                        gCupStage++;
+                        gTeamBIndex = cup_opponent(gTeamAIndex, gCupStage);
+                        gScoreA = 0;
+                        gScoreB = 0;
+                        PAL_fadeOutAll(20, FALSE);
+                        scene_match_enter();   /* straight into the next tie */
+                        return;
+                    }
                     PAL_fadeOutAll(20, FALSE);
                     gCurrentScene = GS_GAMEOVER;
                     return;
