@@ -29,6 +29,7 @@ typedef enum {
     MENU_MODE,
     MENU_TEAM_A,
     MENU_TEAM_B,
+    MENU_CUP,       /* tournament ladder: intro before match 1, progress after each win */
     MENU_MATCHUP
 } MenuPhase;
 
@@ -82,6 +83,55 @@ static void draw_mode(void)
 
     ui_draw_text("A START", 9, 24, UI_GOLD);
     ui_draw_text("C BACK", 24, 24, UI_CYAN);
+}
+
+/* The tournament ladder doubles as the cup intro (before match 1, with every
+ * rival still "upcoming") and the post-match bracket update (beaten rivals
+ * ticked, the next one flagged NOW). Text-tile + navy-panel only. */
+static void draw_cup_ladder(void)
+{
+    char prog[13] = "STAGE _ OF 5";
+    u8 s;
+
+    VDP_clearPlane(BG_A, TRUE);
+    VDP_clearSprites();
+    sprites_data_hide_all_sprites();
+    flag_data_fill_panel(0, 0, 40, 28);   /* solid navy backdrop */
+    ui_set_palette(PAL0);
+    ui_apply_palette();
+    PAL_setColor(0, RGB24_TO_VDPCOLOR(0x081830));
+
+    ui_draw_big_center("ROAD TO GLORY", 2, UI_WHITE);
+    ui_draw_text_center(teamNames[gTeamAIndex], 6, UI_CYAN);
+
+    ui_draw_panel(5, 8, 30, 12, FALSE);
+
+    for (s = 0; s < CUP_STAGES; s++)
+    {
+        u16 row = 10 + (u16)s * 2;
+        u8  opp = cup_opponent(gTeamAIndex, s);
+        u8  nameStyle = (s == gCupStage) ? UI_GOLD :
+                        (s <  gCupStage) ? UI_CYAN : UI_WHITE;
+        char rlabel[3] = { 'R', (char)('1' + s), 0 };
+
+        if (s == gCupStage) ui_draw_text(">", 6, row, UI_GOLD);
+        ui_draw_text(rlabel, 8, row, UI_WHITE);
+        ui_draw_text(teamNames[opp], 12, row, nameStyle);
+        if (s < gCupStage)       ui_draw_text("BEATEN", 27, row, UI_CYAN);
+        else if (s == gCupStage) ui_draw_text("NOW",    27, row, UI_GOLD);
+    }
+
+    prog[6] = (char)('1' + gCupStage);
+    ui_draw_text_center(prog, 22, UI_WHITE);
+
+    ui_draw_text("A CONTINUE", 9, 25, UI_GOLD);
+    ui_draw_text("C EXIT", 26, 25, UI_CYAN);
+}
+
+static void enter_cup_ladder(void)
+{
+    phase = MENU_CUP;
+    draw_cup_ladder();
 }
 
 static void draw_selector(void)
@@ -143,6 +193,17 @@ static void move_selection(s8 delta)
 void scene_menu_enter(void)
 {
     VDP_setTextPalette(PAL0);
+
+    /* A mid-cup match win returns here to show the updated ladder rather than
+     * the title. Consume the request so a later title-return works normally. */
+    if (gMenuEntry == MENU_ENTRY_CUP_LADDER)
+    {
+        gMenuEntry = MENU_ENTRY_TITLE;
+        ui_data_init();          /* the match may have reclaimed UI font VRAM */
+        enter_cup_ladder();
+        return;
+    }
+
     phase = MENU_TITLE;
     draw_title();
 }
@@ -208,6 +269,23 @@ void scene_menu_update(void)
         return;
     }
 
+    if (phase == MENU_CUP)
+    {
+        if (input_pressed(BUTTON_A) || input_pressed(BUTTON_START))
+        {
+            sound_mgr_confirm();
+            enter_matchup();
+            return;
+        }
+        if (input_pressed(BUTTON_C) || input_pressed(BUTTON_B))
+        {
+            sound_mgr_cancel();
+            phase = MENU_TITLE;
+            draw_title();
+        }
+        return;
+    }
+
     if (phase == MENU_MATCHUP)
     {
         /* Figures are static BG tiles drawn once on entry - just wait on
@@ -267,7 +345,7 @@ void scene_menu_update(void)
             gScoreA = 0;
             gScoreB = 0;
             gTeamBIndex = cup_opponent(gTeamAIndex, 0);
-            enter_matchup();
+            enter_cup_ladder();   /* cup intro ladder, then A -> matchup */
             return;
         }
         if (phase == MENU_TEAM_A)

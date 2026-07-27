@@ -1248,7 +1248,11 @@ void scene_match_update(void)
                         gScoreA = 0;
                         gScoreB = 0;
                         PAL_fadeOutAll(20, FALSE);
-                        scene_match_enter();   /* straight into the next tie */
+                        /* Back to the ladder so the player sees the bracket
+                         * update (beaten rival ticked, next flagged NOW) and
+                         * can Continue or Exit before the next tie. */
+                        gMenuEntry = MENU_ENTRY_CUP_LADDER;
+                        gCurrentScene = GS_MENU;
                         return;
                     }
                     PAL_fadeOutAll(20, FALSE);

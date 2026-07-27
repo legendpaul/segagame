@@ -74,4 +74,12 @@ extern u8 gGameMode;       /* GameMode */
 extern u8 gDifficulty;     /* Difficulty */
 extern u8 gCupStage;       /* 0-based opponent index in tournament mode */
 
+/* How GS_MENU should present itself when (re)entered. Lets a mid-cup match
+ * win return to the tournament ladder instead of the title screen. */
+typedef enum {
+    MENU_ENTRY_TITLE = 0,
+    MENU_ENTRY_CUP_LADDER
+} MenuEntry;
+extern u8 gMenuEntry;      /* MenuEntry */
+
 #endif /* _GAME_STATE_H_ */
