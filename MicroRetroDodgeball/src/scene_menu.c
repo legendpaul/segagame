@@ -121,14 +121,17 @@ static const u16 PLATE_ROW[4] = { 5, 9, 15, 19 };
 #define JOIN_R_IN  24   /* right pair joins,  stub lands on 23 */
 #define CUP_X      18   /* gold cup box, 18..20 - clear of both half joins */
 #define CHAMP_ROW  23
+/* Later rounds have fewer teams, so their plates widen to reach the joins. */
+#define WIDE_W     15   /* left 1..15, right 23..37 */
+#define WIDE_R_X   23
 
 /* A team plate: a framed box with the name inside, like the roster plates in
  * the reference. Gold frame for the player's own team so it stands out. */
-static void bracket_plate(u8 team, u16 x, u16 row, u8 round)
+static void bracket_plate(u8 team, u16 x, u16 row, u16 w, u8 round)
 {
     u8 style;
     bool mine = (team == gTeamAIndex);
-    ui_draw_panel(x, (u16)(row - 1), PLATE_W, 3, mine);
+    ui_draw_panel(x, (u16)(row - 1), w, 3, mine);
     if (team == CUP_TBD) return;
     style = mine ? UI_GOLD : cup_is_out(team, round) ? UI_CYAN : UI_WHITE;
     ui_draw_text(teamNames[team], (u16)(x + 1), row, style);
@@ -139,6 +142,9 @@ static void draw_cup_bracket(void)
     static const char *roundName[CUP_ROUNDS] = {
         "QUARTER FINAL", "SEMI FINAL", "FINAL"
     };
+    /* Once the cup is won gCupStage runs past the last round; keep showing the
+     * final's two-team board with the champion crowned. */
+    u8 round = (gCupStage < CUP_ROUNDS) ? gCupStage : (CUP_ROUNDS - 1);
     u8 i;
 
     VDP_clearPlane(BG_A, TRUE);
@@ -150,24 +156,47 @@ static void draw_cup_bracket(void)
     PAL_setColor(0, RGB24_TO_VDPCOLOR(0x081830));
 
     ui_draw_text_center("TOURNAMENT", 0, UI_WHITE);
-    ui_draw_text_center(cupChampion != CUP_TBD ? "COMPLETE"
-                        : roundName[gCupStage < CUP_ROUNDS ? gCupStage : 2],
+    ui_draw_text_center(cupChampion != CUP_TBD ? "COMPLETE" : roundName[round],
                         2, UI_GOLD);
 
-    /* Eight plates: the first four slots down the left, the last four down the
-     * right, so both halves converge on the cup in the middle. */
-    for (i = 0; i < 4; i++)
-        bracket_plate(cupQF[i], PLATE_L_X, PLATE_ROW[i], gCupStage);
-    for (i = 0; i < 4; i++)
-        bracket_plate(cupQF[4 + i], PLATE_R_X, PLATE_ROW[i], gCupStage);
+    /* Only the teams still in the competition are shown: the full eight-team
+     * draw in the quarter-final, the four survivors in the semi-final, and
+     * just the two finalists in the final. Knocked-out sides drop off the
+     * board entirely rather than lingering as dead plates. */
+    if (round == 0)
+    {
+        for (i = 0; i < 4; i++)
+            bracket_plate(cupQF[i], PLATE_L_X, PLATE_ROW[i], PLATE_W, round);
+        for (i = 0; i < 4; i++)
+            bracket_plate(cupQF[4 + i], PLATE_R_X, PLATE_ROW[i], PLATE_W, round);
 
-    /* Pair joins, then each half's semi-final join heading inward. */
-    ui_draw_bracket(JOIN_L_IN,  PLATE_ROW[0], PLATE_ROW[1], FALSE);
-    ui_draw_bracket(JOIN_L_IN,  PLATE_ROW[2], PLATE_ROW[3], FALSE);
-    ui_draw_bracket(JOIN_L_MID, 7, 17, FALSE);
-    ui_draw_bracket(JOIN_R_IN,  PLATE_ROW[0], PLATE_ROW[1], TRUE);
-    ui_draw_bracket(JOIN_R_IN,  PLATE_ROW[2], PLATE_ROW[3], TRUE);
-    ui_draw_bracket(JOIN_R_MID, 7, 17, TRUE);
+        /* Pair joins, then each half's semi-final join heading inward. */
+        ui_draw_bracket(JOIN_L_IN,  PLATE_ROW[0], PLATE_ROW[1], FALSE);
+        ui_draw_bracket(JOIN_L_IN,  PLATE_ROW[2], PLATE_ROW[3], FALSE);
+        ui_draw_bracket(JOIN_L_MID, 7, 17, FALSE);
+        ui_draw_bracket(JOIN_R_IN,  PLATE_ROW[0], PLATE_ROW[1], TRUE);
+        ui_draw_bracket(JOIN_R_IN,  PLATE_ROW[2], PLATE_ROW[3], TRUE);
+        ui_draw_bracket(JOIN_R_MID, 7, 17, TRUE);
+    }
+    else if (round == 1)
+    {
+        /* Four survivors: wider plates reaching the half-joins, which carry
+         * straight on into the cup. */
+        bracket_plate(cupSF[0], PLATE_L_X, 7,  WIDE_W, round);
+        bracket_plate(cupSF[1], PLATE_L_X, 17, WIDE_W, round);
+        bracket_plate(cupSF[2], WIDE_R_X,  7,  WIDE_W, round);
+        bracket_plate(cupSF[3], WIDE_R_X,  17, WIDE_W, round);
+        ui_draw_bracket(JOIN_L_MID, 7, 17, FALSE);
+        ui_draw_bracket(JOIN_R_MID, 7, 17, TRUE);
+    }
+    else
+    {
+        /* The final: two teams, connected straight through to the cup. */
+        bracket_plate(cupF[0], PLATE_L_X, 12, WIDE_W, round);
+        bracket_plate(cupF[1], WIDE_R_X,  12, WIDE_W, round);
+        ui_draw_hrule(JOIN_L_MID, 12, 2);
+        ui_draw_hrule((u16)(CUP_X + 3), 12, 2);
+    }
 
     /* The cup itself in the centre, where both halves meet. Sized and placed
      * so the converging lines stop at its edges rather than crossing it. */

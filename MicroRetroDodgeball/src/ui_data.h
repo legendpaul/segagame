@@ -22,6 +22,8 @@ void ui_draw_panel(u16 x, u16 y, u16 w, u16 h, bool gold);
 /* Tournament-bracket join linking two paired rows in column x, with a stub
  * leaving the midpoint toward the next round. */
 void ui_draw_bracket(u16 x, u16 yTop, u16 yBot, bool mirrored);
+/* Horizontal connector run, w tiles wide. */
+void ui_draw_hrule(u16 x, u16 y, u16 w);
 void ui_draw_button(const char *label, u16 x, u16 y, u16 w);
 
 #endif /* _UI_DATA_H_ */

@@ -174,6 +174,14 @@ void ui_draw_panel(u16 x, u16 y, u16 w, u16 h, bool gold)
         }
 }
 
+void ui_draw_hrule(u16 x, u16 y, u16 w)
+{
+    u16 i;
+    for (i = 0; i < w; i++)
+        VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(uiPalette, 0, FALSE, FALSE,
+                         TILE_UI_H_CYAN), (u16)(x + i), y);
+}
+
 void ui_draw_bracket(u16 x, u16 yTop, u16 yBot, bool mirrored)
 {
     /* A tournament-bracket join: a vertical run down column x linking the two
