@@ -534,11 +534,22 @@ static void draw_hud_clock(void)
     ui_draw_text(clock, 13, 1, UI_CYAN);
 }
 
+/* Round banner rect, shared by the fill and the restore in
+ * clear_playfield_text() so the two can never drift apart. */
+#define INTRO_X  2
+#define INTRO_Y 20
+#define INTRO_W 36
+#define INTRO_H  7
+
 static void draw_match_intro(void)
 {
     char roundBuf[4];
     u8 roundNumber = gScoreA + gScoreB + 1;
-    ui_draw_panel(2, 20, 36, 7, TRUE);
+    /* Solid navy on BG_B first: the glyphs' transparent pixels would otherwise
+     * show the pitch straight through the banner text and make it unreadable.
+     * clear_playfield_text() restores the court here when the banner goes. */
+    flag_data_fill_panel(INTRO_X, INTRO_Y, INTRO_W, INTRO_H);
+    ui_draw_panel(INTRO_X, INTRO_Y, INTRO_W, INTRO_H, TRUE);
     ui_draw_text("ROUND", 16, 21, UI_CYAN);
     intToStr(roundNumber, roundBuf, 1);
     ui_draw_text(roundBuf, 22, 21, UI_GOLD);
@@ -559,6 +570,10 @@ static void clear_playfield_text(void)
      * clear could remain queued behind the per-second HUD writes, leaving a
      * supposedly temporary lower-third stuck over live play. */
     VDP_clearTileMapRect(BG_A, 0, 0, 40, 28);
+    /* Put the court back underneath the round banner. draw_match_intro() lays a
+     * solid navy fill on BG_B so its text is readable; without restoring it
+     * here that fill would stay as a permanent blue box over the pitch. */
+    court_bg_redraw_rect(INTRO_X, INTRO_Y, INTRO_W, INTRO_H);
     draw_hud();
     court_bg_drawForeground();
 }
