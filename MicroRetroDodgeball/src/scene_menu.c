@@ -52,9 +52,34 @@ static void draw_title(void)
     promptVisible = TRUE;
 }
 
-static void draw_mode(void)
+/* Redraw only the values that change on input - no full-plane clear, so the
+ * setup screen never blanks/flashes on a keypress. Only the small cells that
+ * actually change are cleared (marker columns, the variable-width level name
+ * and description); the fixed-width mode name is simply overwritten. */
+static void draw_mode_rows(void)
 {
     static const char *diffName[3] = { "EASY", "NORMAL", "HARD" };
+    VDP_clearTileMapRect(BG_A, 18, 11, 1, 1);
+    VDP_clearTileMapRect(BG_A, 31, 11, 1, 1);
+    VDP_clearTileMapRect(BG_A, 18, 14, 1, 1);
+    VDP_clearTileMapRect(BG_A, 31, 14, 1, 1);
+    VDP_clearTileMapRect(BG_A, 20, 14, 8, 1);
+    VDP_clearTileMapRect(BG_A, 5, 20, 31, 1);
+
+    ui_draw_text(gGameMode == MODE_EXHIBITION ? "EXHIBITION" : "TOURNAMENT",
+                 20, 11, (modeRow == 0) ? UI_GOLD : UI_WHITE);
+    if (modeRow == 0) { ui_draw_text(">", 18, 11, UI_GOLD); ui_draw_text("<", 31, 11, UI_GOLD); }
+
+    ui_draw_text(diffName[gDifficulty], 20, 14, (modeRow == 1) ? UI_GOLD : UI_WHITE);
+    if (modeRow == 1) { ui_draw_text(">", 18, 14, UI_GOLD); ui_draw_text("<", 31, 14, UI_GOLD); }
+
+    ui_draw_text(gGameMode == MODE_EXHIBITION
+                 ? "SINGLE MATCH VS ONE RIVAL"
+                 : "BEAT EVERY RIVAL TO WIN THE CUP", 5, 20, UI_CYAN);
+}
+
+static void draw_mode(void)
+{
     VDP_clearPlane(BG_A, TRUE);
     VDP_clearSprites();
     sprites_data_hide_all_sprites();
@@ -65,24 +90,11 @@ static void draw_mode(void)
 
     ui_draw_big_center("GAME SETUP", 3, UI_WHITE);
     ui_draw_panel(6, 9, 28, 9, FALSE);
-
-    /* MODE row */
     ui_draw_text("MODE", 9, 11, UI_CYAN);
-    ui_draw_text(gGameMode == MODE_EXHIBITION ? "EXHIBITION" : "TOURNAMENT",
-                 20, 11, (modeRow == 0) ? UI_GOLD : UI_WHITE);
-    if (modeRow == 0) { ui_draw_text(">", 18, 11, UI_GOLD); ui_draw_text("<", 31, 11, UI_GOLD); }
-
-    /* DIFFICULTY row */
     ui_draw_text("LEVEL", 9, 14, UI_CYAN);
-    ui_draw_text(diffName[gDifficulty], 20, 14, (modeRow == 1) ? UI_GOLD : UI_WHITE);
-    if (modeRow == 1) { ui_draw_text(">", 18, 14, UI_GOLD); ui_draw_text("<", 31, 14, UI_GOLD); }
-
-    ui_draw_text(gGameMode == MODE_EXHIBITION
-                 ? "SINGLE MATCH VS ONE RIVAL"
-                 : "BEAT EVERY RIVAL TO WIN THE CUP", 5, 20, UI_CYAN);
-
     ui_draw_text("A START", 9, 24, UI_GOLD);
     ui_draw_text("C BACK", 24, 24, UI_CYAN);
+    draw_mode_rows();
 }
 
 /* The tournament ladder doubles as the cup intro (before match 1, with every
@@ -240,7 +252,7 @@ void scene_menu_update(void)
         {
             modeRow ^= 1;
             sound_mgr_blip();
-            draw_mode();
+            draw_mode_rows();   /* in-place value update, no plane clear/flash */
         }
         else if (input_pressed(BUTTON_LEFT) || input_pressed(BUTTON_RIGHT))
         {
@@ -253,7 +265,7 @@ void scene_menu_update(void)
                 gDifficulty = (u8)((gDifficulty + d) % 3);
             }
             sound_mgr_blip();
-            draw_mode();
+            draw_mode_rows();   /* in-place value update, no plane clear/flash */
         }
         else if (input_pressed(BUTTON_C) || input_pressed(BUTTON_B))
         {

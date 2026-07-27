@@ -515,6 +515,25 @@ static void draw_hud(void)
     ui_draw_text(buf, 22, 1, UI_GOLD);
 }
 
+/* Per-second update: redraw ONLY the five clock digits. They are always the
+ * same 5 cells and fully overwrite the previous value, so there is no clear,
+ * no panel refill and no palette re-apply - and therefore no scoreboard flash
+ * (unlike calling the whole draw_hud() every second, which repainted the
+ * entire bar mid-frame). */
+static void draw_hud_clock(void)
+{
+    char clock[6];
+    u16 minutes = matchSeconds / 60;
+    u16 seconds = matchSeconds % 60;
+    clock[0] = '0' + ((minutes / 10) % 10);
+    clock[1] = '0' + (minutes % 10);
+    clock[2] = ':';
+    clock[3] = '0' + (seconds / 10);
+    clock[4] = '0' + (seconds % 10);
+    clock[5] = 0;
+    ui_draw_text(clock, 13, 1, UI_CYAN);
+}
+
 static void draw_match_intro(void)
 {
     char roundBuf[4];
@@ -940,7 +959,7 @@ void scene_match_update(void)
     {
         clockFrameCounter = 0;
         if (matchSeconds < 5999) matchSeconds++;
-        draw_hud();
+        draw_hud_clock();   /* clock digits only - no whole-bar repaint/flash */
     }
 
     if (flashTimer > 0)
