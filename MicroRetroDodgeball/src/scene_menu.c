@@ -97,13 +97,35 @@ static void draw_mode(void)
     draw_mode_rows();
 }
 
-/* The tournament ladder doubles as the cup intro (before match 1, with every
- * rival still "upcoming") and the post-match bracket update (beaten rivals
- * ticked, the next one flagged NOW). Text-tile + navy-panel only. */
-static void draw_cup_ladder(void)
+/* Single-elimination bracket, read left to right: the eight-team quarter-final
+ * column, the semi-final column, then the final - with the champion at the
+ * far right. Knocked-out teams dim to cyan, teams still in stay white and the
+ * player's own team is always gold, so the whole competition is legible at a
+ * glance (the same read as a TV tournament roster). */
+/* Column x positions and the row of every slot. Pairs sit two rows apart and
+ * each round's winner sits on the midpoint row, so the connectors line up. */
+#define QF_X  2
+#define SF_X 17
+#define F_X  30
+static const u16 QF_ROW[CUP_TEAMS] = { 7, 9, 12, 14, 17, 19, 22, 24 };
+static const u16 SF_ROW[4]         = { 8, 13, 18, 23 };
+static const u16 F_ROW[2]          = { 10, 20 };
+
+static void bracket_name(u8 team, u16 x, u16 y, u8 round)
 {
-    char prog[13] = "STAGE _ OF 5";
-    u8 s;
+    u8 style;
+    if (team == CUP_TBD) { ui_draw_text("-", x, y, UI_WHITE); return; }
+    style = (team == gTeamAIndex) ? UI_GOLD
+          : cup_is_out(team, round) ? UI_CYAN : UI_WHITE;
+    ui_draw_text(teamNames[team], x, y, style);
+}
+
+static void draw_cup_bracket(void)
+{
+    static const char *roundName[CUP_ROUNDS] = {
+        "QUARTER FINAL", "SEMI FINAL", "FINAL"
+    };
+    u8 i;
 
     VDP_clearPlane(BG_A, TRUE);
     VDP_clearSprites();
@@ -113,37 +135,41 @@ static void draw_cup_ladder(void)
     ui_apply_palette();
     PAL_setColor(0, RGB24_TO_VDPCOLOR(0x081830));
 
-    ui_draw_big_center("ROAD TO GLORY", 2, UI_WHITE);
-    ui_draw_text_center(teamNames[gTeamAIndex], 6, UI_CYAN);
+    ui_draw_big_center("TOURNAMENT", 1, UI_WHITE);
+    ui_draw_text_center(roundName[gCupStage < CUP_ROUNDS ? gCupStage : 2],
+                        4, UI_GOLD);
 
-    ui_draw_panel(5, 8, 30, 12, FALSE);
+    /* Quarter-final column: the full eight-team draw, with a bracket join
+     * linking each pair through to its semi-final slot. */
+    for (i = 0; i < CUP_TEAMS; i++)
+        bracket_name(cupQF[i], QF_X, QF_ROW[i], gCupStage);
+    for (i = 0; i < 4; i++)
+        ui_draw_bracket(SF_X - 3, QF_ROW[i * 2], QF_ROW[i * 2 + 1]);
 
-    for (s = 0; s < CUP_STAGES; s++)
+    /* Semi-final column, joined through to the final. */
+    for (i = 0; i < 4; i++)
+        bracket_name(cupSF[i], SF_X, SF_ROW[i], gCupStage);
+    for (i = 0; i < 2; i++)
+        ui_draw_bracket(F_X - 2, SF_ROW[i * 2], SF_ROW[i * 2 + 1]);
+
+    /* The two finalists. */
+    for (i = 0; i < 2; i++)
+        bracket_name(cupF[i], F_X, F_ROW[i], gCupStage);
+
+    if (cupChampion != CUP_TBD)
     {
-        u16 row = 10 + (u16)s * 2;
-        u8  opp = cup_opponent(gTeamAIndex, s);
-        u8  nameStyle = (s == gCupStage) ? UI_GOLD :
-                        (s <  gCupStage) ? UI_CYAN : UI_WHITE;
-        char rlabel[3] = { 'R', (char)('1' + s), 0 };
-
-        if (s == gCupStage) ui_draw_text(">", 6, row, UI_GOLD);
-        ui_draw_text(rlabel, 8, row, UI_WHITE);
-        ui_draw_text(teamNames[opp], 12, row, nameStyle);
-        if (s < gCupStage)       ui_draw_text("BEATEN", 27, row, UI_CYAN);
-        else if (s == gCupStage) ui_draw_text("NOW",    27, row, UI_GOLD);
+        ui_draw_text("CHAMPION", 15, 26, UI_GOLD);
+        ui_draw_text(teamNames[cupChampion], 24, 26, UI_GOLD);
     }
 
-    prog[6] = (char)('1' + gCupStage);
-    ui_draw_text_center(prog, 22, UI_WHITE);
-
-    ui_draw_text("A CONTINUE", 9, 25, UI_GOLD);
-    ui_draw_text("C EXIT", 26, 25, UI_CYAN);
+    ui_draw_text("A CONTINUE", 2, 27, UI_GOLD);
+    ui_draw_text("C EXIT", 31, 27, UI_CYAN);
 }
 
 static void enter_cup_ladder(void)
 {
     phase = MENU_CUP;
-    draw_cup_ladder();
+    draw_cup_bracket();
 }
 
 static void draw_selector(void)
@@ -356,8 +382,9 @@ void scene_menu_update(void)
             gCupStage = 0;
             gScoreA = 0;
             gScoreB = 0;
-            gTeamBIndex = cup_opponent(gTeamAIndex, 0);
-            enter_cup_ladder();   /* cup intro ladder, then A -> matchup */
+            cup_build(gTeamAIndex);   /* fresh 8-team knockout draw */
+            gTeamBIndex = cup_opponent_now(gTeamAIndex, 0);
+            enter_cup_ladder();   /* show the bracket, then A -> matchup */
             return;
         }
         if (phase == MENU_TEAM_A)

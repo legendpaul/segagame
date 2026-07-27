@@ -18,6 +18,20 @@
  * while court foreground/flags start after these 16 slots, so it's dead space
  * during a match. */
 #define TILE_REFEREE   (TILE_COURT_BASE + COURT_TILE_COUNT)
+/* One more tile in the same dead boot-logo region, immediately after the
+ * referee bank: a short white dash used to build the dotted vertical line that
+ * shows how high the ball is off the ground. */
+#define TILE_BALL_TETHER (TILE_REFEREE + REF_TILE_COUNT)
+static const u32 tile_ball_tether[8] = {
+    0x00011000,
+    0x00011000,
+    0x00000000,
+    0x00000000,
+    0x00011000,
+    0x00011000,
+    0x00000000,
+    0x00000000
+};
 #define REF_SKIN_LIGHT 0xD8A878
 #define REF_SKIN_DARK  0x9C6C40
 
@@ -179,22 +193,48 @@ static void draw_control_marker(void)
                        SLOT_SHADOWS);
 }
 
-static void hide_unselected_player_dots(void)
+/* The six ex-player-shadow slots now draw a dotted white line from the ball's
+ * ground point up to the ball whenever it is off the ground, so its height is
+ * readable at a glance. Unused dots are parked off-screen; the link chain and
+ * its terminator are unchanged. The dots take the SAME net priority as the
+ * ball, so the centre board occludes them exactly like it occludes the ball. */
+static void draw_ball_air_dots(void)
 {
-    u8 i;
-    for (i = 0; i < TEAM_SIZE; i++)
+    bool held = (ball.state == BALL_HELD_A) || (ball.state == BALL_HELD_B);
+    /* A held ball is off the ground too: its ground point is the carrier's
+     * feet, so the dots run from there up to the ball in the hand. */
+    const Player *carrier = (ball.state == BALL_HELD_A) ? &teamA[holderA]
+                                                       : &teamB[holderB];
+    s16 groundY = held ? (carrier->y + 16 + worldOffsetY)
+                       : (ball.y + worldOffsetY);
+    s16 groundX = held ? (carrier->x + 8) : ball.x;
+    s16 gap     = groundY - (ball_visualY(&ball) + worldOffsetY);
+    bool airborne = held ||
+                    (ball.state == BALL_FLYING_TO_A) ||
+                    (ball.state == BALL_FLYING_TO_B) ||
+                    ((ball.state == BALL_LOOSE) && ((ball.height >> 8) > 2));
+    u16 netPriority = (COURT_DEPTH_OF(ball.x, ball.y) >= COURT_CENTER_DEPTH) ? 1 : 0;
+    u8 dots = 0, i;
+
+    if (airborne && gap > 10)
     {
-        u8 slotA = SLOT_SHADOWS + i;
-        u8 slotB = SLOT_SHADOWS + TEAM_SIZE + i;
-        /* The old six one-tile shadows read as selection dots under every
-         * player. The wide two-tile control marker is the sole indicator;
-         * retain these slots only to keep the hardware sprite link intact. */
-        VDP_setSpriteFull(slotA, -16, -16, SPRITE_SIZE(1, 1),
-                           TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL_SHADOW),
-                           slotA + 1);
-        VDP_setSpriteFull(slotB, -16, -16, SPRITE_SIZE(1, 1),
-                           TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, TILE_BALL_SHADOW),
-                           (i == TEAM_SIZE - 1) ? 0 : (slotB + 1));
+        dots = (u8)((gap - 4) / 8);
+        if (dots > 6) dots = 6;
+    }
+
+    for (i = 0; i < 6; i++)
+    {
+        u8 slot = SLOT_SHADOWS + i;
+        u8 link = (i == 5) ? 0 : (u8)(slot + 1);
+        if (i < dots)
+            VDP_setSpriteFull(slot, groundX - 4, groundY - 10 - (s16)i * 8,
+                               SPRITE_SIZE(1, 1),
+                               TILE_ATTR_FULL(PAL_BALL, netPriority, FALSE, FALSE,
+                                              TILE_BALL_TETHER), link);
+        else
+            VDP_setSpriteFull(slot, -16, -16, SPRITE_SIZE(1, 1),
+                               TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE,
+                                              TILE_BALL_SHADOW), link);
     }
 }
 
@@ -635,6 +675,7 @@ void scene_match_enter(void)
 
     /* Referee sprite lives in the (now-dead) boot-logo VRAM region. */
     VDP_loadTileData(ref_tiles[0], TILE_REFEREE, REF_TILE_COUNT, DMA);
+    VDP_loadTileData(tile_ball_tether, TILE_BALL_TETHER, 1, DMA);
 
     /* Solid navy behind the HUD strip so the score/clock glyphs never reveal
      * the crowd through their transparent pixels (and no fans sit under it). */
@@ -666,6 +707,9 @@ static void go_round_end(u8 winnerIsA)
 
     pickupClock = 0;
     roundWinnerIsA = winnerIsA;
+    /* The round-end celebration does not tick loose-ball physics either, so
+     * make sure the ball is resting on the ground rather than stuck mid-air. */
+    ball_settle(&ball);
     sound_mgr_score();
     sound_mgr_crowdVictory();
 
@@ -863,6 +907,10 @@ static void trigger_pickup_timeout(void)
      * left completely untouched where it settled. */
     if (ball.state == BALL_HELD_A || ball.state == BALL_HELD_B)
         ball_dropAt(&ball, ball.x, ball.y);
+    /* Nothing ticks the loose-ball physics during the escort, so settle the
+     * ball flat on the ground now - otherwise it hangs frozen in mid-bounce
+     * for the whole walk-off. */
+    ball_settle(&ball);
 
     /* Referee enters from the corner on the player's own half so it never
      * appears to cross the centre net: bottom-right for a near-side team A
@@ -1341,11 +1389,20 @@ void scene_match_update(void)
                     /* Tournament: a match win advances the gauntlet to the
                      * next opponent instead of ending the game - unless that
                      * was the final, in which case you're crowned champion. */
-                    if (gGameMode == MODE_TOURNAMENT && gScoreA >= WIN_SCORE
-                        && (gCupStage + 1) < CUP_STAGES)
+                    if (gGameMode == MODE_TOURNAMENT && gScoreA >= WIN_SCORE)
                     {
+                        /* Record the win and simulate the other ties in this
+                         * round, so the bracket fills in like a real cup. */
+                        cup_advance(gTeamAIndex, gCupStage);
                         gCupStage++;
-                        gTeamBIndex = cup_opponent(gTeamAIndex, gCupStage);
+                        if (gCupStage >= CUP_ROUNDS)
+                        {
+                            /* Won the final - champion. */
+                            PAL_fadeOutAll(20, FALSE);
+                            gCurrentScene = GS_GAMEOVER;
+                            return;
+                        }
+                        gTeamBIndex = cup_opponent_now(gTeamAIndex, gCupStage);
                         gScoreA = 0;
                         gScoreB = 0;
                         PAL_fadeOutAll(20, FALSE);
@@ -1407,7 +1464,7 @@ void scene_match_update(void)
     ball.y -= worldOffsetY;
     if (state == MS_ESCORT) draw_referee(escortPhase == 1);
     else draw_control_marker();
-    hide_unselected_player_dots();
+    draw_ball_air_dots();
 
     /* On-screen shot clock for whichever side is on the loose-ball timer. */
     if (pickupClock > 0)

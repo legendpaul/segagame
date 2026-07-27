@@ -184,6 +184,18 @@ bool ball_updateLoose(Ball *b)
     return contact;
 }
 
+void ball_settle(Ball *b)
+{
+    /* Flat on the deck, no bounce left, no drift - the resting pose. */
+    b->height = 0;
+    b->velocityZ = 0;
+    b->velocityX = 0;
+    b->velocityY = 0;
+    b->bounceCount = 2;
+    b->preciseX = (s32)b->x << 8;
+    b->preciseY = (s32)b->y << 8;
+}
+
 #define ARC_HEIGHT   28   /* px, strong arcade arc at the midpoint */
 
 s16 ball_visualY(const Ball *b)

@@ -50,6 +50,10 @@ void ball_startRicochet(Ball *b);
  * victim's feet, retaining only a tiny spin kick and vertical bounce. */
 void ball_dropAt(Ball *b, s16 x, s16 y);
 bool ball_updateLoose(Ball *b); /* TRUE when the ball contacts floor/wall */
+/* Force the ball flat on the ground and completely at rest. Used by states
+ * that stop ticking the loose physics (referee escort, round end) so a ball
+ * can never be left frozen in mid-air. */
+void ball_settle(Ball *b);
 /* Visible flight Y, including the parabola used by ball_draw(). */
 s16 ball_visualY(const Ball *b);
 void ball_draw(Ball *b);

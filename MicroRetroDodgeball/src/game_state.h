@@ -75,7 +75,8 @@ typedef enum {
     DIFF_HARD
 } Difficulty;
 
-#define CUP_STAGES  (TEAM_SIZE + 2)   /* opponents to beat to win the cup (5) */
+/* The cup is an 8-team single-elimination bracket: see CUP_ROUNDS in teams.h
+ * (quarter-final, semi-final, final). gCupStage is the current round, 0..2. */
 
 /* Persist across scenes */
 extern u8 gTeamAIndex;     /* player's team */
