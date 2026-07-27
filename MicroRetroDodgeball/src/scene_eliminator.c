@@ -173,17 +173,11 @@ static void eliminate(u8 who)
 
 static void draw_hud(void)
 {
-    char buf[4];
     ui_set_palette(PAL0);
     ui_apply_palette();
     flag_data_fill_panel(0, 0, 40, 3);
     ui_draw_panel(0, 0, 40, 3, FALSE);
-    ui_draw_text("GLOBAL ELIMINATOR", 2, 1, UI_CYAN);
-    ui_draw_text(teamNames[gTeamAIndex], 22, 1,
-                 fighters[humanIdx].out ? UI_CYAN : UI_GOLD);
-    intToStr(aliveCount, buf, 1);
-    ui_draw_text("LEFT", 32, 1, UI_WHITE);
-    ui_draw_text(buf, 37, 1, UI_GOLD);
+    ui_draw_text_center("GLOBAL ELIMINATOR", 1, UI_CYAN);
 }
 
 static void draw_result(void)
