@@ -6,6 +6,15 @@
 #define RUN_FRAME_LEN   4   /* frames between four-beat run phases */
 #define IDLE_FRAME_LEN  28  /* restrained breathing cadence */
 
+/* The player's ground-contact point (feet / control-ring centre) sits 8px
+ * right of and 8px below the sprite origin - the same point the game uses for
+ * the held ball and the ground marker. Boundary clamping must use THIS point,
+ * not the raw origin, and keep half the stance width inside every touchline so
+ * no foot or marker overhangs the line. */
+#define PLAYER_FEET_DX   8
+#define PLAYER_FEET_DY   8
+#define PLAYER_HALF_W   10
+
 #define OFFSCREEN_X   -100
 #define OFFSCREEN_Y   -100
 
@@ -112,12 +121,16 @@ void player_clampToCourt(Player *p)
     if (depth < minDepth) p->y += minDepth - depth;
     if (depth > maxDepth) p->y -= depth - maxDepth;
 
-    depth = p->y - (p->x >> 2);
-    /* The parallel sidelines drift left toward the near edge. */
-    s16 minX = COURT_MIN_X_AT_DEPTH(depth) + 8;
-    s16 maxX = COURT_MAX_X_AT_DEPTH(depth) - 8;
-    if (p->x < minX) p->x = minX;
-    if (p->x > maxX) p->x = maxX;
+    /* Sideline clamp on the feet/bottom-centre point, keeping half the stance
+     * width inside each touchline. Identical for both teams. The parallel
+     * sidelines drift left toward the near edge, so evaluate the rail at the
+     * feet's projected depth. */
+    s16 feetX = p->x + PLAYER_FEET_DX;
+    s16 feetDepth = (p->y + PLAYER_FEET_DY) - (feetX >> 2);
+    s16 minX = COURT_MIN_X_AT_DEPTH(feetDepth) + PLAYER_HALF_W;
+    s16 maxX = COURT_MAX_X_AT_DEPTH(feetDepth) - PLAYER_HALF_W;
+    if (feetX < minX) p->x += (minX - feetX);
+    if (feetX > maxX) p->x -= (feetX - maxX);
 }
 
 void player_tickAnim(Player *p, bool isMoving)
