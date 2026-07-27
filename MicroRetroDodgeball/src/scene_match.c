@@ -95,6 +95,16 @@ static u8  flashTimer;      /* frames left in the current impact flash, 0 = none
 static u8  shakeTimer;      /* frames left in the current screen shake, 0 = none */
 static s8  worldOffsetY;    /* applied to BG_B and every world sprite together */
 
+/* In-match pause overlay: START freezes the whole update loop (all timers,
+ * AI and physics) and shows a small centred menu. Sprites are parked while
+ * paused; the normal render tail redraws them on resume. */
+static bool matchPaused;
+static u8   pauseRow;       /* 0 = RESUME, 1 = QUIT TO TITLE */
+#define PAUSE_X  12
+#define PAUSE_Y  9
+#define PAUSE_W  16
+#define PAUSE_H  10
+
 /* Safety watchdog: if the match state hasn't changed for an
  * unreasonably long time (STALL_LIMIT frames), something has gone
  * wrong - force the current state's natural timer/condition to
@@ -570,6 +580,7 @@ void scene_match_enter(void)
     VDP_setVerticalScroll(BG_B, 0);
     stallTrackerInit = FALSE;
     server = 0;
+    matchPaused = FALSE;
     start_round();
 }
 
@@ -795,6 +806,69 @@ static void trigger_pickup_timeout(void)
     state = MS_ESCORT;
 }
 
+/* Draw just the two option rows so cursor moves don't redraw the whole box. */
+static void draw_pause_rows(void)
+{
+    ui_draw_text("RESUME",       15, PAUSE_Y + 4, (pauseRow == 0) ? UI_GOLD : UI_WHITE);
+    ui_draw_text("QUIT TO TITLE", 14, PAUSE_Y + 6, (pauseRow == 1) ? UI_GOLD : UI_WHITE);
+    /* Selection chevrons - clear both columns first, then mark the active row. */
+    ui_draw_text(" ", 13, PAUSE_Y + 4, UI_GOLD);
+    ui_draw_text(" ", 13, PAUSE_Y + 6, UI_GOLD);
+    ui_draw_text(">", 13, PAUSE_Y + 4 + (pauseRow * 2), UI_GOLD);
+}
+
+static void pause_enter(void)
+{
+    matchPaused = TRUE;
+    pauseRow = 0;
+    sound_mgr_confirm();
+    VDP_clearSprites();
+    sprites_data_hide_all_sprites();
+    flag_data_fill_panel(PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H);
+    ui_draw_panel(PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H, FALSE);
+    ui_draw_big_center("PAUSED", PAUSE_Y + 1, UI_GOLD);
+    draw_pause_rows();
+}
+
+static void pause_resume(void)
+{
+    matchPaused = FALSE;
+    sound_mgr_cancel();
+    /* Wipe the overlay from both planes; the render tail restores the sprites. */
+    VDP_clearTextArea(PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H);
+    court_bg_redraw_rect(PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H);
+    draw_hud();
+}
+
+static void pause_menu_update(void)
+{
+    if (input_pressed(BUTTON_UP) || input_pressed(BUTTON_DOWN))
+    {
+        pauseRow ^= 1;
+        sound_mgr_blip();
+        draw_pause_rows();
+    }
+    else if (input_pressed(BUTTON_START) || input_pressed(BUTTON_C) ||
+             input_pressed(BUTTON_B))
+    {
+        pause_resume();   /* START/B/C are a quick unpause */
+    }
+    else if (input_pressed(BUTTON_A))
+    {
+        if (pauseRow == 0)
+        {
+            pause_resume();
+        }
+        else
+        {
+            sound_mgr_confirm();
+            matchPaused = FALSE;
+            PAL_fadeOutAll(20, FALSE);
+            gCurrentScene = GS_MENU;
+        }
+    }
+}
+
 void scene_match_update(void)
 {
     bool cpuMoved = FALSE;
@@ -803,6 +877,22 @@ void scene_match_update(void)
     u8 i;
 
     input_mgr_update();
+
+    /* Pause gate: while paused, nothing else in the loop runs, so every
+     * timer, the AI and all physics are frozen until the player resumes. */
+    if (matchPaused)
+    {
+        pause_menu_update();
+        return;
+    }
+    /* START opens the pause menu, but never mid-elimination/round-break so
+     * the overlay can't strand an in-progress escort or banner. */
+    if (input_pressed(BUTTON_START) &&
+        state != MS_ANNOUNCE && state != MS_ROUND_END && state != MS_ESCORT)
+    {
+        pause_enter();
+        return;
+    }
 
     if (++clockFrameCounter >= (SYS_isPAL() ? 50 : 60))
     {
