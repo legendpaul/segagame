@@ -895,9 +895,16 @@ static void pause_resume(void)
 {
     matchPaused = FALSE;
     sound_mgr_cancel();
-    /* Wipe the overlay from both planes; the render tail restores the sprites. */
-    VDP_clearTextArea(PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H);
+    /* Wipe the overlay from both planes; the render tail restores the sprites.
+     * NOTE: use the rectangular tilemap clear, NOT VDP_clearTextArea(). The
+     * latter stamps the FONT's space tile, and the UI/title art has reclaimed
+     * that font VRAM - so it painted a block of garbage (vertical white
+     * stripes) over the pitch on resume. */
+    VDP_clearTileMapRect(BG_A, PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H);
     court_bg_redraw_rect(PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H);
+    /* The panel also covered part of the high-priority net overlay on BG_A,
+     * which the BG_B court redraw cannot bring back - restore it explicitly. */
+    court_bg_drawForeground();
     draw_hud();
 }
 
