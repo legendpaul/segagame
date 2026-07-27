@@ -29,6 +29,7 @@ void player_init(Player *p, s16 startX, s16 y, u8 spriteSlot, u8 pal)
     p->eliminated = FALSE;
     p->exiting = FALSE;
     p->freeRoam = FALSE;
+    p->kitVariant = 0;
     p->spriteSlot = spriteSlot;
     p->pal = pal;
     p->pose = POSE_STAND;
@@ -202,6 +203,20 @@ void player_setPose(Player *p, u8 pose, u8 timer)
     p->animCounter = 0;
 }
 
+/* Map a pose's tile base onto a recoloured variant of the same pose.
+ *
+ * PHASE 1 (this commit) deliberately returns the original base for every
+ * variant, so behaviour is bit-identical to before and the plumbing can be
+ * proven safe on its own. Phase 2 uploads the extra variant banks into the
+ * reclaimed VRAM (unused court reserve + the dead boot-logo region) and this
+ * becomes a real lookup. Keeping the translation in ONE place is what stops a
+ * repeat of the tile-index chain corruption we hit previously. */
+u16 player_variant_base(u16 base, u8 variant)
+{
+    if (variant == 0) return base;
+    return base;   /* variant banks not uploaded yet - Phase 2 */
+}
+
 void player_draw(Player *p)
 {
     /* Hardware sprites form a linked list starting at slot 0; match play
@@ -274,6 +289,11 @@ void player_draw(Player *p)
         static const s8 breatheY[4] = { 0, 0, -1, 0 };
         poseOffsetY = breatheY[p->animFrame & 3];
     }
+
+    /* Swap in this player's recoloured copy of whichever pose was selected.
+     * Variant 0 resolves to the original bank, so the default path is exactly
+     * the artwork used before this existed. */
+    base = player_variant_base(base, p->kitVariant);
 
     /* The centre board is a high-priority BG_A foreground. Near-half players
      * must use high sprite priority to cover it; far-half players remain low

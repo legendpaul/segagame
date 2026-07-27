@@ -36,6 +36,12 @@ typedef struct {
     u8  small;        /* TRUE = render the dedicated 24x24 far-side size */
     bool farSide;     /* gameplay half, independent of visual sprite scale */
     bool freeRoam;    /* TRUE = no centre net, may use the WHOLE court */
+    /* Which recoloured copy of the player art to draw. Variant 0 is the
+     * original bank; higher variants are identical artwork whose kit pixels
+     * use a different set of palette indices, so several kits can share one
+     * palette line. Combined with the sprite's palette line this is what lets
+     * every nation wear its own colours at once. */
+    u8   kitVariant;
     bool facingLeft;  /* horizontal travel direction; mirrors current front/rear bank */
 } Player;
 
@@ -58,6 +64,9 @@ void player_clampToCourt(Player *p);
 void player_tickAnim(Player *p, bool isMoving);
 /* Forces a transient action pose for "timer" frames. */
 void player_setPose(Player *p, u8 pose, u8 timer);
+/* Translate a pose tile base into the given kit variant's copy of that pose.
+ * Variant 0 is always the original artwork. */
+u16 player_variant_base(u16 base, u8 variant);
 void player_draw(Player *p);
 
 #endif /* _PLAYER_H_ */

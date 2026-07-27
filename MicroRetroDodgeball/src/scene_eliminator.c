@@ -235,8 +235,18 @@ void scene_eliminator_enter(void)
         fighters[i].out  = FALSE;
         fighters[i].ball = NO_BALL;
         fighters[i].think = (u16)(30 + (random() % 90));
+        /* Ten nations, ten kits: five recoloured tile variants per palette
+         * line, two lines. Variant picks which kit indices the art uses and
+         * the palette line supplies the actual colours, so variant 2 on PAL1
+         * and variant 2 on PAL2 are different nations. (The variant banks go
+         * live in phase 2; until then every variant resolves to the base art,
+         * so this assignment is harmless.) */
         player_init(&fighters[i].p, x, y, (u8)(SLOT_PLAYERS + i),
                     (i == humanIdx) ? PAL_TEAM_A : PAL_TEAM_B);
+        /* Variant assignment is already final; the palette split to PAL_TEAM_A
+         * for slots 0-4 and PAL_TEAM_B for 5-9 lands in phase 3, once the
+         * variant banks actually hold different kit indices. */
+        fighters[i].p.kitVariant = (u8)(i % 5);
         fighters[i].p.freeRoam = TRUE;      /* no net: the whole court is live */
         fighters[i].p.farSide  = (row == 0);
         fighters[i].p.facingLeft = (col >= 3);
