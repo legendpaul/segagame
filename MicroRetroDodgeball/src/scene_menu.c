@@ -104,24 +104,30 @@ static void draw_mode(void)
  * glance (the same read as a TV tournament roster). */
 /* Column x positions and the row of every slot. Pairs sit two rows apart and
  * each round's winner sits on the midpoint row, so the connectors line up. */
-#define QF_X   1     /* names 1..11  */
-#define QF_B  12     /* bracket join, stub lands on 13 */
-#define SF_X  14     /* names 14..24 */
-#define SF_B  25     /* bracket join, stub lands on 26 */
-#define F_X   27     /* names 27..37 */
-#define F_B   38     /* winner bracket - the two finalists converge here */
-static const u16 QF_ROW[CUP_TEAMS] = { 7, 9, 12, 14, 17, 19, 22, 24 };
-static const u16 SF_ROW[4]         = { 8, 13, 18, 23 };
-static const u16 F_ROW[2]          = { 10, 20 };
-#define CHAMP_ROW 15
+/* Mirrored bracket: four teams down each side on plates, the joins converging
+ * inward to the cup in the centre - the classic tournament-roster layout. */
+#define PLATE_L_X   1
+#define PLATE_R_X  26
+#define PLATE_W    13
+/* Text rows of the eight plates: left side then right side, in bracket order
+ * (pairs are adjacent, so 0-1 and 2-3 meet, then those winners meet). */
+static const u16 PLATE_ROW[4] = { 5, 9, 15, 19 };
+#define JOIN_L_IN  15   /* left  pair joins  */
+#define JOIN_L_MID 17   /* left  half joins toward the centre */
+#define JOIN_R_IN  24   /* right pair joins  */
+#define JOIN_R_MID 22   /* right half joins toward the centre */
+#define CHAMP_ROW  23
 
-static void bracket_name(u8 team, u16 x, u16 y, u8 round)
+/* A team plate: a framed box with the name inside, like the roster plates in
+ * the reference. Gold frame for the player's own team so it stands out. */
+static void bracket_plate(u8 team, u16 x, u16 row, u8 round)
 {
     u8 style;
-    if (team == CUP_TBD) { ui_draw_text("-", x, y, UI_WHITE); return; }
-    style = (team == gTeamAIndex) ? UI_GOLD
-          : cup_is_out(team, round) ? UI_CYAN : UI_WHITE;
-    ui_draw_text(teamNames[team], x, y, style);
+    bool mine = (team == gTeamAIndex);
+    ui_draw_panel(x, (u16)(row - 1), PLATE_W, 3, mine);
+    if (team == CUP_TBD) return;
+    style = mine ? UI_GOLD : cup_is_out(team, round) ? UI_CYAN : UI_WHITE;
+    ui_draw_text(teamNames[team], (u16)(x + 1), row, style);
 }
 
 static void draw_cup_bracket(void)
@@ -139,42 +145,38 @@ static void draw_cup_bracket(void)
     ui_apply_palette();
     PAL_setColor(0, RGB24_TO_VDPCOLOR(0x081830));
 
-    /* Small header: the bracket itself is the content, so the title does not
-     * need the double-height font competing with it. */
-    ui_draw_text_center("TOURNAMENT", 1, UI_WHITE);
+    ui_draw_text_center("TOURNAMENT", 0, UI_WHITE);
     ui_draw_text_center(cupChampion != CUP_TBD ? "COMPLETE"
                         : roundName[gCupStage < CUP_ROUNDS ? gCupStage : 2],
-                        3, UI_GOLD);
+                        2, UI_GOLD);
 
-    /* Quarter-final column: the full eight-team draw, each pair joined through
-     * to its semi-final slot. */
-    for (i = 0; i < CUP_TEAMS; i++)
-        bracket_name(cupQF[i], QF_X, QF_ROW[i], gCupStage);
+    /* Eight plates: the first four slots down the left, the last four down the
+     * right, so both halves converge on the cup in the middle. */
     for (i = 0; i < 4; i++)
-        ui_draw_bracket(QF_B, QF_ROW[i * 2], QF_ROW[i * 2 + 1]);
-
-    /* Semi-final column, joined through to the final. */
+        bracket_plate(cupQF[i], PLATE_L_X, PLATE_ROW[i], gCupStage);
     for (i = 0; i < 4; i++)
-        bracket_name(cupSF[i], SF_X, SF_ROW[i], gCupStage);
-    for (i = 0; i < 2; i++)
-        ui_draw_bracket(SF_B, SF_ROW[i * 2], SF_ROW[i * 2 + 1]);
+        bracket_plate(cupQF[4 + i], PLATE_R_X, PLATE_ROW[i], gCupStage);
 
-    /* The two finalists, and the winner bracket they converge into. */
-    for (i = 0; i < 2; i++)
-        bracket_name(cupF[i], F_X, F_ROW[i], gCupStage);
-    ui_draw_bracket(F_B, F_ROW[0], F_ROW[1]);
+    /* Pair joins, then each half's semi-final join heading inward. */
+    ui_draw_bracket(JOIN_L_IN,  PLATE_ROW[0], PLATE_ROW[1], FALSE);
+    ui_draw_bracket(JOIN_L_IN,  PLATE_ROW[2], PLATE_ROW[3], FALSE);
+    ui_draw_bracket(JOIN_L_MID, 7, 17, FALSE);
+    ui_draw_bracket(JOIN_R_IN,  PLATE_ROW[0], PLATE_ROW[1], TRUE);
+    ui_draw_bracket(JOIN_R_IN,  PLATE_ROW[2], PLATE_ROW[3], TRUE);
+    ui_draw_bracket(JOIN_R_MID, 7, 17, TRUE);
 
-    /* Champion sits on the winner bracket's midpoint row. */
-    ui_draw_text("WINNER", F_X, CHAMP_ROW - 1, UI_CYAN);
-    if (cupChampion != CUP_TBD)
-        ui_draw_text(teamNames[cupChampion], F_X, CHAMP_ROW, UI_GOLD);
-    else
-        ui_draw_text("-", F_X, CHAMP_ROW, UI_WHITE);
+    /* The cup itself in the centre, where both halves meet. */
+    ui_draw_panel(18, 10, 4, 5, TRUE);
+    ui_draw_text("CUP", 18, 12, UI_GOLD);
+
+    ui_draw_text_center(cupChampion != CUP_TBD ? teamNames[cupChampion]
+                                               : "WINNER", CHAMP_ROW,
+                        cupChampion != CUP_TBD ? UI_GOLD : UI_CYAN);
 
     /* Once the cup is won there is nothing left to continue into. */
     if (cupChampion == CUP_TBD)
-        ui_draw_text("A CONTINUE", 2, 27, UI_GOLD);
-    ui_draw_text("C EXIT", 31, 27, UI_CYAN);
+        ui_draw_text("A CONTINUE", 2, 26, UI_GOLD);
+    ui_draw_text("C EXIT", 31, 26, UI_CYAN);
 }
 
 static void enter_cup_ladder(void)

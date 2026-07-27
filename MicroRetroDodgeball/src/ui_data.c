@@ -174,25 +174,27 @@ void ui_draw_panel(u16 x, u16 y, u16 w, u16 h, bool gold)
         }
 }
 
-void ui_draw_bracket(u16 x, u16 yTop, u16 yBot)
+void ui_draw_bracket(u16 x, u16 yTop, u16 yBot, bool mirrored)
 {
     /* A tournament-bracket join: a vertical run down column x linking the two
      * paired rows, closed with corners, and a horizontal stub leaving the
-     * midpoint toward the next round's column. Built from the existing panel
-     * line tiles, whose navy fill matches the screen backdrop. */
+     * midpoint toward the next round. Built from the existing panel line
+     * tiles, whose navy fill matches the screen backdrop. "mirrored" flips it
+     * for the right-hand half of a centre-converging bracket, so its lines run
+     * down the left edge and the stub exits leftward. */
+    bool hf = !mirrored;   /* vertical rule on the right for the left half */
     u16 y;
-    /* Top corner: line arrives along the top, turns down the right side. */
-    VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(uiPalette, 0, FALSE, TRUE,
+    VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(uiPalette, 0, FALSE, hf,
                      TILE_UI_CORNER_CYAN), x, yTop);
-    /* Bottom corner: mirrored vertically so the line turns up. */
-    VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(uiPalette, 0, TRUE, TRUE,
+    VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(uiPalette, 0, TRUE, hf,
                      TILE_UI_CORNER_CYAN), x, yBot);
     for (y = (u16)(yTop + 1); y < yBot; y++)
-        VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(uiPalette, 0, FALSE, TRUE,
+        VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(uiPalette, 0, FALSE, hf,
                          TILE_UI_V_CYAN), x, y);
-    /* Stub out of the middle toward the next column. */
     VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(uiPalette, 0, FALSE, FALSE,
-                     TILE_UI_H_CYAN), (u16)(x + 1), (u16)((yTop + yBot) >> 1));
+                     TILE_UI_H_CYAN),
+                     mirrored ? (u16)(x - 1) : (u16)(x + 1),
+                     (u16)((yTop + yBot) >> 1));
 }
 
 void ui_draw_button(const char *label, u16 x, u16 y, u16 w)
