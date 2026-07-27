@@ -104,12 +104,16 @@ static void draw_mode(void)
  * glance (the same read as a TV tournament roster). */
 /* Column x positions and the row of every slot. Pairs sit two rows apart and
  * each round's winner sits on the midpoint row, so the connectors line up. */
-#define QF_X  2
-#define SF_X 17
-#define F_X  30
+#define QF_X   1     /* names 1..11  */
+#define QF_B  12     /* bracket join, stub lands on 13 */
+#define SF_X  14     /* names 14..24 */
+#define SF_B  25     /* bracket join, stub lands on 26 */
+#define F_X   27     /* names 27..37 */
+#define F_B   38     /* winner bracket - the two finalists converge here */
 static const u16 QF_ROW[CUP_TEAMS] = { 7, 9, 12, 14, 17, 19, 22, 24 };
 static const u16 SF_ROW[4]         = { 8, 13, 18, 23 };
 static const u16 F_ROW[2]          = { 10, 20 };
+#define CHAMP_ROW 15
 
 static void bracket_name(u8 team, u16 x, u16 y, u8 round)
 {
@@ -135,34 +139,41 @@ static void draw_cup_bracket(void)
     ui_apply_palette();
     PAL_setColor(0, RGB24_TO_VDPCOLOR(0x081830));
 
-    ui_draw_big_center("TOURNAMENT", 1, UI_WHITE);
-    ui_draw_text_center(roundName[gCupStage < CUP_ROUNDS ? gCupStage : 2],
-                        4, UI_GOLD);
+    /* Small header: the bracket itself is the content, so the title does not
+     * need the double-height font competing with it. */
+    ui_draw_text_center("TOURNAMENT", 1, UI_WHITE);
+    ui_draw_text_center(cupChampion != CUP_TBD ? "COMPLETE"
+                        : roundName[gCupStage < CUP_ROUNDS ? gCupStage : 2],
+                        3, UI_GOLD);
 
-    /* Quarter-final column: the full eight-team draw, with a bracket join
-     * linking each pair through to its semi-final slot. */
+    /* Quarter-final column: the full eight-team draw, each pair joined through
+     * to its semi-final slot. */
     for (i = 0; i < CUP_TEAMS; i++)
         bracket_name(cupQF[i], QF_X, QF_ROW[i], gCupStage);
     for (i = 0; i < 4; i++)
-        ui_draw_bracket(SF_X - 3, QF_ROW[i * 2], QF_ROW[i * 2 + 1]);
+        ui_draw_bracket(QF_B, QF_ROW[i * 2], QF_ROW[i * 2 + 1]);
 
     /* Semi-final column, joined through to the final. */
     for (i = 0; i < 4; i++)
         bracket_name(cupSF[i], SF_X, SF_ROW[i], gCupStage);
     for (i = 0; i < 2; i++)
-        ui_draw_bracket(F_X - 2, SF_ROW[i * 2], SF_ROW[i * 2 + 1]);
+        ui_draw_bracket(SF_B, SF_ROW[i * 2], SF_ROW[i * 2 + 1]);
 
-    /* The two finalists. */
+    /* The two finalists, and the winner bracket they converge into. */
     for (i = 0; i < 2; i++)
         bracket_name(cupF[i], F_X, F_ROW[i], gCupStage);
+    ui_draw_bracket(F_B, F_ROW[0], F_ROW[1]);
 
+    /* Champion sits on the winner bracket's midpoint row. */
+    ui_draw_text("WINNER", F_X, CHAMP_ROW - 1, UI_CYAN);
     if (cupChampion != CUP_TBD)
-    {
-        ui_draw_text("CHAMPION", 15, 26, UI_GOLD);
-        ui_draw_text(teamNames[cupChampion], 24, 26, UI_GOLD);
-    }
+        ui_draw_text(teamNames[cupChampion], F_X, CHAMP_ROW, UI_GOLD);
+    else
+        ui_draw_text("-", F_X, CHAMP_ROW, UI_WHITE);
 
-    ui_draw_text("A CONTINUE", 2, 27, UI_GOLD);
+    /* Once the cup is won there is nothing left to continue into. */
+    if (cupChampion == CUP_TBD)
+        ui_draw_text("A CONTINUE", 2, 27, UI_GOLD);
     ui_draw_text("C EXIT", 31, 27, UI_CYAN);
 }
 
@@ -309,7 +320,9 @@ void scene_menu_update(void)
 
     if (phase == MENU_CUP)
     {
-        if (input_pressed(BUTTON_A) || input_pressed(BUTTON_START))
+        /* Cup already won: this is the final standings, so only EXIT applies. */
+        if (cupChampion == CUP_TBD &&
+            (input_pressed(BUTTON_A) || input_pressed(BUTTON_START)))
         {
             sound_mgr_confirm();
             enter_matchup();

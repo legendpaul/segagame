@@ -201,24 +201,29 @@ static void draw_control_marker(void)
 static void draw_ball_air_dots(void)
 {
     bool held = (ball.state == BALL_HELD_A) || (ball.state == BALL_HELD_B);
-    /* A held ball is off the ground too: its ground point is the carrier's
-     * feet, so the dots run from there up to the ball in the hand. */
+    /* The dots ALWAYS hang directly below the ball sprite itself, so the
+     * column lines up with the ball - not with the carrier's body. For a held
+     * ball the ground reference is the carrier's feet; otherwise it is the
+     * ball's own ground track. */
     const Player *carrier = (ball.state == BALL_HELD_A) ? &teamA[holderA]
                                                        : &teamB[holderB];
+    s16 groundX = ball.x;
     s16 groundY = held ? (carrier->y + 16 + worldOffsetY)
                        : (ball.y + worldOffsetY);
-    s16 groundX = held ? (carrier->x + 8) : ball.x;
     s16 gap     = groundY - (ball_visualY(&ball) + worldOffsetY);
+    /* Any loose ball with real height counts as airborne - including the low
+     * bounces after it ricochets off a wall back into play. */
     bool airborne = held ||
                     (ball.state == BALL_FLYING_TO_A) ||
                     (ball.state == BALL_FLYING_TO_B) ||
-                    ((ball.state == BALL_LOOSE) && ((ball.height >> 8) > 2));
+                    ((ball.state == BALL_LOOSE) && ((ball.height >> 8) > 0));
     u16 netPriority = (COURT_DEPTH_OF(ball.x, ball.y) >= COURT_CENTER_DEPTH) ? 1 : 0;
     u8 dots = 0, i;
 
-    if (airborne && gap > 10)
+    if (airborne && gap >= 6)
     {
-        dots = (u8)((gap - 4) / 8);
+        dots = (u8)(gap / 8);
+        if (dots < 1) dots = 1;      /* a low bounce still shows one dot */
         if (dots > 6) dots = 6;
     }
 
@@ -1397,9 +1402,12 @@ void scene_match_update(void)
                         gCupStage++;
                         if (gCupStage >= CUP_ROUNDS)
                         {
-                            /* Won the final - champion. */
+                            /* Won the final: go back to the bracket so the
+                             * player sees the completed competition with their
+                             * name as winner (exit only, nothing to continue). */
                             PAL_fadeOutAll(20, FALSE);
-                            gCurrentScene = GS_GAMEOVER;
+                            gMenuEntry = MENU_ENTRY_CUP_LADDER;
+                            gCurrentScene = GS_MENU;
                             return;
                         }
                         gTeamBIndex = cup_opponent_now(gTeamAIndex, gCupStage);
