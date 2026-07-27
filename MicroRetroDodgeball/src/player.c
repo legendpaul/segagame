@@ -15,7 +15,7 @@
  * point the control ring already marks. All court alignment keys off this. */
 #define PLAYER_FEET_DX   8
 #define PLAYER_FEET_DY  16
-#define PLAYER_HALF_W   10
+#define PLAYER_HALF_W    8   /* half the foot stance, so shoes touch the line */
 
 #define OFFSCREEN_X   -100
 #define OFFSCREEN_Y   -100
@@ -120,10 +120,14 @@ void player_clampToCourt(Player *p)
      * control-ring point), so the visible feet - not the sprite origin 16px
      * above them - are what actually line up with the painted court lines.
      * Both the near/far baselines and the sidelines use this one point. */
+    /* Outer baselines use a 1px margin so the feet actually REACH the painted
+     * end line (a larger margin, on top of the feet reference, left a visible
+     * gap of bare grass). The centre-line margins stay larger so players don't
+     * stand inside the net. */
     s16 feetX = p->x + PLAYER_FEET_DX;
     s16 depth = COURT_DEPTH_OF(feetX, p->y + PLAYER_FEET_DY);
-    s16 minDepth = p->farSide ? (COURT_FAR_DEPTH + 6) : (COURT_CENTER_DEPTH + 8);
-    s16 maxDepth = p->farSide ? (COURT_CENTER_DEPTH - 8) : (COURT_NEAR_DEPTH - 6);
+    s16 minDepth = p->farSide ? (COURT_FAR_DEPTH + 1) : (COURT_CENTER_DEPTH + 8);
+    s16 maxDepth = p->farSide ? (COURT_CENTER_DEPTH - 8) : (COURT_NEAR_DEPTH - 1);
 
     if (depth < minDepth) p->y += minDepth - depth;
     if (depth > maxDepth) p->y -= depth - maxDepth;
