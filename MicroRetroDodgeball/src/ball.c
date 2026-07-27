@@ -123,30 +123,30 @@ bool ball_updateLoose(Ball *b)
     /* Clamp depth first, then derive the sloping side rails from that same
      * projected depth. This is the exact quadrilateral painted by the court
      * converter rather than the old screen-aligned invisible rectangle. */
-    depth = b->y - (b->x >> 2);
+    depth = COURT_DEPTH_OF(b->x, b->y);
     if (depth < minDepth)
     {
-        b->y = minDepth + (b->x >> 2);
+        b->y = COURT_Y_AT_DEPTH_X(minDepth, b->x);
         b->preciseY = (s32)b->y << 8;
         b->velocityY = (s16)(-b->velocityY * 3 / 4);
         contact = TRUE;
     }
     else if (depth > maxDepth)
     {
-        b->y = maxDepth + (b->x >> 2);
+        b->y = COURT_Y_AT_DEPTH_X(maxDepth, b->x);
         b->preciseY = (s32)b->y << 8;
         b->velocityY = (s16)(-b->velocityY * 3 / 4);
         contact = TRUE;
     }
 
-    depth = b->y - (b->x >> 2);
+    depth = COURT_DEPTH_OF(b->x, b->y);
     {
         const s16 minX = COURT_MIN_X_AT_DEPTH(depth) + 8;
         const s16 maxX = COURT_MAX_X_AT_DEPTH(depth) - 8;
         if (b->x < minX)
         {
             b->x = minX;
-            b->y = depth + (b->x >> 2);
+            b->y = COURT_Y_AT_DEPTH_X(depth, b->x);
             b->preciseX = (s32)b->x << 8;
             b->preciseY = (s32)b->y << 8;
             b->velocityX = (s16)(-b->velocityX * 3 / 4);
@@ -155,7 +155,7 @@ bool ball_updateLoose(Ball *b)
         else if (b->x > maxX)
         {
             b->x = maxX;
-            b->y = depth + (b->x >> 2);
+            b->y = COURT_Y_AT_DEPTH_X(depth, b->x);
             b->preciseX = (s32)b->x << 8;
             b->preciseY = (s32)b->y << 8;
             b->velocityX = (s16)(-b->velocityX * 3 / 4);
@@ -211,7 +211,7 @@ void ball_draw(Ball *b)
      * the player's body cover the ball at the rear hand anchor. */
     u16 netPriority = (b->state == BALL_HELD_A) ? 1 :
                       (b->state == BALL_HELD_B) ? 0 :
-                      (((b->y - (b->x >> 2)) >= COURT_CENTER_DEPTH) ? 1 : 0);
+                      ((COURT_DEPTH_OF(b->x, b->y) >= COURT_CENTER_DEPTH) ? 1 : 0);
 
     if (inFlight)
     {

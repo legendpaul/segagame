@@ -13,8 +13,21 @@
 #define SCREEN_W            320
 #define SCREEN_H            224
 
-/* Isometric screen-space court. A player's depth is y - x/4; moving
- * along either diagonal axis changes both screen coordinates. */
+/* Isometric screen-space court. The ONE projection parameter is the screen
+ * skew: how much screen-Y rises per unit of screen-X across the court. Depth
+ * (distance up the court) is therefore  y - skew(x), and a point at a given
+ * depth sits at screen-y = depth + skew(x). Centralising it here means the
+ * whole coordinate system - players, ball, spawns, AI aim and the court art -
+ * derives the angle from these macros, so the pitch angle is tunable in one
+ * place. COURT_SKEW_SHIFT 2 == the historical x/4 shear; a smaller shift makes
+ * a steeper, more FIFA-like angle. */
+#define COURT_SKEW_SHIFT     2
+#define COURT_SKEW(x)        ((x) >> COURT_SKEW_SHIFT)
+#define COURT_DEPTH_OF(x, y) ((y) - COURT_SKEW(x))
+
+/* Sideline drift with depth (how the parallel touchlines lean). */
+#define COURT_SIDE_SHIFT     1
+
 #define COURT_FAR_DEPTH      24
 #define COURT_NEAR_DEPTH     144
 #define COURT_CENTER_DEPTH   84
@@ -24,9 +37,9 @@
 #define COURT_RIGHT_X        304
 
 /* Projected side rails used by players, loose-ball physics and authored art. */
-#define COURT_MIN_X_AT_DEPTH(d) (64 - (((d) - COURT_FAR_DEPTH) >> 1))
-#define COURT_MAX_X_AT_DEPTH(d) (312 - (((d) - COURT_FAR_DEPTH) >> 1))
-#define COURT_Y_AT_DEPTH_X(d, x) ((d) + ((x) >> 2))
+#define COURT_MIN_X_AT_DEPTH(d) (64 - (((d) - COURT_FAR_DEPTH) >> COURT_SIDE_SHIFT))
+#define COURT_MAX_X_AT_DEPTH(d) (312 - (((d) - COURT_FAR_DEPTH) >> COURT_SIDE_SHIFT))
+#define COURT_Y_AT_DEPTH_X(d, x) ((d) + COURT_SKEW(x))
 
 /* --- Gameplay tuning --- */
 #define PLAYER_SPEED        2       /* px per frame */

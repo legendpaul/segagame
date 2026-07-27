@@ -121,7 +121,7 @@ void player_clampToCourt(Player *p)
      * above them - are what actually line up with the painted court lines.
      * Both the near/far baselines and the sidelines use this one point. */
     s16 feetX = p->x + PLAYER_FEET_DX;
-    s16 depth = (p->y + PLAYER_FEET_DY) - (feetX >> 2);
+    s16 depth = COURT_DEPTH_OF(feetX, p->y + PLAYER_FEET_DY);
     s16 minDepth = p->farSide ? (COURT_FAR_DEPTH + 6) : (COURT_CENTER_DEPTH + 8);
     s16 maxDepth = p->farSide ? (COURT_CENTER_DEPTH - 8) : (COURT_NEAR_DEPTH - 6);
 
@@ -130,7 +130,7 @@ void player_clampToCourt(Player *p)
 
     /* Re-project the feet depth after the baseline clamp, then keep half the
      * stance width inside each drifting sideline. */
-    depth = (p->y + PLAYER_FEET_DY) - (feetX >> 2);
+    depth = COURT_DEPTH_OF(feetX, p->y + PLAYER_FEET_DY);
     s16 minX = COURT_MIN_X_AT_DEPTH(depth) + PLAYER_HALF_W;
     s16 maxX = COURT_MAX_X_AT_DEPTH(depth) - PLAYER_HALF_W;
     if (feetX < minX) p->x += (minX - feetX);

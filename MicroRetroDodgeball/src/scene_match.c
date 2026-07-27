@@ -458,7 +458,7 @@ static void fixed_back_target(bool farSide, u8 lane, s16 *x, s16 *y)
     s16 minX = COURT_MIN_X_AT_DEPTH(depth) + 8;
     s16 maxX = COURT_MAX_X_AT_DEPTH(depth) - 8;
     *x = minX + (s16)((maxX - minX) * lane / 2);
-    *y = depth + (*x >> 2);
+    *y = COURT_Y_AT_DEPTH_X(depth, *x);
 }
 
 static bool player_reached_ball(const Player *p)
@@ -479,7 +479,7 @@ static void reset_team(Player team[], u8 baseSlot, u8 pal, s16 baseDepth, bool f
     for (i = 0; i < TEAM_SIZE; i++)
     {
         s16 x = lane_x(i);
-        s16 y = baseDepth + depthOffset[i] + (x >> 2);
+        s16 y = COURT_Y_AT_DEPTH_X(baseDepth + depthOffset[i], x);
         player_init(&team[i], x, y, baseSlot + i, pal);
         team[i].farSide = farSide;
         team[i].facingLeft = farSide;
