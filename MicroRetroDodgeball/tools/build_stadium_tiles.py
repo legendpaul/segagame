@@ -110,13 +110,25 @@ def prepare_image():
             point(next_depth, True), point(next_depth)
         ], fill=colour)
 
-    # Sparse checker highlights add 16-bit texture without noisying the play.
-    for depth in range(31, 141, 16):
-        left = edge_x(depth)
-        right = edge_x(depth, True)
-        for x in range(left + 13, right - 8, 32):
-            y = depth + x // 4
-            draw.rectangle((x, y, x + 7, y + 2), fill=PALETTE[3])
+    # FIFA-94-style perimeter advertising hoardings. Segmented colour boards
+    # ring the pitch just outside the touchlines, following the same dimetric
+    # projection, framing the court like a broadcast football stadium.
+    def hoardings(p0, p1, outward, segs, thickness):
+        ad_cols = (PALETTE[15], PALETTE[9], PALETTE[12], PALETTE[6])
+        ox, oy = outward
+        for i in range(segs):
+            t0, t1 = i / segs, (i + 1) / segs
+            x0 = round(p0[0] + (p1[0] - p0[0]) * t0) + ox
+            y0 = round(p0[1] + (p1[1] - p0[1]) * t0) + oy
+            x1 = round(p0[0] + (p1[0] - p0[0]) * t1) + ox
+            y1 = round(p0[1] + (p1[1] - p0[1]) * t1) + oy
+            draw.line((x0, y0, x1, y1), fill=ad_cols[i & 3], width=thickness)
+            draw.line((x0, y0 - thickness, x1, y1 - thickness),
+                      fill=PALETTE[14], width=1)
+
+    hoardings(near_l, near_r, (0, 6), 10, 3)     # near touchline, closest to camera
+    hoardings(far_l, near_l, (-7, 0), 6, 3)      # left touchline
+    hoardings(far_r, near_r, (7, 0), 6, 3)       # right touchline
 
     # Strong double-edged boundary, exactly on the movement polygon.
     boundary = [far_l, far_r, near_r, near_l, far_l]
