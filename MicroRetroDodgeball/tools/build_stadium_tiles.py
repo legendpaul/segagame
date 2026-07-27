@@ -76,32 +76,40 @@ def prepare_image():
     for poly in (far_wedge, left_strip, right_strip, near_apron):
         draw.polygon(poly, fill=STAND)
 
-    # Crowd sampled from an AI-generated aerial-crowd texture (assets/
-    # crowd_texture.png), downscaled so the spectators are a few pixels each and
-    # quantised into our 16-colour palette. This gives a genuinely believable
-    # packed crowd instead of a hand-drawn dither. A pure-crowd corner of the
-    # source is used (its centre court is ignored) and tiled across the stands.
-    crowd_src = (Image.open(CROWD_TEXTURE).convert("RGB")
-                 .crop((24, 24, 470, 470))
-                 .resize((96, 96), Image.Resampling.LANCZOS))
-    cp = crowd_src.load()
-    cw, ch = crowd_src.size
+    # Tiered arena SEATING - like the reference photo, the stands are rows of
+    # (mostly empty) red seats, not a packed crowd. A regular seat grid is
+    # exactly right here, reads cleanly at 8x8 and dedupes to few tiles. Each
+    # seat is a small red block; a dark step shadows each row; occasional blue
+    # and pale seats break the red; wide dark vomitory aisles split the decks.
+    RED, BLUE, PALE, STEP, GAP = 9, 11, 1, 14, 8
+    def seat_idx(x, y):
+        if (x % 38) < 3:            # vomitory aisle (dark vertical gangway)
+            return GAP
+        if y % 3 == 2:              # shadowed step under each seat row
+            return STEP
+        if x % 3 == 2:              # gap between seats along a row
+            return GAP
+        s = ((x // 3) * 5 + (y // 3) * 7) % 13
+        if s == 0:  return BLUE
+        if s == 8:  return PALE
+        return RED
 
     px = image.load()
     for y in range(24, 224):
         for x in range(320):
             if px[x, y] == STAND:
-                px[x, y] = PALETTE[nearest_colour(cp[x % cw, y % ch])]
+                px[x, y] = PALETTE[seat_idx(x, y)]
 
-    # Roof shadow + a lit front rail along the top of the far grandstand.
-    draw.rectangle((0, 24, 319, 27), fill=PALETTE[8])
-    draw.line((0, 28, 319, 28), fill=PALETTE[13], width=1)
-    # Concrete tier walkways step the far stand into decks.
-    for ry in (40, 54, 68, 82):
-        sx = (ry - 24) * 4
-        if sx < 313:
-            draw.line((max(0, sx), ry, 313, ry), fill=PALETTE[13], width=1)
-            draw.line((max(0, sx), ry + 1, 313, ry + 1), fill=PALETTE[14], width=1)
+    # Roof: dark shadow band across the top with a row of bright floodlights.
+    draw.rectangle((0, 24, 319, 29), fill=PALETTE[8])
+    for fx in range(10, 318, 24):
+        draw.rectangle((fx, 25, fx + 3, 26), fill=PALETTE[15])
+    # A blue LED advertising ring band divides the lower and upper decks.
+    draw.rectangle((0, 34, 319, 37), fill=PALETTE[11])
+    for ax in range(2, 320, 14):
+        draw.rectangle((ax, 35, ax + 2, 36), fill=PALETTE[15])
+    draw.line((0, 33, 319, 33), fill=PALETTE[14], width=1)
+    draw.line((0, 38, 319, 38), fill=PALETTE[14], width=1)
 
     # Clean, readable striped turf replaces the old football-box markings.
     # Bands follow court depth, preserving the isometric perspective.
