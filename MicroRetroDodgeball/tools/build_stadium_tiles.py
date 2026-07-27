@@ -61,75 +61,43 @@ def prepare_image():
     far_l, far_r = point(24), point(24, True)
     near_l, near_r = point(144), point(144, True)
 
-    # Purpose-built stadium surround: a sloped far grandstand, concrete
-    # perimeter and advertising rail frame the court instead of leaving a
-    # large anonymous green field outside it.
+    # ---- Clean, simple stadium surround -----------------------------------
+    # Everything outside the pitch is ONE dark stand. Start from a flat dark
+    # fill so no leftover source-image garbage, mismatched concrete apron or
+    # advertising shapes can clutter the area around the court. Then add only a
+    # calm, recessive crowd in the far grandstand wedge above the pitch. A busy,
+    # high-contrast surround fights the play and reads as noise at 8x8 tiles, so
+    # this is deliberately understated.
+    draw.rectangle((0, 0, 319, 223), fill=PALETTE[8])
     STAND = PALETTE[4]
     draw.polygon([(0, 24), (319, 24), far_r, far_l], fill=STAND)
 
-    # The far touchline for a given screen column: the stand fills every row
-    # above this line. Used to clip crowd, rails and aisles to the bowl.
-    def stand_bottom(x):
-        return 24 + x // 4
-
-    # FIFA-style packed stand. The reference crowd reads as a dense, WARM,
-    # fairly uniform mass (reds/golds/greys over deep shadow) - not a rainbow
-    # of every colour. ~50% fill so it looks sold-out; 8 = shadow between
-    # spectators. Periodic in (x & 7, y & 7) so it still dedupes to a handful
-    # of VDP tiles.
-    R, Y, G, W, S = 9, 6, 13, 1, 8
+    # Sparse, muted crowd dots over the dark stand: enough to read as a distant
+    # crowd, sparse enough to recede. Periodic (x&7,y&7) so it dedupes to a
+    # couple of tiles.
     CROWD = (
-        ( R, S, Y, S, R, S, G, S),
-        ( S, G, S, R, S, W, S, R),
-        ( Y, S, R, S, G, S, R, S),
-        ( S, R, S, Y, S, R, S, G),
-        ( G, S, R, S, W, S, R, S),
-        ( S, R, S, G, S, R, S, Y),
-        ( R, S, W, S, R, S, G, S),
-        ( S, Y, S, R, S, G, S, R),
+        ( 0,  0, 13,  0,  0,  0,  9,  0),
+        ( 0,  0,  0,  0,  0,  6,  0,  0),
+        ( 6,  0,  0,  0, 13,  0,  0,  0),
+        ( 0,  0,  9,  0,  0,  0,  0, 13),
+        ( 0, 13,  0,  0,  0,  0,  6,  0),
+        ( 0,  0,  0,  6,  0,  9,  0,  0),
+        ( 9,  0, 13,  0,  0,  0,  0,  0),
+        ( 0,  0,  0,  0,  6,  0, 13,  0),
     )
     px = image.load()
     for y in range(24, far_r[1] + 1):
         for x in range(320):
             if px[x, y] == STAND:
-                px[x, y] = PALETTE[CROWD[y & 7][x & 7]]
+                idx = CROWD[y & 7][x & 7]
+                if idx:
+                    px[x, y] = PALETTE[idx]
 
-    # Deep roof shadow along the very top of the bowl.
-    draw.rectangle((0, 24, 319, 26), fill=PALETTE[8])
-    # Terraced steps: each concrete walkway casts a dark shadow onto the tier
-    # below it, giving the stand real stepped depth instead of a flat wall.
-    for ry in (34, 46, 58, 70, 82):
+    # Two subtle tier lines for a hint of stepped depth (clipped to the wedge).
+    for ry in (44, 68):
         sx = (ry - 24) * 4
         if sx < 313:
-            draw.line((max(0, sx), ry - 1, 313, ry - 1), fill=PALETTE[14], width=1)
-            draw.line((max(0, sx), ry, 313, ry), fill=PALETTE[13], width=1)
-    # Vertical aisle gangways break the terraces into seating blocks.
-    for ax in range(16, 314, 44):
-        draw.line((ax, 28, ax, stand_bottom(ax)), fill=PALETTE[8], width=1)
-    # Front perimeter wall: a bright barrier separating the crowd from the
-    # pitch, exactly like the fascia in the FIFA reference.
-    draw.line((far_l[0] - 8, far_l[1] - 2, far_r[0] + 8, far_r[1] - 2),
-              fill=PALETTE[15], width=2)
-    draw.line((far_l[0] - 8, far_l[1], far_r[0] + 8, far_r[1]),
-              fill=PALETTE[14], width=1)
-
-    outer = [
-        (far_l[0] - 10, far_l[1] - 3),
-        (far_r[0] + 10, far_r[1] - 3),
-        (near_r[0] + 10, near_r[1] + 5),
-        (near_l[0] - 10, near_l[1] + 5),
-    ]
-    draw.polygon(outer, fill=PALETTE[13])
-    draw.line(outer + [outer[0]], fill=PALETTE[4], width=3)
-
-    # Segmented far-side advertising strip follows the same projection.
-    for i in range(8):
-        t0, t1 = i / 8, (i + 1) / 8
-        x0 = round(far_l[0] + (far_r[0] - far_l[0]) * t0)
-        x1 = round(far_l[0] + (far_r[0] - far_l[0]) * t1) - 2
-        y0 = round(far_l[1] + (far_r[1] - far_l[1]) * t0) - 5
-        y1 = round(far_l[1] + (far_r[1] - far_l[1]) * t1) - 5
-        draw.line((x0, y0, x1, y1), fill=PALETTE[12 if i & 1 else 15], width=3)
+            draw.line((max(0, sx), ry, 313, ry), fill=PALETTE[14], width=1)
 
     # Clean, readable striped turf replaces the old football-box markings.
     # Bands follow court depth, preserving the isometric perspective.
