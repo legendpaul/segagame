@@ -72,43 +72,46 @@ def prepare_image():
     def stand_bottom(x):
         return 24 + x // 4
 
-    # Dense packed crowd. The colour depends only on (x & 7, y & 7), so the
-    # entire stand collapses to a couple of unique VDP tiles yet still reads
-    # as a colourful sell-out crowd. Index 8 (near-black) is the shadow gap
-    # between spectators, the bright indices are shirts.
-    # ~30% speckle of varied shirt colours over a dark seating mass - the way
-    # a packed stand reads from the pitch. 0 = keep the dark backing; other
-    # values are spectators. Colours are spread so no single hue dominates.
-    D = 0
+    # FIFA-style packed stand. The reference crowd reads as a dense, WARM,
+    # fairly uniform mass (reds/golds/greys over deep shadow) - not a rainbow
+    # of every colour. ~50% fill so it looks sold-out; 8 = shadow between
+    # spectators. Periodic in (x & 7, y & 7) so it still dedupes to a handful
+    # of VDP tiles.
+    R, Y, G, W, S = 9, 6, 13, 1, 8
     CROWD = (
-        ( 0, 11,  0,  0,  6,  0,  0,  1),
-        ( 0,  0,  0,  9,  0,  0, 12,  0),
-        (13,  0,  0,  0, 11,  0,  0,  6),
-        ( 0,  0,  1,  0,  0,  0,  9,  0),
-        ( 0,  6,  0,  0, 12,  0,  0, 11),
-        ( 9,  0,  0, 13,  0,  0,  0,  0),
-        ( 0,  0, 11,  0,  0,  6,  0,  1),
-        ( 0, 12,  0,  0,  9,  0, 13,  0),
+        ( R, S, Y, S, R, S, G, S),
+        ( S, G, S, R, S, W, S, R),
+        ( Y, S, R, S, G, S, R, S),
+        ( S, R, S, Y, S, R, S, G),
+        ( G, S, R, S, W, S, R, S),
+        ( S, R, S, G, S, R, S, Y),
+        ( R, S, W, S, R, S, G, S),
+        ( S, Y, S, R, S, G, S, R),
     )
     px = image.load()
     for y in range(24, far_r[1] + 1):
         for x in range(320):
             if px[x, y] == STAND:
-                idx = CROWD[y & 7][x & 7]
-                if idx:
-                    px[x, y] = PALETTE[idx]
+                px[x, y] = PALETTE[CROWD[y & 7][x & 7]]
 
-    # Dark roof shadow across the very top of the bowl.
-    draw.rectangle((0, 24, 319, 27), fill=PALETTE[8])
-    # Bright concourse walkways band the crowd into tiers (clipped to bowl).
-    for ry in (37, 53, 69, 85):
+    # Deep roof shadow along the very top of the bowl.
+    draw.rectangle((0, 24, 319, 26), fill=PALETTE[8])
+    # Terraced steps: each concrete walkway casts a dark shadow onto the tier
+    # below it, giving the stand real stepped depth instead of a flat wall.
+    for ry in (34, 46, 58, 70, 82):
         sx = (ry - 24) * 4
         if sx < 313:
-            draw.line((max(0, sx), ry, 313, ry), fill=PALETTE[13], width=2)
             draw.line((max(0, sx), ry - 1, 313, ry - 1), fill=PALETTE[14], width=1)
-    # Vertical aisle steps break the decks into seating blocks.
-    for ax in range(16, 314, 40):
-        draw.line((ax, 28, ax, stand_bottom(ax)), fill=PALETTE[14], width=1)
+            draw.line((max(0, sx), ry, 313, ry), fill=PALETTE[13], width=1)
+    # Vertical aisle gangways break the terraces into seating blocks.
+    for ax in range(16, 314, 44):
+        draw.line((ax, 28, ax, stand_bottom(ax)), fill=PALETTE[8], width=1)
+    # Front perimeter wall: a bright barrier separating the crowd from the
+    # pitch, exactly like the fascia in the FIFA reference.
+    draw.line((far_l[0] - 8, far_l[1] - 2, far_r[0] + 8, far_r[1] - 2),
+              fill=PALETTE[15], width=2)
+    draw.line((far_l[0] - 8, far_l[1], far_r[0] + 8, far_r[1]),
+              fill=PALETTE[14], width=1)
 
     outer = [
         (far_l[0] - 10, far_l[1] - 3),
