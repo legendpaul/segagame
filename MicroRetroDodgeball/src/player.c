@@ -193,6 +193,10 @@ void player_draw(Player *p)
             base = (p->animFrame == 2) ? TILE_PLAYER_BACK_RUN_ALT : TILE_PLAYER_BACK_RUN;
         else
             base = (p->animFrame == 2) ? TILE_PLAYER_FRONT_RUN_ALT : TILE_PLAYER_FRONT_RUN;
+        /* A one-pixel bounce on the passing steps gives the run a real gait
+         * rhythm instead of a flat glide - the body rises as it strides
+         * through, drops back down on each foot-contact frame. */
+        poseOffsetY = (p->animFrame & 1) ? -1 : 0;
     }
     else if (p->pose == POSE_THROW)
     {
@@ -228,7 +232,13 @@ void player_draw(Player *p)
         base = backView ? TILE_PLAYER_BACK_CELEBRATE : TILE_PLAYER_FRONT_CELEBRATE;
         poseOffsetY = victoryY[p->animFrame & 3];
     }
-    else poseOffsetY = (p->animFrame == 3) ? -1 : 0;
+    else
+    {
+        /* Idle breathing: a slow four-phase chest rise so a standing player
+         * looks alive and poised rather than frozen between actions. */
+        static const s8 breatheY[4] = { 0, 0, -1, 0 };
+        poseOffsetY = breatheY[p->animFrame & 3];
+    }
 
     /* The centre board is a high-priority BG_A foreground. Near-half players
      * must use high sprite priority to cover it; far-half players remain low
