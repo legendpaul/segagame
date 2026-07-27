@@ -42,6 +42,8 @@ typedef struct {
     u8   team;        /* nation index */
     bool out;
     u8   ball;        /* index of the ball being carried, or NO_BALL */
+    u8   fallTimer;   /* frames left showing the hit before walking off */
+    bool gone;        /* has finished leaving the pitch */
     u16  think;       /* AI countdown: throw when carrying, re-target when not */
     s16  wanderX, wanderY;
 } Fighter;
@@ -150,6 +152,10 @@ static void throw_ball(u8 who, s16 targetX, s16 targetY)
 static void eliminate(u8 who)
 {
     fighters[who].out = TRUE;
+    /* Take the hit for a beat, then walk off - a knocked-out player should not
+     * lie on the court cluttering the game up. */
+    fighters[who].fallTimer = 36;
+    fighters[who].gone = FALSE;
     player_setPose(&fighters[who].p, POSE_FALL, 255);
     if (fighters[who].ball != NO_BALL)
     {
@@ -234,6 +240,8 @@ void scene_eliminator_enter(void)
                          : (u8)((gTeamAIndex + i) % NUM_TEAMS);
         fighters[i].out  = FALSE;
         fighters[i].ball = NO_BALL;
+        fighters[i].fallTimer = 0;
+        fighters[i].gone = FALSE;
         fighters[i].think = (u16)(30 + (random() % 90));
         /* Ten nations, ten kits: five recoloured tile variants per palette
          * line, two lines. Variant picks which kit indices the art uses and
@@ -478,10 +486,37 @@ void scene_eliminator_update(void)
         return;
     }
 
+    /* Knocked-out players take a beat on the floor, then run off the pitch and
+     * are removed from the board entirely. */
+    for (i = 0; i < ELIM_PLAYERS; i++)
+    {
+        Fighter *f = &fighters[i];
+        if (!f->out || f->gone) continue;
+        if (f->fallTimer > 0)
+        {
+            f->fallTimer--;
+            if (f->fallTimer == 0) player_eliminate(&f->p);   /* start the exit */
+        }
+        else if (player_updateExit(&f->p))
+        {
+            f->gone = TRUE;   /* cleared the screen - stop drawing them */
+        }
+    }
+
     for (i = 0; i < ELIM_PLAYERS; i++)
     {
         Fighter *f = &fighters[i];
         bool moving = (!f->out) && (i != humanIdx);
+        if (f->gone)
+        {
+            /* Park the slot off-screen but keep the sprite link chain intact. */
+            VDP_setSpriteFull(f->p.spriteSlot, -64, -64, SPRITE_SIZE(1, 1),
+                              TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE,
+                                             TILE_BALL_SHADOW),
+                              (u8)(f->p.spriteSlot + 1));
+            continue;
+        }
+        if (f->out) moving = f->p.exiting;   /* legs move while running off */
         /* Face the camera when in the near half, away when up the far end. */
         if (!f->out)
             f->p.farSide = (COURT_DEPTH_OF(f->p.x + 8, f->p.y + 16)
