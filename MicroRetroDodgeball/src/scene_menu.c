@@ -106,16 +106,20 @@ static void draw_mode(void)
  * each round's winner sits on the midpoint row, so the connectors line up. */
 /* Mirrored bracket: four teams down each side on plates, the joins converging
  * inward to the cup in the centre - the classic tournament-roster layout. */
+/* Columns are spaced so every element is adjacent to the next and NOTHING
+ * overlaps: plate | pair-join | half-join | CUP | half-join | pair-join | plate
+ *   1..13   14(->15)   16(->17)  18..20  22(->21)  24(->23)   25..37          */
 #define PLATE_L_X   1
-#define PLATE_R_X  26
+#define PLATE_R_X  25
 #define PLATE_W    13
 /* Text rows of the eight plates: left side then right side, in bracket order
  * (pairs are adjacent, so 0-1 and 2-3 meet, then those winners meet). */
 static const u16 PLATE_ROW[4] = { 5, 9, 15, 19 };
-#define JOIN_L_IN  15   /* left  pair joins  */
-#define JOIN_L_MID 17   /* left  half joins toward the centre */
-#define JOIN_R_IN  24   /* right pair joins  */
-#define JOIN_R_MID 22   /* right half joins toward the centre */
+#define JOIN_L_IN  14   /* left  pair joins,  stub lands on 15 */
+#define JOIN_L_MID 16   /* left  half join,   stub lands on 17 */
+#define JOIN_R_MID 22   /* right half join,   stub lands on 21 */
+#define JOIN_R_IN  24   /* right pair joins,  stub lands on 23 */
+#define CUP_X      18   /* gold cup box, 18..20 - clear of both half joins */
 #define CHAMP_ROW  23
 
 /* A team plate: a framed box with the name inside, like the roster plates in
@@ -165,9 +169,10 @@ static void draw_cup_bracket(void)
     ui_draw_bracket(JOIN_R_IN,  PLATE_ROW[2], PLATE_ROW[3], TRUE);
     ui_draw_bracket(JOIN_R_MID, 7, 17, TRUE);
 
-    /* The cup itself in the centre, where both halves meet. */
-    ui_draw_panel(18, 10, 4, 5, TRUE);
-    ui_draw_text("CUP", 18, 12, UI_GOLD);
+    /* The cup itself in the centre, where both halves meet. Sized and placed
+     * so the converging lines stop at its edges rather than crossing it. */
+    ui_draw_panel(CUP_X, 11, 3, 3, TRUE);
+    ui_draw_text("CUP", CUP_X, 12, UI_GOLD);
 
     ui_draw_text_center(cupChampion != CUP_TBD ? teamNames[cupChampion]
                                                : "WINNER", CHAMP_ROW,
