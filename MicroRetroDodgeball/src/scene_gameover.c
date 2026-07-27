@@ -10,9 +10,7 @@
 #include "flag_data.h"
 #include "player.h"
 
-static Player champion;
-static u16 victoryCounter;
-static s16 victoryBob;
+/* No celebrating figure on this screen - it is a clean results card. */
 
 void scene_gameover_enter(void)
 {
@@ -24,7 +22,10 @@ void scene_gameover_enter(void)
     sprites_data_hide_all_sprites();   /* no stray match sprites bleeding in */
     VDP_clearPlane(BG_A, TRUE);
     VDP_clearPlane(BG_B, TRUE);
-    VDP_clearTextArea(0, 0, 40, 28);
+    /* Rectangular tilemap clear, NOT VDP_clearTextArea(): the latter stamps the
+     * FONT's space tile, and the UI/title art has reclaimed that font VRAM, so
+     * it painted vertical white stripes across the whole screen. */
+    VDP_clearTileMapRect(BG_A, 0, 0, 40, 28);
     court_bg_draw();
     sprites_data_apply_teams(gTeamAIndex, gTeamBIndex);
 
@@ -61,15 +62,7 @@ void scene_gameover_enter(void)
     intToStr(gScoreB, buf, 1);
     ui_draw_big_text(buf, 24, 16, UI_GOLD);
 
-    ui_draw_button("START REMATCH", 11, 21, 18);
-
-    /* Animated winning-kit figure turns the result into a celebration
-     * screen instead of a static text card. */
-    player_init(&champion, 278, 153, 0, aWon ? PAL_TEAM_A : PAL_TEAM_B);
-    player_setPose(&champion, POSE_CELEBRATE, 255);
-    victoryCounter = 0;
-    victoryBob = 0;
-    player_draw(&champion);
+    ui_draw_button("EXIT", 11, 21, 18);
 
     sound_mgr_score();
     sound_mgr_crowdGameOver();   /* big sustained stadium roar for the win */
@@ -79,15 +72,7 @@ void scene_gameover_update(void)
 {
     input_mgr_update();
 
-    if (++victoryCounter >= 18)
-    {
-        victoryCounter = 0;
-        victoryBob = victoryBob ? 0 : -3;
-    }
-    champion.y = 153 + victoryBob;
-    player_draw(&champion);
-
-    if (input_pressed(BUTTON_START))
+    if (input_pressed(BUTTON_START) || input_pressed(BUTTON_A))
     {
         sound_mgr_confirm();
         PAL_fadeOutAll(20, FALSE);
