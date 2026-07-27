@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "assets" / "stadium_source_v1.png"
+CROWD_TEXTURE = ROOT / "assets" / "crowd_texture.png"
 PREVIEW = ROOT / "assets" / "stadium_genesis_preview.png"
 OUTPUT = ROOT / "src" / "stadium_tiles.inc"
 
@@ -61,43 +62,46 @@ def prepare_image():
     far_l, far_r = point(24), point(24, True)
     near_l, near_r = point(144), point(144, True)
 
-    # ---- Clean, simple stadium surround -----------------------------------
-    # Everything outside the pitch is ONE dark stand. Start from a flat dark
-    # fill so no leftover source-image garbage, mismatched concrete apron or
-    # advertising shapes can clutter the area around the court. Then add only a
-    # calm, recessive crowd in the far grandstand wedge above the pitch. A busy,
-    # high-contrast surround fights the play and reads as noise at 8x8 tiles, so
-    # this is deliberately understated.
+    # ---- Authored stadium that FRAMES the pitch on all sides --------------
+    # Start from a flat dark fill, then lay dark stand backing around every
+    # side of the pitch, then paint an authored "rows of seated spectators"
+    # crowd over it. The pitch is drawn on top afterwards, so the crowd wraps
+    # the whole court and it reads as a stadium, not an empty field.
     draw.rectangle((0, 0, 319, 223), fill=PALETTE[8])
     STAND = PALETTE[4]
-    draw.polygon([(0, 24), (319, 24), far_r, far_l], fill=STAND)
+    far_wedge   = [(0, 24), (319, 24), far_r, far_l]
+    left_strip  = [(0, 24), far_l, near_l, (0, 223)]
+    right_strip = [far_r, (319, 24), (319, 223), near_r]
+    near_apron  = [near_l, near_r, (319, 223), (0, 223)]
+    for poly in (far_wedge, left_strip, right_strip, near_apron):
+        draw.polygon(poly, fill=STAND)
 
-    # Sparse, muted crowd dots over the dark stand: enough to read as a distant
-    # crowd, sparse enough to recede. Periodic (x&7,y&7) so it dedupes to a
-    # couple of tiles.
-    CROWD = (
-        ( 0,  0, 13,  0,  0,  0,  9,  0),
-        ( 0,  0,  0,  0,  0,  6,  0,  0),
-        ( 6,  0,  0,  0, 13,  0,  0,  0),
-        ( 0,  0,  9,  0,  0,  0,  0, 13),
-        ( 0, 13,  0,  0,  0,  0,  6,  0),
-        ( 0,  0,  0,  6,  0,  9,  0,  0),
-        ( 9,  0, 13,  0,  0,  0,  0,  0),
-        ( 0,  0,  0,  0,  6,  0, 13,  0),
-    )
+    # Crowd sampled from an AI-generated aerial-crowd texture (assets/
+    # crowd_texture.png), downscaled so the spectators are a few pixels each and
+    # quantised into our 16-colour palette. This gives a genuinely believable
+    # packed crowd instead of a hand-drawn dither. A pure-crowd corner of the
+    # source is used (its centre court is ignored) and tiled across the stands.
+    crowd_src = (Image.open(CROWD_TEXTURE).convert("RGB")
+                 .crop((24, 24, 470, 470))
+                 .resize((96, 96), Image.Resampling.LANCZOS))
+    cp = crowd_src.load()
+    cw, ch = crowd_src.size
+
     px = image.load()
-    for y in range(24, far_r[1] + 1):
+    for y in range(24, 224):
         for x in range(320):
             if px[x, y] == STAND:
-                idx = CROWD[y & 7][x & 7]
-                if idx:
-                    px[x, y] = PALETTE[idx]
+                px[x, y] = PALETTE[nearest_colour(cp[x % cw, y % ch])]
 
-    # Two subtle tier lines for a hint of stepped depth (clipped to the wedge).
-    for ry in (44, 68):
+    # Roof shadow + a lit front rail along the top of the far grandstand.
+    draw.rectangle((0, 24, 319, 27), fill=PALETTE[8])
+    draw.line((0, 28, 319, 28), fill=PALETTE[13], width=1)
+    # Concrete tier walkways step the far stand into decks.
+    for ry in (40, 54, 68, 82):
         sx = (ry - 24) * 4
         if sx < 313:
-            draw.line((max(0, sx), ry, 313, ry), fill=PALETTE[14], width=1)
+            draw.line((max(0, sx), ry, 313, ry), fill=PALETTE[13], width=1)
+            draw.line((max(0, sx), ry + 1, 313, ry + 1), fill=PALETTE[14], width=1)
 
     # Clean, readable striped turf replaces the old football-box markings.
     # Bands follow court depth, preserving the isometric perspective.
