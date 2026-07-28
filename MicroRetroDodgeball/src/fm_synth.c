@@ -86,6 +86,70 @@ void fm_synth_initBassChannel(u8 ch)
     writeOp(part, chOff, 0x0C, 1, 0, 22, 31, 8, 5, 2, 9);
 }
 
+void fm_synth_initPadChannel(u8 ch, bool panRight)
+{
+    u8 part = (ch >= 3) ? 1 : 0;
+    u8 chOff = ch % 3;
+
+    /* Four quiet carriers, slightly detuned around the fundamental. The
+     * deliberately slow attack/release avoids the brittle organ edge of the
+     * lead voice and makes scene changes feel cinematic. */
+    YM2612_writeReg(part, 0xB0 + chOff, 0x07);
+    YM2612_writeReg(part, 0xB4 + chOff, panRight ? 0x40 : 0x80);
+    writeOp(part, chOff, 0x00, 1, 1, 30, 18, 3, 2, 2, 6);
+    writeOp(part, chOff, 0x08, 1, 7, 35, 17, 3, 2, 2, 6);
+    writeOp(part, chOff, 0x04, 2, 1, 46, 16, 4, 2, 3, 6);
+    writeOp(part, chOff, 0x0C, 1, 7, 39, 18, 3, 2, 2, 6);
+}
+
+void fm_synth_initPercussionChannel(u8 ch)
+{
+    u8 part = (ch >= 3) ? 1 : 0;
+    u8 chOff = ch % 3;
+
+    YM2612_writeReg(part, 0xB0 + chOff, 0x07);
+    YM2612_writeReg(part, 0xB4 + chOff, 0xC0);
+    /* Fast, dark click/tom. Retriggered at different notes it supplies kick,
+     * rim and impact colours without enabling DAC playback. */
+    writeOp(part, chOff, 0x00, 1, 0, 12, 31, 20, 0, 15, 12);
+    writeOp(part, chOff, 0x08, 2, 0, 28, 31, 23, 0, 15, 12);
+    writeOp(part, chOff, 0x04, 3, 0, 38, 31, 24, 0, 15, 12);
+    writeOp(part, chOff, 0x0C, 1, 0, 20, 31, 21, 0, 15, 12);
+}
+
+void fm_synth_initRockChannel(u8 ch, bool panRight)
+{
+    u8 part = (ch >= 3) ? 1 : 0;
+    u8 chOff = ch % 3;
+
+    /* Algorithm 4 gives two independent modulator/carrier stacks. Strong
+     * feedback and mismatched ratios create a crunchy guitar-like edge, but
+     * the carriers retain a firm fundamental so the riff stays musical on a
+     * television speaker. */
+    YM2612_writeReg(part, 0xB0 + chOff, (7 << 3) | 0x04);
+    YM2612_writeReg(part, 0xB4 + chOff, panRight ? 0x40 : 0x80);
+    writeOp(part, chOff, 0x00, 1, 0, 18, 31, 12, 3, 8, 10);
+    writeOp(part, chOff, 0x08, 1, 0,  3, 31,  7, 4, 3, 10);
+    writeOp(part, chOff, 0x04, 2, 1, 27, 31, 13, 3, 8, 10);
+    writeOp(part, chOff, 0x0C, 1, 7, 10, 31,  8, 4, 4, 10);
+}
+
+void fm_synth_initSportsBrassChannel(u8 ch, bool panRight)
+{
+    u8 part = (ch >= 3) ? 1 : 0;
+    u8 chOff = ch % 3;
+
+    /* Algorithm 5: a bright common modulator feeds three carriers, producing
+     * the compact brass/synth stab characteristic of early CD sports menus. */
+    YM2612_writeReg(part, 0xB0 + chOff, (3 << 3) | 0x05);
+    YM2612_writeReg(part, 0xB4 + chOff,
+                    panRight ? 0x40 : (ch == 0 ? 0xC0 : 0x80));
+    writeOp(part, chOff, 0x00, 1, 0, 24, 31, 14, 4, 8, 9);
+    writeOp(part, chOff, 0x08, 1, 0,  4, 31, 10, 4, 5, 9);
+    writeOp(part, chOff, 0x04, 2, 1, 15, 31, 11, 4, 6, 9);
+    writeOp(part, chOff, 0x0C, 3, 7, 22, 31, 12, 4, 7, 9);
+}
+
 void fm_synth_noteOn(u8 ch, u8 note, u8 octave)
 {
     u8  part  = (ch >= 3) ? 1 : 0;

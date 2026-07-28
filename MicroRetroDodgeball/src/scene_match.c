@@ -11,17 +11,36 @@
 #include "court_bg.h"
 #include "ui_data.h"
 #include "flag_data.h"
+#include "impact_fx.h"
+#include "screen_transition.h"
 
-#include "ref_tiles.inc"   /* 32x32 referee sprite (16 tiles) drawn on PAL3 */
+#define REF_FRAME_COUNT 4
+#define REF_FRAME_TILE_COUNT 16
 /* The referee tiles live in the boot-logo VRAM region: that splash is never
  * shown again after startup, and the court base tileset ends just before it
  * while court foreground/flags start after these 16 slots, so it's dead space
  * during a match. */
 #define TILE_REFEREE   (TILE_COURT_BASE + COURT_TILE_COUNT)
-/* One more tile in the same dead boot-logo region, immediately after the
- * referee bank: a short white dash used to build the dotted vertical line that
- * shows how high the ball is off the ground. */
-#define TILE_BALL_TETHER (TILE_REFEREE + REF_TILE_COUNT)
+/* Frame zero occupies the dead boot-logo region. The other three frames use
+ * the title-art bank, which is mutually exclusive with live match play. */
+#define TILE_REFEREE_EXTRA TILE_TITLE_BASE
+/* Rear-view stand fits between shared impact art and the court foreground.
+ * Three rear run frames use the final 48 tiles immediately before the flag
+ * bank. Both gaps coexist with live match play and avoid the HUD flag tiles. */
+#define TILE_REFEREE_BACK       (TILE_IMPACT_GREY + 4)
+#define TILE_REFEREE_BACK_EXTRA (TILE_FLAG_BASE - 48)
+#if (TILE_REFEREE_BACK + 16) > TILE_COURT_FG_BASE
+#error "Rear referee stand overlaps court foreground VRAM"
+#endif
+#if (TILE_REFEREE_BACK_EXTRA + 48) > TILE_FLAG_BASE
+#error "Rear referee run frames overlap HUD flag VRAM"
+#endif
+#if (TILE_REFEREE_EXTRA + 48) > TILE_UI_BASE
+#error "Front referee run frames overlap UI VRAM"
+#endif
+/* One more tile immediately after frame zero: a short white dash used to build
+ * the dotted vertical line that shows how high the ball is off the ground. */
+#define TILE_BALL_TETHER (TILE_REFEREE + REF_FRAME_TILE_COUNT)
 static const u32 tile_ball_tether[8] = {
     0x00011000,
     0x00011000,
@@ -38,8 +57,11 @@ static const u32 tile_ball_tether[8] = {
 #define SLOT_TEAM_A   0    /* initial slots; reassigned by projected depth each frame */
 #define SLOT_TEAM_B   3    /* initial slots; reassigned by projected depth each frame */
 #define SLOT_BALL     6    /* initial ball slot; reassigned with player depth */
-#define SLOT_MARKER   8    /* coloured ground star (see draw_control_marker) */
-#define SLOT_SHADOWS  9    /* six grounded player shadows use slots 9..14 */
+#define AIR_DOT_COUNT 6
+/* Six players, ball, impact, referee and six airborne guide dots occupy the
+ * depth-sorted slots 0..14. Only ground underlays remain behind that list. */
+#define SLOT_BALL_SHADOW 15
+#define SLOT_MARKER      16
 
 typedef enum {
     MS_ANNOUNCE = 0,
@@ -70,6 +92,10 @@ static u16 announceTimer;
 static u16 matchSeconds;
 static u8  clockFrameCounter;
 static u16 aiDelay;
+static bool aiCarrierRepositions;
+static s8  aiCarrierOffset;
+static u8  aiCarrierMoveFloor; /* minimum visible movement before an armed CPU throws */
+static s8  aiEvadeDir[TEAM_SIZE]; /* stable sidestep direction for an incoming throw */
 static u16 roundEndTimer;
 static u8  windupTimer;
 static u8  impactTimer;
@@ -79,12 +105,9 @@ static s8  hitKnockX;       /* signed screen-space direction of the incoming bal
 static s8  hitKnockY;
 static u8  looseTimer;      /* prevents instant pickup at the impact point */
 /* Shot-clock on a loose ball: the responsible player must retrieve AND
- * throw it before this runs out or they're eliminated. Human side is always
- * enforced; the AI is effectively immune (it always throws in time) except
- * for a rare scripted fumble - see begin_loose_for_B(). */
+ * throw it before this runs out or they're eliminated. */
 static u16 pickupClock;     /* frames left, 0 = no clock running */
 static bool pickupIsA;      /* TRUE: team A (human) on the clock, FALSE: AI */
-static bool aiFumbling;     /* rare (~1/1000) AI fumble that lets its clock expire */
 static u16  aiLooseReact;   /* frames the CPU still waits before chasing a loose ball */
 
 /* Referee escort: on a shot-clock timeout the ref runs in from the right,
@@ -92,11 +115,16 @@ static u16  aiLooseReact;   /* frames the CPU still waits before chasing a loose
  * loose again for the next player - or the round/match ends if that was the
  * team's last player. */
 static s16  refX, refY;     /* referee sprite position (screen space) */
+static u8   refSpriteSlot;
+static u8   airDotSpriteSlots[AIR_DOT_COUNT];
 static u8   escortIdx;      /* which player on the escorted side is being walked off */
 static bool escortIsA;      /* TRUE: escorting a team A (human) player */
 static u8   escortPhase;    /* 0 = running in to the player, 1 = walking them out */
 static u8   refAnim;        /* walk-frame counter */
+static bool refFacingLeft;  /* horizontal mirror follows actual X movement */
+static bool refBackView;    /* rear bank follows last vertical move upward */
 static bool shotClockShown; /* whether the on-screen countdown is currently drawn */
+static u16  shotClockSecondsShown; /* cached value: prevents per-frame tile/palette rewrites */
 #define PICKUP_CLOCK_SECS  10
 #define PICKUP_CLOCK_FRAMES (u16)((SYS_isPAL() ? 50 : 60) * PICKUP_CLOCK_SECS)
 static s8  pendingSpin;
@@ -105,6 +133,7 @@ static s16 pendingTargetY;
 static u8  server;          /* 0 = team A serves, 1 = team B serves */
 static u8  roundWinnerIsA;
 static u16 ambientTick;      /* gentle off-ball repositioning cadence */
+static u8  markerPulseTick;  /* low-frequency light breathing inside control ring */
 
 static u8  flashTimer;      /* frames left in the current impact flash, 0 = none */
 static u8  shakeTimer;      /* frames left in the current screen shake, 0 = none */
@@ -114,7 +143,7 @@ static s8  worldOffsetY;    /* applied to BG_B and every world sprite together *
  * AI and physics) and shows a small centred menu. Sprites are parked while
  * paused; the normal render tail redraws them on resume. */
 static bool matchPaused;
-static u8   pauseRow;       /* 0 = RESUME, 1 = QUIT TO TITLE */
+static u8   pauseRow;       /* 0 = RESUME, 1 = EXIT MATCH */
 #define PAUSE_X  12
 #define PAUSE_Y  9
 #define PAUSE_W  16
@@ -173,6 +202,117 @@ static bool activeA_has_ball(void)
             (state == MS_ANNOUNCE && server == 0));
 }
 
+/* Button presses are throws while team A owns the ball. At every other
+ * playable moment they select a defender instead: A/C use current screen-X
+ * order while B prioritises distance to the live ball. */
+static bool teamA_has_possession(void)
+{
+    return state == MS_A_HOLD || state == MS_A_WINDUP ||
+           (state == MS_ANNOUNCE && server == 0);
+}
+
+/* A hit or escort only disables the player involved.  Their team-mates stay
+ * controllable, which removes the long whole-team input lock after contact. */
+static bool control_candidate(u8 index)
+{
+    Player *p = &teamA[index];
+    if (p->eliminated || p->exiting) return FALSE;
+    if (state == MS_HIT_A && index == responderA) return FALSE;
+    if (state == MS_ESCORT && escortIsA && index == escortIdx) return FALSE;
+    return TRUE;
+}
+
+static void rotate_controlled_player(bool right, bool audible)
+{
+    s16 currentX = teamA[activeA].x;
+    s16 bestDistance = 32767;
+    s16 wrapX = right ? 32767 : -32767;
+    u8 best = activeA;
+    u8 wrap = activeA;
+    u8 i;
+
+    for (i = 0; i < TEAM_SIZE; i++)
+    {
+        s16 distance;
+        if (i == activeA || !control_candidate(i)) continue;
+
+        distance = teamA[i].x - currentX;
+        if ((right && distance > 0 && distance < bestDistance) ||
+            (!right && distance < 0 && -distance < bestDistance))
+        {
+            bestDistance = right ? distance : -distance;
+            best = i;
+        }
+
+        /* Right wraps to the leftmost player; left wraps to the rightmost. */
+        if ((right && teamA[i].x < wrapX) ||
+            (!right && teamA[i].x > wrapX))
+        {
+            wrapX = teamA[i].x;
+            wrap = i;
+        }
+    }
+
+    if (best == activeA) best = wrap;
+    if (best != activeA)
+    {
+        activeA = best;
+        if (audible) sound_mgr_blip();
+    }
+}
+
+/* B is the tactical switch: take the selectable player nearest the ball. If
+ * that player is already controlled, select the second-nearest instead so a
+ * repeated press remains useful rather than appearing to do nothing. */
+static void select_controlled_nearest_to_ball(bool audible)
+{
+    u32 nearestDistance = 0xFFFFFFFF;
+    u32 nextDistance = 0xFFFFFFFF;
+    u8 nearest = activeA;
+    u8 next = activeA;
+    u8 i;
+
+    for (i = 0; i < TEAM_SIZE; i++)
+    {
+        s32 dx, dy;
+        u32 distance;
+
+        if (!control_candidate(i)) continue;
+        dx = teamA[i].x + PLAYER_PICKUP_DX - ball.x;
+        dy = teamA[i].y + PLAYER_PICKUP_DY - ball.y;
+        distance = (u32)(dx * dx + dy * dy);
+
+        if (distance < nearestDistance)
+        {
+            nextDistance = nearestDistance;
+            next = nearest;
+            nearestDistance = distance;
+            nearest = i;
+        }
+        else if (distance < nextDistance)
+        {
+            nextDistance = distance;
+            next = i;
+        }
+    }
+
+    if (activeA == nearest && nextDistance != 0xFFFFFFFF)
+        nearest = next;
+
+    if (nearest != activeA && control_candidate(nearest))
+    {
+        activeA = nearest;
+        if (audible) sound_mgr_blip();
+    }
+}
+
+static bool activeA_can_move(void)
+{
+    if (state == MS_ROUND_END || !control_candidate(activeA)) return FALSE;
+    if (state == MS_A_WINDUP && activeA == holderA) return FALSE;
+    return TRUE;
+}
+
 /* Wide ground ring under the controlled player: yellow while defending or
  * moving without the ball, red while holding/winding up a throw. */
 static void draw_control_marker(void)
@@ -180,17 +320,20 @@ static void draw_control_marker(void)
     Player *p = &teamA[activeA];
     bool hasBall = activeA_has_ball();
     u16 markerTile = hasBall ? TILE_RING_RED : TILE_RING_YELLOW;
-    if (p->eliminated)
+    if ((markerPulseTick & 15) == 0)
+        sprites_data_set_ring_pulse((u8)((markerPulseTick >> 4) & 3), FALSE);
+    markerPulseTick++;
+    if (!control_candidate(activeA))
     {
         VDP_setSpriteFull(SLOT_MARKER, -24, -24, SPRITE_SIZE(3, 2),
                            TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, markerTile),
-                           SLOT_SHADOWS);
+                           0);
         return;
     }
     /* A 24px open ellipse stays readable without covering the runner's feet. */
     VDP_setSpriteFull(SLOT_MARKER, p->x - 4, p->y + 8 + worldOffsetY, SPRITE_SIZE(3, 2),
                        TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, markerTile),
-                       SLOT_SHADOWS);
+                       0);
 }
 
 /* The six ex-player-shadow slots now draw a dotted white line from the ball's
@@ -227,15 +370,21 @@ static void draw_ball_air_dots(void)
         if (dots > 6) dots = 6;
     }
 
-    for (i = 0; i < 6; i++)
+    for (i = 0; i < AIR_DOT_COUNT; i++)
     {
-        u8 slot = SLOT_SHADOWS + i;
-        u8 link = (i == 5) ? 0 : (u8)(slot + 1);
+        u8 slot = airDotSpriteSlots[i];
+        u8 link = (u8)(slot + 1);
         if (i < dots)
-            VDP_setSpriteFull(slot, groundX - 4, groundY - 10 - (s16)i * 8,
+        {
+            s16 dotY = groundY - 10 - (s16)i * 8;
+            u16 dotPriority = (ui_sprite_behind_panel(groundX - 4, dotY, 8, 8) ||
+                               court_bg_spriteBehindRoof(groundX - 4, dotY, 8, 8))
+                ? 0 : netPriority;
+            VDP_setSpriteFull(slot, groundX - 4, dotY,
                                SPRITE_SIZE(1, 1),
-                               TILE_ATTR_FULL(PAL_BALL, netPriority, FALSE, FALSE,
+                               TILE_ATTR_FULL(PAL_BALL, dotPriority, FALSE, FALSE,
                                               TILE_BALL_TETHER), link);
+        }
         else
             VDP_setSpriteFull(slot, -16, -16, SPRITE_SIZE(1, 1),
                                TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE,
@@ -253,6 +402,9 @@ typedef struct {
     s16 groundX;
     s16 groundY;
     bool isBall;
+    bool isImpact;
+    bool isReferee;
+    s8 airDot;
 } DepthActor;
 
 static bool actor_is_nearer(const DepthActor *a, const DepthActor *b)
@@ -263,46 +415,104 @@ static bool actor_is_nearer(const DepthActor *a, const DepthActor *b)
 
 static void assign_actor_depth_slots(void)
 {
-    DepthActor order[TEAM_SIZE * 2 + 1];
+    DepthActor order[TEAM_SIZE * 2 + 3 + AIR_DOT_COUNT];
+    const u8 ballIndex = TEAM_SIZE * 2;
+    const u8 impactIndex = ballIndex + 1;
+    const u8 refereeIndex = impactIndex + 1;
+    const u8 dotIndex = refereeIndex + 1;
+    const u8 actorCount = dotIndex + AIR_DOT_COUNT;
+    s16 ballGroundX, ballGroundY;
     u8 i;
 
     for (i = 0; i < TEAM_SIZE; i++)
     {
         order[i].player = &teamA[i];
-        order[i].groundX = teamA[i].x;
-        order[i].groundY = teamA[i].y;
+        if (teamA[i].eliminated && !teamA[i].exiting)
+        {
+            order[i].groundX = -32767;
+            order[i].groundY = -32767;
+        }
+        else player_visualGround(&teamA[i], &order[i].groundX,
+                                  &order[i].groundY);
         order[i].isBall = FALSE;
+        order[i].isImpact = FALSE;
+        order[i].isReferee = FALSE;
+        order[i].airDot = -1;
         order[TEAM_SIZE + i].player = &teamB[i];
-        order[TEAM_SIZE + i].groundX = teamB[i].x;
-        order[TEAM_SIZE + i].groundY = teamB[i].y;
+        if (teamB[i].eliminated && !teamB[i].exiting)
+        {
+            order[TEAM_SIZE + i].groundX = -32767;
+            order[TEAM_SIZE + i].groundY = -32767;
+        }
+        else player_visualGround(&teamB[i],
+                                  &order[TEAM_SIZE + i].groundX,
+                                  &order[TEAM_SIZE + i].groundY);
         order[TEAM_SIZE + i].isBall = FALSE;
+        order[TEAM_SIZE + i].isImpact = FALSE;
+        order[TEAM_SIZE + i].isReferee = FALSE;
+        order[TEAM_SIZE + i].airDot = -1;
     }
 
     /* Sort the ball from its ground track, never its airborne screen Y.
      * A held near-side ball sits just behind its rear-facing owner; the
      * far-side/front-facing holder presents it just in front of the torso. */
-    order[TEAM_SIZE * 2].player = NULL;
-    order[TEAM_SIZE * 2].isBall = TRUE;
+    order[ballIndex].player = NULL;
+    order[ballIndex].isBall = TRUE;
+    order[ballIndex].isImpact = FALSE;
+    order[ballIndex].isReferee = FALSE;
+    order[ballIndex].airDot = -1;
     if (ball.state == BALL_HELD_A)
     {
-        order[TEAM_SIZE * 2].groundX = teamA[holderA].x;
-        order[TEAM_SIZE * 2].groundY = teamA[holderA].y - 1;
+        ballGroundX = teamA[holderA].x;
+        ballGroundY = teamA[holderA].y - 1;
     }
     else if (ball.state == BALL_HELD_B)
     {
-        order[TEAM_SIZE * 2].groundX = teamB[holderB].x;
-        order[TEAM_SIZE * 2].groundY = teamB[holderB].y + 1;
+        ballGroundX = teamB[holderB].x;
+        ballGroundY = teamB[holderB].y + 1;
     }
     else
     {
-        order[TEAM_SIZE * 2].groundX = ball.x;
-        order[TEAM_SIZE * 2].groundY = ball.y;
+        ballGroundX = ball.x;
+        ballGroundY = ball.y;
+    }
+    order[ballIndex].groundX = ballGroundX;
+    order[ballIndex].groundY = ballGroundY;
+
+    order[impactIndex].player = NULL;
+    order[impactIndex].isBall = FALSE;
+    order[impactIndex].isImpact = TRUE;
+    order[impactIndex].isReferee = FALSE;
+    order[impactIndex].airDot = -1;
+    order[impactIndex].groundX = impact_fx_active()
+        ? impact_fx_sortX() : -32767;
+    order[impactIndex].groundY = impact_fx_active()
+        ? impact_fx_sortY() : -32767;
+
+    order[refereeIndex].player = NULL;
+    order[refereeIndex].isBall = FALSE;
+    order[refereeIndex].isImpact = FALSE;
+    order[refereeIndex].isReferee = TRUE;
+    order[refereeIndex].airDot = -1;
+    order[refereeIndex].groundX = (state == MS_ESCORT) ? refX : -32767;
+    order[refereeIndex].groundY = (state == MS_ESCORT) ? refY : -32767;
+
+    /* The vertical guide belongs to the ball's ground-depth layer. Sorting
+     * every dot prevents its column from cutting across a nearer body. */
+    for (i = 0; i < AIR_DOT_COUNT; i++)
+    {
+        order[dotIndex + i].player = NULL;
+        order[dotIndex + i].isBall = FALSE;
+        order[dotIndex + i].isImpact = FALSE;
+        order[dotIndex + i].isReferee = FALSE;
+        order[dotIndex + i].airDot = (s8)i;
+        order[dotIndex + i].groundX = ballGroundX;
+        order[dotIndex + i].groundY = ballGroundY;
     }
 
-    /* Seven entries only: a stable insertion sort is cheaper and clearer than
-     * carrying a general-purpose sorter into the ROM. Exact ties retain their
-     * previous team/player order, preventing one-frame overlap flicker. */
-    for (i = 1; i < TEAM_SIZE * 2 + 1; i++)
+    /* This compact list is small enough for a stable insertion sort. Exact
+     * ties retain their prior actor order, preventing one-frame overlap flicker. */
+    for (i = 1; i < actorCount; i++)
     {
         DepthActor key = order[i];
         u8 j = i;
@@ -314,11 +524,16 @@ static void assign_actor_depth_slots(void)
         order[j] = key;
     }
 
-    for (i = 0; i < TEAM_SIZE * 2 + 1; i++)
+    for (i = 0; i < actorCount; i++)
     {
         if (order[i].isBall) ball.spriteSlot = i;
+        else if (order[i].isImpact) impact_fx_setSpriteSlot(i);
+        else if (order[i].isReferee) refSpriteSlot = i;
+        else if (order[i].airDot >= 0)
+            airDotSpriteSlots[(u8)order[i].airDot] = i;
         else order[i].player->spriteSlot = i;
     }
+    ball.shadowSlot = SLOT_BALL_SHADOW;
 }
 
 static u8 count_in_play(Player team[])
@@ -342,20 +557,6 @@ static u8 first_in_play_from(Player team[], u8 preferred)
     return preferred; /* shouldn't happen - round should already have ended */
 }
 
-/* Picks the Nth in-play slot (0-based) on a team - used to turn an
- * ai_pickSlot() count-based roll into a real team index. */
-static u8 nth_in_play(Player team[], u8 n)
-{
-    u8 idx, seen = 0;
-    for (idx = 0; idx < TEAM_SIZE; idx++)
-    {
-        if (team[idx].eliminated) continue;
-        if (seen == n) return idx;
-        seen++;
-    }
-    return 0;
-}
-
 static u8 closest_in_play(Player team[], s16 x, s16 y)
 {
     u8 i, best = first_in_play_from(team, 0);
@@ -365,8 +566,8 @@ static u8 closest_in_play(Player team[], s16 x, s16 y)
         s32 dx, dy;
         u32 distance;
         if (team[i].eliminated) continue;
-        dx = team[i].x + 4 - x;
-        dy = team[i].y + 5 - y;
+        dx = team[i].x + PLAYER_PICKUP_DX - x;
+        dy = team[i].y + PLAYER_PICKUP_DY - y;
         distance = (u32)(dx * dx + dy * dy);
         if (distance < bestDistance)
         {
@@ -377,12 +578,10 @@ static u8 closest_in_play(Player team[], s16 x, s16 y)
     return best;
 }
 
-static bool move_toward_ball(Player *p)
+static bool move_toward_point(Player *p, s16 targetX, s16 targetY)
 {
     bool moved = FALSE;
     s16 oldX = p->x;
-    s16 targetX = ball.x - 4;
-    s16 targetY = ball.y - 5;
     if (p->x < targetX - 1) { p->x += PLAYER_SPEED; moved = TRUE; }
     else if (p->x > targetX + 1) { p->x -= PLAYER_SPEED; moved = TRUE; }
     if (p->y < targetY - 1) { p->y++; moved = TRUE; }
@@ -392,13 +591,124 @@ static bool move_toward_ball(Player *p)
     return moved;
 }
 
-/* Independent off-ball wandering: each of the six players carries its own
- * countdown and its own randomly-chosen destination near its home spot, so
- * they drift and pause on their own schedules instead of all twitching on a
- * shared global beat (which read as a robotic timed update). */
+static bool move_toward_ball(Player *p)
+{
+    return move_toward_point(p, ball.x - PLAYER_PICKUP_DX,
+                             ball.y - PLAYER_PICKUP_DY);
+}
+
+static bool move_cpu_carrier(Player *p, const Player *rival, s8 laneOffset)
+{
+    /* Build the target from a legal FEET position in Team B's far half. The
+     * former target projected Y from the carrier's old X, so moving sideways
+     * silently changed its intended court depth and made it ride the net clamp. */
+    const s16 setDepth = COURT_CENTER_DEPTH - 12;
+    const s16 minFeetX = COURT_MIN_X_AT_DEPTH(setDepth) + PLAYER_HALF_W;
+    const s16 maxFeetX = COURT_MAX_X_AT_DEPTH(setDepth) - PLAYER_HALF_W;
+    s16 targetFeetX = rival->x + PLAYER_FEET_DX + laneOffset;
+    s16 targetY;
+
+    if (targetFeetX < minFeetX) targetFeetX = minFeetX;
+    if (targetFeetX > maxFeetX) targetFeetX = maxFeetX;
+    targetY = COURT_Y_AT_DEPTH_X(setDepth, targetFeetX) - PLAYER_FEET_DY;
+    return move_toward_point(p, targetFeetX - PLAYER_FEET_DX, targetY);
+}
+
+static void choose_ai_carrier_style(void)
+{
+    /* Most possessions include a short, visible reposition before the throw.
+     * Some are deliberately planted so armed CPU players do not feel robotic. */
+    if (gDifficulty == DIFF_EASY)
+        aiCarrierRepositions = ((random() & 1) != 0);
+    else if (gDifficulty == DIFF_HARD)
+        aiCarrierRepositions = ((random() & 7) != 0);
+    else
+        aiCarrierRepositions = ((random() & 3) != 0);
+    aiCarrierOffset = (random() & 1) ? 18 : -18;
+    /* HARD still releases quickly, but no longer snaps immediately from a
+     * pickup into a throw. This floor makes every selected carrier run read
+     * on screen while preserving the occasional planted possession. */
+    aiCarrierMoveFloor = aiCarrierRepositions ?
+        (gDifficulty == DIFF_HARD ? 10 :
+         gDifficulty == DIFF_EASY ? 20 : 16) : 0;
+}
+
+/* Cache one evasive direction per defender when Team A releases the ball.
+ * Keeping this stable prevents the left/right jitter that results from
+ * recalculating "away" after the defender crosses the flight lane. */
+static void prepare_cpu_evades(void)
+{
+    u8 i;
+    for (i = 0; i < TEAM_SIZE; i++)
+    {
+        s16 centre = teamB[i].x + PLAYER_PICKUP_DX;
+        bool reacts = gDifficulty == DIFF_HARD ? TRUE :
+                      gDifficulty == DIFF_EASY ? ((random() % 3) == 0) :
+                                                ((random() & 3) != 0);
+        if (!reacts || teamB[i].eliminated) aiEvadeDir[i] = 0;
+        else if (centre < pendingTargetX) aiEvadeDir[i] = -1;
+        else if (centre > pendingTargetX) aiEvadeDir[i] = 1;
+        else aiEvadeDir[i] = (random() & 1) ? 1 : -1;
+    }
+}
+
+/* Dodge only when the incoming lane genuinely threatens this defender. The
+ * reaction point is difficulty-scaled; CPU players therefore look aware of
+ * the throw without gaining an impossible instant read on EASY/NORMAL. */
+static bool move_cpu_evade(Player *p, u8 index)
+{
+    u16 reactionPoint = gDifficulty == DIFF_HARD ? 72 :
+                        gDifficulty == DIFF_EASY ? 198 : 126;
+    s16 centre = p->x + PLAYER_PICKUP_DX;
+    s16 feetY = p->y + PLAYER_PICKUP_DY;
+    s16 oldX = p->x;
+    s16 oldY = p->y;
+
+    if (aiEvadeDir[index] == 0 || ball.progress < reactionPoint ||
+        abs(centre - pendingTargetX) > (HIT_WINDOW_X + 28) ||
+        abs(feetY - pendingTargetY) > 34)
+        return FALSE;
+
+    /* A lateral burst is readable in the isometric view and gets the body out
+     * of the collision lane while player_clampToCourt keeps it in Team B's 50%. */
+    p->x += aiEvadeDir[index] *
+            (gDifficulty == DIFF_HARD ? 3 : PLAYER_SPEED);
+    p->y += aiEvadeDir[index];
+    player_clampToCourt(p);
+    if (p->x != oldX) p->facingLeft = (p->x < oldX);
+    return p->x != oldX || p->y != oldY;
+}
+
+/* Aim at a real living opponent rather than choosing an unrelated lane.
+ * The landing remains in the legal back court, while Normal/Hard compensate
+ * for the authored curve so intentional spin does not sabotage CPU aim. */
+static void plan_cpu_throw(void)
+{
+    const s16 depth = COURT_NEAR_DEPTH - BALL_WALL_MARGIN;
+    const s16 minX = COURT_MIN_X_AT_DEPTH(depth) + 8;
+    const s16 maxX = COURT_MAX_X_AT_DEPTH(depth) - 8;
+    Player *target;
+
+    responderA = closest_in_play(teamA,
+                                 teamB[holderB].x + PLAYER_PICKUP_DX,
+                                 teamB[holderB].y + PLAYER_PICKUP_DY);
+    activeA = responderA;
+    target = &teamA[responderA];
+    pendingSpin = (s8)((random() % 3) - 1);
+    pendingTargetX = ai_pickTargetX(target->x + PLAYER_PICKUP_DX);
+    if (gDifficulty != DIFF_EASY)
+        pendingTargetX -= pendingSpin * 18;
+    if (pendingTargetX < minX) pendingTargetX = minX;
+    if (pendingTargetX > maxX) pendingTargetX = maxX;
+    pendingTargetY = COURT_Y_AT_DEPTH_X(depth, pendingTargetX);
+}
+
+/* Independent off-ball movement. Human-side teammates retain a restrained
+ * home formation; CPU players patrol broad tactical lanes across their own
+ * 50% of the court, with every target authored in projected feet/depth space. */
 #define AMBIENT_SLOTS   6
-#define WANDER_RANGE_X  9    /* +/- px roam around the home mark */
-#define WANDER_RANGE_Y  6
+#define WANDER_RANGE_X  10
+#define WANDER_RANGE_Y   6
 static u16 wanderTimer[AMBIENT_SLOTS];   /* frames until this player re-targets */
 static s16 wanderTX[AMBIENT_SLOTS];
 static s16 wanderTY[AMBIENT_SLOTS];
@@ -406,11 +716,59 @@ static u8  wanderPace[AMBIENT_SLOTS];    /* 1 = ambles, 2 = brisker - per player
 
 static void wander_pick(Player *p, u8 slot)
 {
-    wanderTX[slot] = p->homeX + (s16)(random() % (WANDER_RANGE_X * 2 + 1)) - WANDER_RANGE_X;
-    wanderTY[slot] = p->homeY + (s16)(random() % (WANDER_RANGE_Y * 2 + 1)) - WANDER_RANGE_Y;
-    /* Randomised dwell (arrive, then loiter) desynchronises the six players. */
-    wanderTimer[slot] = (u16)(35 + (random() % 85));   /* ~0.6-2.0s at 60fps */
-    wanderPace[slot]  = (u8)(1 + (random() & 1));
+    if (p->farSide)
+    {
+        /* Team B owns depths 25..76. Leave a visual margin at both the far
+         * baseline and centre board, then split the available width into three
+         * lanes so teammates cover the half instead of forming one scrum. */
+        const s16 minDepth = COURT_FAR_DEPTH + 8;
+        const s16 maxDepth = COURT_CENTER_DEPTH - 12;
+        const s16 depth = minDepth + (s16)(random() % (maxDepth - minDepth + 1));
+        const s16 minFeetX = COURT_MIN_X_AT_DEPTH(depth) + PLAYER_HALF_W;
+        const s16 maxFeetX = COURT_MAX_X_AT_DEPTH(depth) - PLAYER_HALF_W;
+        const u8 role = (u8)(slot - TEAM_SIZE);
+        const s16 width = maxFeetX - minFeetX;
+        const s16 laneCentre = minFeetX +
+            (s16)(width * (role + 1) / (TEAM_SIZE + 1));
+        s16 roamingRadius = width / 5;
+        s16 feetX;
+
+        if (roamingRadius < 18) roamingRadius = 18;
+        feetX = laneCentre +
+            (s16)(random() % (roamingRadius * 2 + 1)) - roamingRadius;
+        if (feetX < minFeetX) feetX = minFeetX;
+        if (feetX > maxFeetX) feetX = maxFeetX;
+
+        wanderTX[slot] = feetX - PLAYER_FEET_DX;
+        wanderTY[slot] = COURT_Y_AT_DEPTH_X(depth, feetX) - PLAYER_FEET_DY;
+        /* Short, difficulty-scaled plants make the CPU look alert instead of
+         * waiting in three fixed lanes. They still pause often enough for a
+         * human to read the formation and choose a throw. */
+        if (gDifficulty == DIFF_EASY)
+        {
+            wanderTimer[slot] = (u16)(24 + (random() % 42));
+            wanderPace[slot] = ((random() & 1) == 0) ? 1 : 2;
+        }
+        else if (gDifficulty == DIFF_HARD)
+        {
+            wanderTimer[slot] = (u16)(3 + (random() % 15));
+            wanderPace[slot] = 2;
+        }
+        else
+        {
+            wanderTimer[slot] = (u16)(8 + (random() % 23));
+            wanderPace[slot] = ((random() & 3) == 0) ? 1 : 2;
+        }
+    }
+    else
+    {
+        wanderTX[slot] = p->homeX +
+            (s16)(random() % (WANDER_RANGE_X * 2 + 1)) - WANDER_RANGE_X;
+        wanderTY[slot] = p->homeY +
+            (s16)(random() % (WANDER_RANGE_Y * 2 + 1)) - WANDER_RANGE_Y;
+        wanderTimer[slot] = (u16)(55 + (random() % 85));
+        wanderPace[slot] = 1;
+    }
 }
 
 /* Seed all six with staggered, independent targets at round start. */
@@ -433,22 +791,25 @@ static bool move_ambient(Player *p, u8 slot)
     u8  pace = wanderPace[slot];
     bool arrived;
 
-    if (wanderTimer[slot] > 0) wanderTimer[slot]--;
-
     if (p->x < tx) { p->x += (p->x + pace <= tx) ? pace : 1; moved = TRUE; }
     else if (p->x > tx) { p->x -= (p->x - pace >= tx) ? pace : 1; moved = TRUE; }
 
-    /* Y drifts at half rate, phased per slot so nobody bobs in unison. */
-    if (((ambientTick + slot * 11) & 1) == 0)
+    /* CPU depth changes every frame so it genuinely covers its full half;
+     * human-side supporting players keep the gentler half-rate shuffle. */
+    if (p->farSide || ((ambientTick + slot * 11) & 1) == 0)
     {
         if (p->y < ty) { p->y++; moved = TRUE; }
         else if (p->y > ty) { p->y--; moved = TRUE; }
     }
 
-    /* Re-target once this player has both arrived and served its dwell time -
-     * so each one independently decides when to move next and where. */
+    /* Dwell time starts after arrival rather than expiring during the run.
+     * This produces readable run/plant/run decisions instead of perpetual drift. */
     arrived = (p->x == tx) && (p->y == ty);
-    if (arrived && wanderTimer[slot] == 0) wander_pick(p, slot);
+    if (arrived)
+    {
+        if (wanderTimer[slot] > 0) wanderTimer[slot]--;
+        else wander_pick(p, slot);
+    }
 
     player_clampToCourt(p);
     if (p->x != oldX) p->facingLeft = (p->x < oldX);
@@ -461,7 +822,7 @@ static void place_ball_in_hand(Player *p, bool windup)
     static const s8 frontHandY[4] = { -9, -10, -9, -10 };
     static const s8 rearHandX[4]  = { 7, 7, 8, 7 };
     static const s8 rearHandY[4]  = { -11, -12, -11, -12 };
-    u8 frame = p->animFrame & 3;
+    u8 frame = (p->animFrame >> 1) & 3;
     s16 direction = p->facingLeft ? -1 : 1;
     s16 bodyCenterX = p->x + 8;
     s16 handX = p->farSide ? frontHandX[frame] : rearHandX[frame];
@@ -495,8 +856,8 @@ static s8 first_ball_hit(Player team[])
 
 static void fixed_back_target(bool farSide, u8 lane, s16 *x, s16 *y)
 {
-    s16 depth = farSide ? (COURT_FAR_DEPTH + 12)
-                        : (COURT_NEAR_DEPTH - 12);
+    s16 depth = farSide ? (COURT_FAR_DEPTH + BALL_WALL_MARGIN)
+                        : (COURT_NEAR_DEPTH - BALL_WALL_MARGIN);
     /* Derive the three back-court points from the projected side walls at
      * this depth. The near edge is wider/shifted left; using the old flat
      * lane_x values would not line up with the isometric court. */
@@ -508,8 +869,36 @@ static void fixed_back_target(bool farSide, u8 lane, s16 *x, s16 *y)
 
 static bool player_reached_ball(const Player *p)
 {
-    return abs((p->x + 4) - ball.x) <= PICKUP_WINDOW_X &&
-           abs((p->y + 5) - ball.y) <= PICKUP_WINDOW_Y;
+    return abs((p->x + PLAYER_PICKUP_DX) - ball.x) <= PICKUP_WINDOW_X &&
+           abs((p->y + PLAYER_PICKUP_DY) - ball.y) <= PICKUP_WINDOW_Y;
+}
+
+static void trigger_surface_impact(Ball *b)
+{
+    impact_fx_trigger(b->x, ball_visualY(b), b->x, b->y,
+                      COURT_DEPTH_OF(b->x, b->y) >= COURT_CENTER_DEPTH,
+                      FALSE);
+}
+
+static void update_loose_ball(void)
+{
+    if (ball_updateLoose(&ball))
+    {
+        sound_mgr_bounce();
+        if (ball.contactKind >= BALL_CONTACT_LEFT_WALL)
+            trigger_surface_impact(&ball);
+    }
+}
+
+static void trigger_player_impact(const Player *victim)
+{
+    s16 travelY = ball.y - ball.startY;
+    /* Collision is tested against the projected ball, but its airborne screen
+     * Y can sit well above the body. Pin feedback to the victim's torso so the
+     * contact always reads as a player hit rather than a nearby wall spark. */
+    impact_fx_trigger(victim->x + 8, victim->y - 4,
+                      victim->x, victim->y + ((travelY >= 0) ? 1 : -1),
+                      !victim->farSide, TRUE);
 }
 
 static void eliminate_from(Player team[], u8 idx)
@@ -542,8 +931,9 @@ static void draw_hud(void)
     ui_draw_panel(0, 0, 40, 3, FALSE);
     flag_data_draw_small(gTeamAIndex, 1, 1, PAL3);
     flag_data_draw_small(gTeamBIndex, 37, 1, PAL3);
-    ui_draw_text(teamNames[gTeamAIndex], 4, 1, UI_WHITE);
-    ui_draw_text(teamNames[gTeamBIndex], 36 - strlen(teamNames[gTeamBIndex]), 1, UI_WHITE);
+    /* FIFA-style fixed-width identifiers keep every team clear of the clock. */
+    ui_draw_text(teamCodes[gTeamAIndex], 4, 1, UI_WHITE);
+    ui_draw_text(teamCodes[gTeamBIndex], 33, 1, UI_WHITE);
 
     clock[0] = '0' + ((minutes / 10) % 10);
     clock[1] = '0' + (minutes % 10);
@@ -590,18 +980,16 @@ static void draw_match_intro(void)
 {
     char roundBuf[4];
     u8 roundNumber = gScoreA + gScoreB + 1;
-    /* Solid navy on BG_B first: the glyphs' transparent pixels would otherwise
-     * show the pitch straight through the banner text and make it unreadable.
+    /* The shared panel painter supplies its own solid BG_B backer.
      * clear_playfield_text() restores the court here when the banner goes. */
-    flag_data_fill_panel(INTRO_X, INTRO_Y, INTRO_W, INTRO_H);
     ui_draw_panel(INTRO_X, INTRO_Y, INTRO_W, INTRO_H, TRUE);
     ui_draw_text("ROUND", 16, 21, UI_CYAN);
     intToStr(roundNumber, roundBuf, 1);
     ui_draw_text(roundBuf, 22, 21, UI_GOLD);
     flag_data_draw_large(gTeamAIndex, 4, 23, PAL3);
     flag_data_draw_large(gTeamBIndex, 32, 23, PAL3);
-    ui_draw_text(teamNames[gTeamAIndex], 9, 23, UI_WHITE);
-    ui_draw_text(teamNames[gTeamBIndex], 31 - strlen(teamNames[gTeamBIndex]), 23, UI_WHITE);
+    ui_draw_text(teamCodes[gTeamAIndex], 9, 23, UI_WHITE);
+    ui_draw_text(teamCodes[gTeamBIndex], 28, 23, UI_WHITE);
     ui_draw_big_text("VS", 18, 23, UI_GOLD);
 }
 
@@ -664,22 +1052,31 @@ static void start_round(void)
 
 void scene_match_enter(void)
 {
+    u8 i;
+
     VDP_clearPlane(BG_A, TRUE);
     VDP_clearPlane(BG_B, TRUE);
     VDP_clearSprites();
     VDP_setTextPalette(PAL0);
+    ui_set_sprite_panel_mask(FALSE, 0, 0, 0, 0);
     /* VDP_clearPlane alone can leave stale text tiles behind on a scene
      * change; explicitly clearing the text area guarantees a clean slate. */
     VDP_clearTextArea(0, 0, 40, 28);
     court_bg_draw();
+    sprites_data_load_impact_art();
+    impact_fx_init();
 
     /* Recolor the shared player tile art to the teams actually picked on
      * the menu - without this both sides always rendered in the same
      * hardcoded colors no matter which team you chose. */
     sprites_data_apply_teams(gTeamAIndex, gTeamBIndex);
 
-    /* Referee sprite lives in the (now-dead) boot-logo VRAM region. */
-    VDP_loadTileData(ref_tiles[0], TILE_REFEREE, REF_TILE_COUNT, DMA);
+    /* The official now shares the players' authored anatomy and run poses,
+     * remapped to a striped white/black shirt with black shorts, socks and
+     * shoes. */
+    sprites_data_load_referee_art(TILE_REFEREE, TILE_REFEREE_EXTRA,
+                                  TILE_REFEREE_BACK,
+                                  TILE_REFEREE_BACK_EXTRA);
     VDP_loadTileData(tile_ball_tether, TILE_BALL_TETHER, 1, DMA);
 
     /* Solid navy behind the HUD strip so the score/clock glyphs never reveal
@@ -691,18 +1088,24 @@ void scene_match_enter(void)
     hitstopTimer = 0;
     looseTimer = 0;
     pickupClock = 0;
-    aiFumbling = FALSE;
     shotClockShown = FALSE;
+    shotClockSecondsShown = 0;
     refAnim = 0;
+    refFacingLeft = TRUE;
+    refBackView = FALSE;
     worldOffsetY = 0;
     matchSeconds = 0;
     ambientTick = 0;
+    markerPulseTick = 0;
+    aiCarrierMoveFloor = 0;
+    for (i = 0; i < TEAM_SIZE; i++) aiEvadeDir[i] = 0;
     clockFrameCounter = 0;
     VDP_setVerticalScroll(BG_B, 0);
     stallTrackerInit = FALSE;
     server = 0;
     matchPaused = FALSE;
     start_round();
+    screen_transition_fade_in();
 }
 
 static void go_round_end(u8 winnerIsA)
@@ -741,18 +1144,13 @@ static void go_round_end(u8 winnerIsA)
 static void begin_loose_for_B(void)
 {
     holderB = closest_in_play(teamB, ball.x, ball.y);
-    /* A miss is still airborne and needs its landing ricochet. After a
-     * hit, ball_dropAt() has already made a bounded loose ball at the
-     * victim's feet; do not relaunch it or change receiving halves. */
+    /* A miss is still airborne and needs its landing ricochet. After a hit,
+     * ball_startHitBounce() has already made the directional loose rebound;
+     * do not relaunch it or change receiving halves. */
     if (ball.state != BALL_LOOSE) ball_startRicochet(&ball);
     looseTimer = 10;
-    /* The AI reliably retrieves and throws well inside the clock, so it is
-     * immune in practice - the clock only actually runs for it on a rare
-     * (~1 in 1000) scripted fumble, during which it won't pick the ball up. */
-    aiFumbling = ((random() % 1000) == 0);
-    /* Run + show the clock for team 2 as well; the AI is still only actually
-     * eliminated on a fumble (see the expiry handler), so a slow approach
-     * never punishes it unfairly. */
+    /* Team 2 observes the same visible possession clock; reliable navigation
+     * replaces the old scripted fumble and hidden immunity. */
     pickupClock = PICKUP_CLOCK_FRAMES;
     pickupIsA = FALSE;
     aiLooseReact = ai_looseReactionFrames();   /* difficulty-scaled hesitation */
@@ -766,7 +1164,6 @@ static void begin_loose_for_A(void)
     if (ball.state != BALL_LOOSE) ball_startRicochet(&ball);
     looseTimer = 10;
     /* Start the human's 10s retrieve-and-throw shot clock. */
-    aiFumbling = FALSE;
     pickupClock = PICKUP_CLOCK_FRAMES;
     pickupIsA = TRUE;
     state = MS_LOOSE_A;
@@ -806,12 +1203,17 @@ static void resolve_throw_to_B(void)
     {
         sound_mgr_bounce();
         begin_loose_for_B();
+        if (ball.contactKind >= BALL_CONTACT_LEFT_WALL)
+            trigger_surface_impact(&ball);
         return;
     }
 
     responderB = (u8)hit;
     lock_hit_direction(&teamB[responderB]);
-    ball_dropAt(&ball, teamB[responderB].x + 4, teamB[responderB].y + 5);
+    trigger_player_impact(&teamB[responderB]);
+    ball_startHitBounce(&ball,
+                        teamB[responderB].x + PLAYER_PICKUP_DX,
+                        teamB[responderB].y + PLAYER_PICKUP_DY);
     sound_mgr_hit();
     trigger_flash(PAL_TEAM_B);
     trigger_shake();
@@ -838,12 +1240,17 @@ static void resolve_throw_to_A(void)
     {
         sound_mgr_bounce();
         begin_loose_for_A();
+        if (ball.contactKind >= BALL_CONTACT_LEFT_WALL)
+            trigger_surface_impact(&ball);
         return;
     }
 
     responderA = (u8)hit;
     lock_hit_direction(&teamA[responderA]);
-    ball_dropAt(&ball, teamA[responderA].x + 4, teamA[responderA].y + 5);
+    trigger_player_impact(&teamA[responderA]);
+    ball_startHitBounce(&ball,
+                        teamA[responderA].x + PLAYER_PICKUP_DX,
+                        teamA[responderA].y + PLAYER_PICKUP_DY);
     sound_mgr_hit();
     trigger_flash(PAL_TEAM_A);
     trigger_shake();
@@ -853,6 +1260,8 @@ static void resolve_throw_to_A(void)
     hitstopTimer = 4;
     hitExitStarted = FALSE;
     state = MS_HIT_A;
+    if (activeA == responderA)
+        rotate_controlled_player(TRUE, FALSE);
 }
 
 static void finish_hit_to_A(void)
@@ -862,39 +1271,75 @@ static void finish_hit_to_A(void)
     begin_loose_for_A();
 }
 
-/* Draw the referee (4x4, PAL3) at the coloured-marker slot, which is unused
- * during an escort. faceRight mirrors the left-facing run art for the walk-out.
- * Links on to SLOT_SHADOWS exactly like the marker it replaces, so the
- * hardware sprite chain stays intact. */
-static void draw_referee(bool faceRight)
+/* Draw the referee (4x4, PAL3) in the same dynamic depth list as players,
+ * balls and effects. These are player-derived stand/run silhouettes in an
+ * official's kit, so proportions and gait match the athletes exactly. */
+static void draw_referee(void)
 {
-    /* A 2px body bob every few ticks reads as a brisk walk without the
-     * broken-looking leg swap the earlier second frame produced. */
-    s16 bob = ((refAnim / 5) & 1) ? -2 : 0;
-    VDP_setSpriteFull(SLOT_MARKER, refX - 16, refY - 16 + bob + worldOffsetY,
+    static const s8 bob[REF_FRAME_COUNT] = { 0, -1, 0, -1 };
+    u8 frame = (refAnim >> 2) & (REF_FRAME_COUNT - 1);
+    u16 base;
+    s16 drawY = refY - 16 + bob[frame] + worldOffsetY;
+    u8 priority = escortIsA ? 1 : 0;
+
+    if (refBackView)
+        base = frame == 0 ? TILE_REFEREE_BACK
+                          : TILE_REFEREE_BACK_EXTRA +
+                            (frame - 1) * REF_FRAME_TILE_COUNT;
+    else
+        base = frame == 0 ? TILE_REFEREE
+                          : TILE_REFEREE_EXTRA +
+                            (frame - 1) * REF_FRAME_TILE_COUNT;
+    if (ui_sprite_behind_panel(refX - 8, drawY, 32, 32) ||
+        court_bg_spriteBehindRoof(refX - 8, drawY, 32, 32))
+        priority = 0;
+    VDP_setSpriteFull(refSpriteSlot, refX - 8,
+                      drawY,
                       SPRITE_SIZE(4, 4),
-                      TILE_ATTR_FULL(PAL_BALL, 1, FALSE, faceRight, TILE_REFEREE),
-                      SLOT_SHADOWS);
+                      TILE_ATTR_FULL(PAL_BALL, priority,
+                                     FALSE, refFacingLeft, base),
+                      (u8)(refSpriteSlot + 1));
 }
 
-/* Big, prominent loose-ball countdown centred just under the HUD. Ceil to
+static void hide_referee(void)
+{
+    VDP_setSpriteFull(refSpriteSlot, -32, -32, SPRITE_SIZE(1, 1),
+                      TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, 0),
+                      (u8)(refSpriteSlot + 1));
+}
+
+/* Big, prominent loose-ball countdown at the top-right under the HUD. Ceil to
  * whole seconds so it reads 10..1; flips to cyan for the last 3 seconds to
  * grab attention. Shown for whichever side is on the clock. */
-#define SC_X 16
+#define SC_X 31
 #define SC_Y 4
 #define SC_W 8
 #define SC_H 4
-static void draw_shot_clock(void)
+static void draw_shot_clock(u16 secs, bool drawPanel)
 {
-    u16 fps = SYS_isPAL() ? 50 : 60;
-    u16 secs = (pickupClock + fps - 1) / fps;
+    u16 numberWidth = (secs >= 10) ? 4 : 2;
     char buf[4];
+
     intToStr(secs, buf, 1);
     ui_set_palette(PAL0);
-    /* Framed navy box so the countdown really stands out over the court. */
-    flag_data_fill_panel(SC_X, SC_Y, SC_W, SC_H);
-    ui_draw_panel(SC_X, SC_Y, SC_W, SC_H, TRUE);
-    ui_draw_big_center(buf, SC_Y + 1, (secs <= 3) ? UI_CYAN : UI_GOLD);
+
+    if (drawPanel)
+    {
+        /* Build the framed navy box only when the clock first appears. The
+         * old code repainted both planes and PAL3 every frame, which was the
+         * visible flicker. */
+        ui_draw_panel(SC_X, SC_Y, SC_W, SC_H, TRUE);
+    }
+    else
+    {
+        /* A two-digit value is four tiles wide while a one-digit value is
+         * only two, so clear the complete interior before drawing the next
+         * cached value. This is just twelve tile writes once per second. */
+        ui_clear_panel_interior(SC_X, SC_Y, SC_W, SC_H);
+    }
+
+    ui_draw_big_text(buf, SC_X + (SC_W - numberWidth) / 2, SC_Y + 1,
+                     (secs <= 3) ? UI_CYAN : UI_GOLD);
 }
 
 /* The shot clock ran out on a loose ball - drop the ball on the spot and send
@@ -904,7 +1349,11 @@ static void trigger_pickup_timeout(void)
     Player *v;
     pickupClock = 0;
     escortIsA = pickupIsA;
-    escortIdx = pickupIsA ? activeA : holderB;
+    /* Penalise the player who is actually nearest the loose/held ball when
+     * time expires. Stored active/holder slots can be stale after a rebound
+     * or manual player switch and previously caused the wrong player to go. */
+    escortIdx = pickupIsA ? closest_in_play(teamA, ball.x, ball.y)
+                          : closest_in_play(teamB, ball.x, ball.y);
     v = escortIsA ? &teamA[escortIdx] : &teamB[escortIdx];
 
     /* The ball must NOT warp to the player. If it was still being held it
@@ -925,6 +1374,11 @@ static void trigger_pickup_timeout(void)
     refY = escortIsA ? 206 : 60;
     escortPhase = 0;
     refAnim = 0;
+    /* The official enters from the right, so the native right-facing art is
+     * mirrored while moving left. Initial front/rear view follows the first
+     * vertical step toward the offender. */
+    refFacingLeft = TRUE;
+    refBackView = v->y < refY;
     /* PAL3 indices 7/15 are unused by the ball art - lend them to the ref for
      * skin tones so it can share the ball palette line during the escort. */
     PAL_setColor(PAL_BALL * 16 + 7,  RGB24_TO_VDPCOLOR(REF_SKIN_LIGHT));
@@ -933,16 +1387,19 @@ static void trigger_pickup_timeout(void)
     player_setPose(v, POSE_STAND, 255);
     sound_mgr_whistle();
     state = MS_ESCORT;
+    if (escortIsA && activeA == escortIdx)
+        rotate_controlled_player(TRUE, FALSE);
 }
 
 /* Draw just the two option rows so cursor moves don't redraw the whole box. */
 static void draw_pause_rows(void)
 {
-    ui_draw_text("RESUME",       15, PAUSE_Y + 4, (pauseRow == 0) ? UI_GOLD : UI_WHITE);
-    ui_draw_text("QUIT TO TITLE", 14, PAUSE_Y + 6, (pauseRow == 1) ? UI_GOLD : UI_WHITE);
-    /* Selection chevrons - clear both columns first, then mark the active row. */
-    ui_draw_text(" ", 13, PAUSE_Y + 4, UI_GOLD);
-    ui_draw_text(" ", 13, PAUSE_Y + 6, UI_GOLD);
+    ui_draw_text("RESUME",    15, PAUSE_Y + 4, (pauseRow == 0) ? UI_GOLD : UI_WHITE);
+    ui_draw_text("EXIT MATCH", 15, PAUSE_Y + 6, (pauseRow == 1) ? UI_GOLD : UI_WHITE);
+    /* ui_draw_text deliberately skips spaces, so drawing " " never erased
+     * the previous arrow. Clear the two actual tilemap cells explicitly. */
+    VDP_clearTileMapRect(BG_A, 13, PAUSE_Y + 4, 1, 1);
+    VDP_clearTileMapRect(BG_A, 13, PAUSE_Y + 6, 1, 1);
     ui_draw_text(">", 13, PAUSE_Y + 4 + (pauseRow * 2), UI_GOLD);
 }
 
@@ -953,7 +1410,6 @@ static void pause_enter(void)
     sound_mgr_confirm();
     VDP_clearSprites();
     sprites_data_hide_all_sprites();
-    flag_data_fill_panel(PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H);
     ui_draw_panel(PAUSE_X, PAUSE_Y, PAUSE_W, PAUSE_H, FALSE);
     ui_draw_big_center("PAUSED", PAUSE_Y + 1, UI_GOLD);
     draw_pause_rows();
@@ -974,6 +1430,10 @@ static void pause_resume(void)
      * which the BG_B court redraw cannot bring back - restore it explicitly. */
     court_bg_drawForeground();
     draw_hud();
+    /* The pause panel may have covered the clock. Force one clean rebuild on
+     * the next gameplay frame instead of trusting the cached tile state. */
+    shotClockShown = FALSE;
+    shotClockSecondsShown = 0;
 }
 
 static void pause_menu_update(void)
@@ -984,13 +1444,16 @@ static void pause_menu_update(void)
         sound_mgr_blip();
         draw_pause_rows();
     }
-    else if (input_pressed(BUTTON_START) || input_pressed(BUTTON_C) ||
-             input_pressed(BUTTON_B))
+    else if (input_pressed(BUTTON_START))
     {
-        pause_resume();   /* START/B/C are a quick unpause */
+        /* START is always the immediate resume shortcut, regardless of which
+         * menu row is highlighted. */
+        pause_resume();
     }
-    else if (input_pressed(BUTTON_A))
+    else if (input_pressed(BUTTON_A) || input_pressed(BUTTON_B) ||
+             input_pressed(BUTTON_C))
     {
+        /* All three face buttons activate the currently highlighted row. */
         if (pauseRow == 0)
         {
             pause_resume();
@@ -999,7 +1462,7 @@ static void pause_menu_update(void)
         {
             sound_mgr_confirm();
             matchPaused = FALSE;
-            PAL_fadeOutAll(20, FALSE);
+            screen_transition_fade_out();
             gCurrentScene = GS_MENU;
         }
     }
@@ -1029,6 +1492,21 @@ void scene_match_update(void)
         pause_enter();
         return;
     }
+
+    /* Off-ball controls: A/C rotate left/right by current X position. B
+     * selects the player nearest the live ball (or second-nearest when the
+     * nearest is already active). During possession all three remain throws. */
+    if (!teamA_has_possession() && state != MS_ROUND_END)
+    {
+        if (input_pressed(BUTTON_A))
+            rotate_controlled_player(FALSE, TRUE);
+        else if (input_pressed(BUTTON_B))
+            select_controlled_nearest_to_ball(TRUE);
+        else if (input_pressed(BUTTON_C))
+            rotate_controlled_player(TRUE, TRUE);
+    }
+
+    impact_fx_update();
 
     if (++clockFrameCounter >= (SYS_isPAL() ? 50 : 60))
     {
@@ -1062,10 +1540,7 @@ void scene_match_update(void)
         pickupClock--;
         if (pickupClock == 0)
         {
-            /* Human always faces the consequence; the AI only when it fumbled,
-             * otherwise its clock simply restarts (never a cheap elimination). */
-            if (pickupIsA || aiFumbling) trigger_pickup_timeout();
-            else pickupClock = PICKUP_CLOCK_FRAMES;
+            trigger_pickup_timeout();
         }
     }
     ambientTick++;
@@ -1080,16 +1555,19 @@ void scene_match_update(void)
             if (i != activeA && !teamA[i].eliminated && !teamA[i].exiting)
                 ambientMovedA[i] = move_ambient(&teamA[i], i);
             if (!cpuBusy && !teamB[i].eliminated && !teamB[i].exiting)
-                ambientMovedB[i] = move_ambient(&teamB[i], i + TEAM_SIZE);
+            {
+                if (state == MS_FLY_TO_B)
+                    ambientMovedB[i] = move_cpu_evade(&teamB[i], i);
+                if (!ambientMovedB[i])
+                    ambientMovedB[i] = move_ambient(&teamB[i], i + TEAM_SIZE);
+            }
         }
     }
 
     /* The player you're actively controlling always moves on input,
      * whether or not they're the one currently resolving a play - lets
      * you reposition a teammate while another exchange is in flight. */
-    if (!teamA[activeA].eliminated &&
-        state != MS_A_WINDUP && state != MS_HIT_A &&
-        state != MS_HIT_B && state != MS_ROUND_END && state != MS_ESCORT)
+    if (activeA_can_move())
         player_moveHuman(&teamA[activeA], activeA_has_ball());
 
     /* Watchdog: force whatever this state is waiting on to complete if
@@ -1135,7 +1613,6 @@ void scene_match_update(void)
                  * possession, so the opening throw is timed too (not just
                  * loose-ball retrievals after the first throw). */
                 pickupClock = PICKUP_CLOCK_FRAMES;
-                aiFumbling = FALSE;
                 if (server == 0)
                 {
                     state = MS_A_HOLD;
@@ -1145,7 +1622,8 @@ void scene_match_update(void)
                 {
                     state = MS_B_HOLD;
                     aiDelay = ai_pickThrowDelay();
-                    pickupIsA = FALSE;   /* AI immune; clock just visualises */
+                    choose_ai_carrier_style();
+                    pickupIsA = FALSE;
                 }
             }
             break;
@@ -1178,6 +1656,7 @@ void scene_match_update(void)
             if (windupTimer > 0) windupTimer--;
             else
             {
+                prepare_cpu_evades();
                 ball_startThrow(&ball, pendingTargetX, pendingTargetY,
                                 BALL_FLYING_TO_B, pendingSpin);
                 sound_mgr_throw();
@@ -1190,16 +1669,27 @@ void scene_match_update(void)
         case MS_B_HOLD:
         {
             place_ball_in_hand(&teamB[holderB], FALSE);
-            if (aiDelay > 0) aiDelay--;
+            if (aiDelay > 0 || aiCarrierMoveFloor > 0)
+            {
+                /* Most armed CPU possessions reposition toward a useful lane;
+                 * some deliberately stay planted and throw from the pickup. */
+                if (aiCarrierRepositions)
+                {
+                    responderA = closest_in_play(teamA,
+                                                 teamB[holderB].x + PLAYER_PICKUP_DX,
+                                                 teamB[holderB].y + PLAYER_PICKUP_DY);
+                    cpuMoved = move_cpu_carrier(&teamB[holderB],
+                                                &teamA[responderA],
+                                                aiCarrierOffset);
+                    if (!cpuMoved) aiCarrierMoveFloor = 0;
+                }
+                place_ball_in_hand(&teamB[holderB], FALSE);
+                if (aiDelay > 0) aiDelay--;
+                if (aiCarrierMoveFloor > 0) aiCarrierMoveFloor--;
+            }
             else
             {
-                u8 lane = ai_pickSlot(TEAM_SIZE);
-                responderA = nth_in_play(teamA, ai_pickSlot(count_in_play(teamA)));
-                /* With C now reserved for right-lane throws, defence
-                 * automatically hands control to the targeted player. */
-                activeA = responderA;
-                fixed_back_target(FALSE, lane, &pendingTargetX, &pendingTargetY);
-                pendingSpin = (random() % 3) - 1;
+                plan_cpu_throw();
 
                 player_setPose(&teamB[holderB], POSE_THROW, 18);
                 windupTimer = 8;
@@ -1228,7 +1718,8 @@ void scene_match_update(void)
             {
                 s8 hit;
                 bool arrived = ball_update(&ball);
-                hit = first_ball_hit(teamB);
+                hit = (ball.state == BALL_FLYING_TO_B)
+                    ? first_ball_hit(teamB) : -1;
                 if (hit >= 0) { responderB = (u8)hit; resolve_throw_to_B(); }
                 else if (arrived)
                     resolve_throw_to_B();
@@ -1241,7 +1732,8 @@ void scene_match_update(void)
             {
                 s8 hit;
                 bool arrived = ball_update(&ball);
-                hit = first_ball_hit(teamA);
+                hit = (ball.state == BALL_FLYING_TO_A)
+                    ? first_ball_hit(teamA) : -1;
                 if (hit >= 0) { responderA = (u8)hit; resolve_throw_to_A(); }
                 else if (arrived)
                     resolve_throw_to_A();
@@ -1251,14 +1743,18 @@ void scene_match_update(void)
 
         case MS_LOOSE_B:
         {
-            if (ball_updateLoose(&ball)) sound_mgr_bounce();
+            update_loose_ball();
             /* Hesitate for the difficulty-scaled reaction window before the CPU
              * commits to the ball, so EASY gives the human a real head start. */
             if (aiLooseReact > 0) aiLooseReact--;
-            else cpuMoved = move_toward_ball(&teamB[holderB]);
-            /* During a scripted fumble the AI deliberately never grabs it, so
-             * its shot clock runs out and it eliminates itself (rarely). */
-            if (!aiFumbling && aiLooseReact == 0 && looseTimer == 0 &&
+            else
+            {
+                /* Reassign every frame as the rebound rolls: this is the same
+                 * nearest-eligible-player principle used by Eliminator. */
+                holderB = closest_in_play(teamB, ball.x, ball.y);
+                cpuMoved = move_toward_ball(&teamB[holderB]);
+            }
+            if (aiLooseReact == 0 && looseTimer == 0 &&
                 player_reached_ball(&teamB[holderB]))
             {
                 sound_mgr_pickup();
@@ -1266,6 +1762,7 @@ void scene_match_update(void)
                 ball_init(&ball, SLOT_BALL, 0, 0, BALL_HELD_B);
                 place_ball_in_hand(&teamB[holderB], FALSE);
                 aiDelay = ai_pickThrowDelay();
+                choose_ai_carrier_style();
                 state = MS_B_HOLD;
             }
             break;
@@ -1273,7 +1770,7 @@ void scene_match_update(void)
 
         case MS_LOOSE_A:
         {
-            if (ball_updateLoose(&ball)) sound_mgr_bounce();
+            update_loose_ball();
             if (looseTimer == 0 && player_reached_ball(&teamA[activeA]))
             {
                 holderA = activeA;
@@ -1291,7 +1788,7 @@ void scene_match_update(void)
              * and shake continue. This is short enough to stay responsive but
              * gives the contact frame a deliberate arcade impact. */
             if (hitstopTimer > 0) { hitstopTimer--; break; }
-            if (ball_updateLoose(&ball)) sound_mgr_bounce();
+            update_loose_ball();
             if (impactTimer > 0)
             {
                 impactTimer--;
@@ -1312,7 +1809,7 @@ void scene_match_update(void)
 
         case MS_HIT_A:
             if (hitstopTimer > 0) { hitstopTimer--; break; }
-            if (ball_updateLoose(&ball)) sound_mgr_bounce();
+            update_loose_ball();
             if (impactTimer > 0)
             {
                 impactTimer--;
@@ -1335,8 +1832,10 @@ void scene_match_update(void)
         {
             Player *v = escortIsA ? &teamA[escortIdx] : &teamB[escortIdx];
             const s16 SPD = 2;
+            s16 oldRefX = refX;
+            s16 oldRefY = refY;
 
-            if (ball_updateLoose(&ball)) sound_mgr_bounce();  /* keep it settled */
+            update_loose_ball();  /* keep it settled */
             refAnim++;
 
             if (escortPhase == 0)
@@ -1364,7 +1863,8 @@ void scene_match_update(void)
                 if (v->y < cornerY) v->y++;
                 else if (v->y > cornerY) v->y--;
                 refY = v->y;
-                if ((ambientTick & 3) == 0) v->animFrame = (v->animFrame + 1) & 3;
+                if ((ambientTick & 3) == 0)
+                    v->animFrame = (v->animFrame + 1) & PLAYER_ANIM_MASK;
 
                 if (v->x > 336)
                 {
@@ -1381,6 +1881,11 @@ void scene_match_update(void)
                     }
                 }
             }
+            /* Face from the movement that actually happened this frame.
+             * Horizontal travel controls mirroring; vertical travel selects
+             * front/rear anatomy and remains remembered on flat steps. */
+            if (refX != oldRefX) refFacingLeft = refX < oldRefX;
+            if (refY != oldRefY) refBackView = refY < oldRefY;
             break;
         }
 
@@ -1405,7 +1910,7 @@ void scene_match_update(void)
                             /* Won the final: go back to the bracket so the
                              * player sees the completed competition with their
                              * name as winner (exit only, nothing to continue). */
-                            PAL_fadeOutAll(20, FALSE);
+                            screen_transition_fade_out();
                             gMenuEntry = MENU_ENTRY_CUP_LADDER;
                             gCurrentScene = GS_MENU;
                             return;
@@ -1413,7 +1918,7 @@ void scene_match_update(void)
                         gTeamBIndex = cup_opponent_now(gTeamAIndex, gCupStage);
                         gScoreA = 0;
                         gScoreB = 0;
-                        PAL_fadeOutAll(20, FALSE);
+                        screen_transition_fade_out();
                         /* Back to the ladder so the player sees the bracket
                          * update (beaten rival ticked, next flagged NOW) and
                          * can Continue or Exit before the next tie. */
@@ -1421,7 +1926,16 @@ void scene_match_update(void)
                         gCurrentScene = GS_MENU;
                         return;
                     }
-                    PAL_fadeOutAll(20, FALSE);
+                    if (gGameMode == MODE_TOURNAMENT)
+                    {
+                        /* A tournament defeat still has to resolve this tie
+                         * before the timed result screen returns to the
+                         * bracket. Advance the rival and the simulated ties,
+                         * then show the next-round board with the player out. */
+                        cup_advance(gTeamBIndex, gCupStage);
+                        gCupStage++;
+                    }
+                    screen_transition_fade_out();
                     gCurrentScene = GS_GAMEOVER;
                     return;
                 }
@@ -1442,12 +1956,15 @@ void scene_match_update(void)
         return;
     }
 
-    /* Sprite table order is visual depth on equal-priority hardware sprites.
-     * Rebuild it after movement so the nearer feet always cover farther bodies. */
-    assign_actor_depth_slots();
+    /* Activate the clock mask before drawing sprites on its first frame. That
+     * prevents a high-priority player or ball punching through before the
+     * panel's tilemap reaches the VDP. */
+    ui_set_sprite_panel_mask(pickupClock > 0,
+                             SC_X * 8, SC_Y * 8, SC_W * 8, SC_H * 8);
 
-    /* Animate + draw every player on both sides (eliminated ones are parked
-     * off-screen; draw call order no longer controls their overlap). */
+    /* Advance every pose before assigning slots. Hit/fall/run frames carry
+     * authored pixel offsets, and the sorter must see the same frame that is
+     * about to be drawn or a knockout can be one depth step out of date. */
     for (i = 0; i < TEAM_SIZE; i++)
     {
         bool aMoving = teamA[i].exiting || ambientMovedA[i] ||
@@ -1455,13 +1972,26 @@ void scene_match_update(void)
                        (input_held(BUTTON_LEFT) || input_held(BUTTON_RIGHT) ||
                         input_held(BUTTON_UP) || input_held(BUTTON_DOWN)));
         player_tickAnim(&teamA[i], aMoving);
+
+        bool bMoving = teamB[i].exiting || ambientMovedB[i] ||
+                       (cpuMoved && (i == holderB) &&
+                        (state == MS_LOOSE_B || state == MS_B_HOLD));
+        player_tickAnim(&teamB[i], bMoving);
+    }
+
+    /* Sprite table order is visual depth on equal-priority hardware sprites.
+     * Rebuild it from the current rendered feet so nearer bodies cover farther
+     * ones throughout hit, fall and eliminated run-off animation. */
+    assign_actor_depth_slots();
+
+    /* Draw every player on both sides. Fully eliminated actors remain parked
+     * at the tail of the linked list and cannot disturb visible depth slots. */
+    for (i = 0; i < TEAM_SIZE; i++)
+    {
         teamA[i].y += worldOffsetY;
         player_draw(&teamA[i]);
         teamA[i].y -= worldOffsetY;
 
-        bool bMoving = teamB[i].exiting || ambientMovedB[i] ||
-                       (cpuMoved && (i == holderB) && (state == MS_LOOSE_B));
-        player_tickAnim(&teamB[i], bMoving);
         teamB[i].y += worldOffsetY;
         player_draw(&teamB[i]);
         teamB[i].y -= worldOffsetY;
@@ -1470,15 +2000,29 @@ void scene_match_update(void)
     ball.y += worldOffsetY;
     ball_draw(&ball);
     ball.y -= worldOffsetY;
-    if (state == MS_ESCORT) draw_referee(escortPhase == 1);
-    else draw_control_marker();
+    impact_fx_draw(worldOffsetY);
+    if (state == MS_ESCORT) draw_referee();
+    else hide_referee();
+    draw_control_marker();
     draw_ball_air_dots();
 
     /* On-screen shot clock for whichever side is on the loose-ball timer. */
     if (pickupClock > 0)
     {
-        draw_shot_clock();
-        shotClockShown = TRUE;
+        u16 fps = SYS_isPAL() ? 50 : 60;
+        u16 secs = (pickupClock + fps - 1) / fps;
+
+        if (!shotClockShown)
+        {
+            draw_shot_clock(secs, TRUE);
+            shotClockShown = TRUE;
+            shotClockSecondsShown = secs;
+        }
+        else if (secs != shotClockSecondsShown)
+        {
+            draw_shot_clock(secs, FALSE);
+            shotClockSecondsShown = secs;
+        }
     }
     else if (shotClockShown)
     {
@@ -1486,5 +2030,6 @@ void scene_match_update(void)
         VDP_clearTileMapRect(BG_A, SC_X, SC_Y, SC_W, SC_H);
         court_bg_redraw_rect(SC_X, SC_Y, SC_W, SC_H);
         shotClockShown = FALSE;
+        shotClockSecondsShown = 0;
     }
 }

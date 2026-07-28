@@ -9,6 +9,8 @@
 #define TILE_FLAGS       (TILE_FLAG_BASE + 4)
 #define TILE_FLAGS_LARGE (TILE_FLAGS + NUM_TEAMS * 2)
 #define TILE_FLAG_SELECT (TILE_FLAGS_LARGE + NUM_TEAMS * 8)
+/* Scene-local menu texture; gameplay reloads the centre-net bank before use. */
+#define TILE_MENU_PATTERN TILE_COURT_FG_BASE
 
 #include "flag_tiles.inc"
 
@@ -34,6 +36,14 @@ static const u32 tile_flag_box_r[8] = {
 static const u32 tile_flag_select[8] = {
     0x99999999, 0x99999999, 0x99999999, 0x99999999,
     0x99999999, 0x99999999, 0x99999999, 0x99999999
+};
+
+/* Subtle embossed diagonal, deliberately using the near-black flag colour
+ * over navy. Alternating flips turns the repeated tile into a woven chevron
+ * instead of an obvious wallpaper stripe. */
+static const u32 tile_menu_pattern[8] = {
+    0xb4444444, 0x4b444444, 0x44b44444, 0x444b4444,
+    0x4444b444, 0x44444b44, 0x444444b4, 0x4444444b
 };
 
 static void apply_flag_palette(void)
@@ -80,6 +90,28 @@ void flag_data_fill_panel(u16 x, u16 y, u16 w, u16 h)
                 TILE_FLAG_PANEL), x + col, y + row);
 }
 
+static u16 centred_in_region(const char *text, u16 x, u16 width)
+{
+    u16 length = (u16)strlen(text);
+    if (length >= width) return x;
+    return x + (width - length) / 2;
+}
+
+void flag_data_fill_backdrop(void)
+{
+    u16 row, col;
+    /* Unlike the selector, setup and tournament screens do not call the flag
+     * palette loader. Pin the texture ink here so transitions from gameplay
+     * cannot leave the weave using an arbitrary court colour. */
+    PAL_setColor(PAL0 * 16 + 11, RGB24_TO_VDPCOLOR(0x040C20));
+    VDP_loadTileData(tile_menu_pattern, TILE_MENU_PATTERN, 1, CPU);
+    for (row = 0; row < 28; row++)
+        for (col = 0; col < 40; col++)
+            VDP_setTileMapXY(BG_B,
+                TILE_ATTR_FULL(PAL0, 0, (row & 1), (col & 1),
+                               TILE_MENU_PATTERN), col, row);
+}
+
 void flag_data_draw_small(u8 teamIndex, u16 x, u16 y, u8 palette)
 {
     VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(palette, 1, FALSE, FALSE,
@@ -101,16 +133,18 @@ void flag_data_draw_large(u8 teamIndex, u16 x, u16 y, u8 palette)
 void flag_data_draw_matchup(u8 teamAIndex, u8 teamBIndex)
 {
     u16 row, col;
+    const u16 leftRegionX = 2;
+    const u16 rightRegionX = 22;
+    const u16 regionWidth = 16;
+    const u16 leftFlagX = leftRegionX + (regionWidth - 4) / 2;
+    const u16 rightFlagX = rightRegionX + (regionWidth - 4) / 2;
     u16 leftBase = TILE_FLAGS_LARGE + teamAIndex * 8;
     u16 rightBase = TILE_FLAGS_LARGE + teamBIndex * 8;
     apply_flag_palette();
     ui_set_palette(PAL0);
     ui_apply_palette();
 
-    for (row = 0; row < 28; row++)
-        for (col = 0; col < 40; col++)
-            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
-                TILE_FLAG_PANEL), col, row);
+    flag_data_fill_backdrop();
 
     VDP_clearPlane(BG_A, TRUE);
     ui_draw_panel(1, 1, 38, 26, FALSE);
@@ -118,18 +152,24 @@ void flag_data_draw_matchup(u8 teamAIndex, u8 teamBIndex)
 
     /* Header row: each side's flag with its country name beneath, sitting
      * above the big player figures (drawn separately by matchup_art). */
+    ui_draw_text("TEAM 1", 7, 4, UI_CYAN);
+    ui_draw_text("TEAM 2", 27, 4, UI_CYAN);
     for (col = 0; col < 4; col++)
         for (row = 0; row < 2; row++)
         {
             VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL0, 1, FALSE, FALSE,
-                leftBase + col * 2 + row), 4 + col, 5 + row);
+                leftBase + col * 2 + row), leftFlagX + col, 5 + row);
             VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL0, 1, FALSE, FALSE,
-                rightBase + col * 2 + row), 32 + col, 5 + row);
+                rightBase + col * 2 + row), rightFlagX + col, 5 + row);
         }
-    ui_draw_text(teamNames[teamAIndex], 6 - strlen(teamNames[teamAIndex]) / 2,
-                 7, UI_GOLD);
-    ui_draw_text(teamNames[teamBIndex], 34 - strlen(teamNames[teamBIndex]) / 2,
-                 7, UI_GOLD);
+    ui_draw_text(teamNames[teamAIndex],
+                 centred_in_region(teamNames[teamAIndex],
+                                   leftRegionX, regionWidth), 7, UI_GOLD);
+    ui_draw_text(teamNames[teamBIndex],
+                 centred_in_region(teamNames[teamBIndex],
+                                   rightRegionX, regionWidth), 7, UI_GOLD);
+    ui_draw_hrule(leftRegionX, 8, regionWidth);
+    ui_draw_hrule(rightRegionX, 8, regionWidth);
 
     /* VS sits between the two figures, vertically centred on them. */
     ui_draw_big_text("VS", 18, 14, UI_GOLD);
@@ -152,14 +192,15 @@ void flag_data_draw_selector(u8 selected, u8 playerNumber)
     apply_flag_palette();
     ui_set_palette(PAL0);
     ui_apply_palette();
+    flag_data_fill_backdrop();
 
     /* Solid broadcast backing; a bright bar sits behind the selected row
      * (list column band cols 1-17 only). */
     for (row = 0; row < 28; row++)
         for (col = 0; col < 40; col++)
-            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, row & 1, col & 1,
                 (col >= 1 && col <= 17 && row == selected + 6)
-                    ? TILE_FLAG_SELECT : TILE_FLAG_PANEL), col, row);
+                    ? TILE_FLAG_SELECT : TILE_MENU_PATTERN), col, row);
 
     VDP_clearPlane(BG_A, TRUE);
 
@@ -187,24 +228,25 @@ void flag_data_draw_selector(u8 selected, u8 playerNumber)
             ui_draw_text(">", 0, y, UI_GOLD);
     }
 
-    /* Right preview panel (cols 20-38): boxed big flag, name centred below. */
-    for (col = 26; col <= 31; col++)
+    /* Right preview panel: the large athlete occupies cols 21..29. Keep the
+     * selected flag in a compact box beside it, with the name above both. */
+    for (col = 33; col <= 38; col++)
     {
         VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_H), col, 7);
         VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, TRUE,  FALSE, TILE_FLAG_BOX_H), col, 10);
     }
     for (row = 8; row <= 9; row++)
     {
-        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_L), 26, row);
-        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_R), 31, row);
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_L), 33, row);
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_FLAG_BOX_R), 38, row);
     }
     for (col = 0; col < 4; col++)
         for (row = 0; row < 2; row++)
             VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
-                largeBase + col * 2 + row), 27 + col, 8 + row);
+                largeBase + col * 2 + row), 34 + col, 8 + row);
 
     ui_draw_text(teamNames[selected],
-                 29 - (u16)strlen(teamNames[selected]) / 2, 12, UI_GOLD);
+                 29 - (u16)strlen(teamNames[selected]) / 2, 5, UI_GOLD);
 
     /* Bottom legend: divider rule + the two controls. */
     for (col = 1; col <= 38; col++)
@@ -212,6 +254,58 @@ void flag_data_draw_selector(u8 selected, u8 playerNumber)
             TILE_FLAG_BOX_H), col, 25);
     ui_draw_text("A CONFIRM", 9, 26, UI_GOLD);
     ui_draw_text("C CANCEL", 23, 26, UI_CYAN);
+}
+
+/* Paint one list row without disturbing anything above, below, or beside it.
+ * The flags live on BG_B over the textured/highlight band; labels and pointer
+ * live on transparent BG_A. Keeping this operation local prevents the VDP
+ * from visibly working through a full selector redraw after every keypress. */
+static void update_selector_row(u8 teamIndex, bool selected)
+{
+    u16 col;
+    u16 y = (u16)teamIndex + 6;
+    u16 backing = selected ? TILE_FLAG_SELECT : TILE_MENU_PATTERN;
+
+    for (col = 1; col <= 17; col++)
+        VDP_setTileMapXY(BG_B,
+            TILE_ATTR_FULL(PAL0, 0, y & 1, col & 1, backing), col, y);
+
+    /* Reapply the two flag cells overwritten by the row backing. */
+    VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
+        TILE_FLAGS + teamIndex * 2), 2, y);
+    VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
+        TILE_FLAGS + teamIndex * 2 + 1), 3, y);
+
+    VDP_clearTileMapRect(BG_A, 0, y, 1, 1);
+    VDP_clearTileMapRect(BG_A, 6, y, 12, 1);
+    ui_draw_text(teamNames[teamIndex], 6, y,
+                 selected ? UI_GOLD : UI_WHITE);
+    if (selected)
+        ui_draw_text(">", 0, y, UI_GOLD);
+}
+
+void flag_data_update_selector(u8 previous, u8 selected)
+{
+    u16 row, col;
+    u16 largeBase = TILE_FLAGS_LARGE + selected * 8;
+
+    if (previous == selected) return;
+
+    update_selector_row(previous, FALSE);
+    update_selector_row(selected, TRUE);
+
+    /* The preview name is centred and variable-width, so erase just its own
+     * line before drawing the replacement. The panel, divider and athlete
+     * remain untouched. */
+    VDP_clearTileMapRect(BG_A, 21, 5, 18, 1);
+    ui_draw_text(teamNames[selected],
+                 29 - (u16)strlen(teamNames[selected]) / 2, 5, UI_GOLD);
+
+    /* Swap only the eight flag tiles inside the already-drawn frame. */
+    for (col = 0; col < 4; col++)
+        for (row = 0; row < 2; row++)
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
+                largeBase + col * 2 + row), 34 + col, 8 + row);
 }
 
 void flag_data_draw_grid(u8 selected)

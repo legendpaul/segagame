@@ -18,3 +18,8 @@ bool input_pressed(u16 button)
 {
     return ((curState & button) && !(prevState & button)) ? TRUE : FALSE;
 }
+
+bool input_pressed_any(u16 buttons)
+{
+    return ((curState & (u16)~prevState & buttons) != 0) ? TRUE : FALSE;
+}

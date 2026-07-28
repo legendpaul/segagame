@@ -37,6 +37,17 @@ void fm_synth_initBassChannel(u8 ch);
 /* Soft, plucky arpeggio voice - a quieter supporting layer under the
  * lead so the theme sounds like an arrangement, not a single line. */
 void fm_synth_initHarmonyChannel(u8 ch);
+/* Wide, quiet chord beds. Two instances panned left/right give the score
+ * space without using PCM samples or stealing the PSG from sound effects. */
+void fm_synth_initPadChannel(u8 ch, bool panRight);
+/* Short percussive FM voice used for match pulse and dramatic accents. */
+void fm_synth_initPercussionChannel(u8 ch);
+/* High-feedback two-stack voice for the title's original distorted-rock
+ * hook.  It deliberately occupies only channels 0-4; channel 5 remains the
+ * YM2612 DAC used by the PCM crowd/effects mixer. */
+void fm_synth_initRockChannel(u8 ch, bool panRight);
+/* Fast brass/synth stab used by the Sega-CD-era sports menu arrangement. */
+void fm_synth_initSportsBrassChannel(u8 ch, bool panRight);
 void fm_synth_noteOn(u8 ch, u8 note, u8 octave);
 void fm_synth_noteOff(u8 ch);
 

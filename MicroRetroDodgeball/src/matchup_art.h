@@ -18,4 +18,12 @@ void matchup_art_load(void);
  * their per-team kit + per-country skin palettes into PAL1/PAL2. */
 void matchup_art_draw(u8 teamAIndex, u8 teamBIndex);
 
+/* Draws one large selected-team athlete in the Team Select preview panel.
+ * Its three kit shades come from the exact same national palette as gameplay. */
+void matchup_art_draw_selector(u8 teamIndex);
+
+/* The selector athlete's tiles never change between countries; only PAL1
+ * does. Use this on cursor movement to avoid rewriting the whole figure. */
+void matchup_art_update_selector_palette(u8 teamIndex);
+
 #endif /* _MATCHUP_ART_H_ */

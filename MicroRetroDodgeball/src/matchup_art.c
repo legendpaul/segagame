@@ -10,9 +10,11 @@
 
 /* Figure placement in 8px tiles. The figures are 9x16 tiles; the silhouette
  * is centred with transparent margins, so cols land the bodies inboard. */
-#define FIG_LX  2
-#define FIG_RX  (40 - MATCHUP_FIG_W - 2)   /* 29 */
+#define FIG_LX  5
+#define FIG_RX  (40 - MATCHUP_FIG_W - 5)   /* 26 */
 #define FIG_Y   8
+#define SELECT_FIG_X 21
+#define SELECT_FIG_Y 7
 
 /* Per-country skin ramps (light, mid, dark) as RGB24. Kept deliberately
  * moderate; assigned per national team below. */
@@ -70,16 +72,44 @@ void matchup_art_draw(u8 teamAIndex, u8 teamBIndex)
     for (r = 0; r < MATCHUP_FIG_H; r++)
         for (c = 0; c < MATCHUP_FIG_W; c++)
         {
-            t = matchup_fig1_map[r][c];
+            /* The source pose faces right: Team 1 uses it normally, while
+             * Team 2 reverses the map and every tile to face left. */
+            t = matchup_fig2_map[r][c];
             if (t)
                 VDP_setTileMapXY(BG_A,
                     TILE_ATTR_FULL(PAL1, 1, FALSE, FALSE, TILE_MATCHUP_BASE + t),
                     FIG_LX + c, FIG_Y + r);
 
+            t = matchup_fig2_map[r][MATCHUP_FIG_W - 1 - c];
+            if (t)
+                VDP_setTileMapXY(BG_A,
+                    TILE_ATTR_FULL(PAL2, 1, FALSE, TRUE, TILE_MATCHUP_BASE + t),
+                    FIG_RX + c, FIG_Y + r);
+        }
+}
+
+void matchup_art_draw_selector(u8 teamIndex)
+{
+    u16 r, c, t;
+
+    /* PAL1 is scene-local here. build_palette obtains the kit ramp through
+     * sprites_data_kit_ramp(), exactly as the matchup and gameplay art do. */
+    build_palette(PAL1, teamIndex);
+    for (r = 0; r < MATCHUP_FIG_H; r++)
+        for (c = 0; c < MATCHUP_FIG_W; c++)
+        {
+            /* Team Select uses the more compact crouched athlete. Its shorts
+             * follow the kit ramp and its right-hand ball uses fixed white. */
             t = matchup_fig2_map[r][c];
             if (t)
                 VDP_setTileMapXY(BG_A,
-                    TILE_ATTR_FULL(PAL2, 1, FALSE, FALSE, TILE_MATCHUP_BASE + t),
-                    FIG_RX + c, FIG_Y + r);
-        }
+                    TILE_ATTR_FULL(PAL1, 1, FALSE, FALSE,
+                                   TILE_MATCHUP_BASE + t),
+                    SELECT_FIG_X + c, SELECT_FIG_Y + r);
+    }
+}
+
+void matchup_art_update_selector_palette(u8 teamIndex)
+{
+    build_palette(PAL1, teamIndex);
 }

@@ -1,13 +1,12 @@
 /*
  * logo_data.h - The "minnka" studio boot logo, shown briefly before the
  * title screen. Built from a real user-provided source image
- * (assets/minnka_logo.png), not hand-drawn: cropped to the text + a
- * hint of the smoke/flame art, downscaled with a real image filter
- * (LANCZOS) to a 30x11 tile grid, then quantized (Floyd-Steinberg
- * dithered median-cut) to a 15-color palette + reserved black. 177 of
- * the 330 possible 8x8 cells turned out unique - the rest (mostly the
- * flat black margins) collapse onto a shared tile, so this is a real
- * background-tile compression, not a 1:1 grid dump.
+ * (assets/minnka_logo.png), not hand-drawn. The complete composition is
+ * downscaled with LANCZOS to a 30x13 tile grid, then mapped onto an authored
+ * 15-colour logo palette + reserved black. That preserves the cream-to-white
+ * wordmark, indigo flame and orange core instead of spending the palette on
+ * near-black shades. Only 166 of the 390 cells are unique; black margins
+ * collapse onto a shared tile rather than becoming a 1:1 grid dump.
  */
 #ifndef _LOGO_DATA_H_
 #define _LOGO_DATA_H_
@@ -17,10 +16,10 @@
 #include "court_bg.h"
 
 #define TILE_LOGO_BASE   (TILE_COURT_BASE + COURT_TILE_COUNT)
-#define LOGO_TILE_COUNT  177
+#define LOGO_TILE_COUNT  166
 
 #define LOGO_TILES_W     30
-#define LOGO_TILES_H     11
+#define LOGO_TILES_H     13
 
 void logo_data_draw(void);
 

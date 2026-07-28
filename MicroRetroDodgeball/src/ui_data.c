@@ -47,6 +47,35 @@ static const u32 tile_ui_button[8] = {
 };
 
 static u8 uiPalette = PAL0;
+static bool spritePanelMaskEnabled;
+static s16 spritePanelX, spritePanelY;
+static u16 spritePanelW, spritePanelH;
+
+void ui_set_sprite_panel_mask(bool enabled, s16 x, s16 y, u16 w, u16 h)
+{
+    spritePanelMaskEnabled = enabled;
+    spritePanelX = x;
+    spritePanelY = y;
+    spritePanelW = w;
+    spritePanelH = h;
+}
+
+static bool rectangles_overlap(s16 ax, s16 ay, u16 aw, u16 ah,
+                               s16 bx, s16 by, u16 bw, u16 bh)
+{
+    return ax < bx + (s16)bw && ax + (s16)aw > bx &&
+           ay < by + (s16)bh && ay + (s16)ah > by;
+}
+
+bool ui_sprite_behind_panel(s16 x, s16 y, u16 w, u16 h)
+{
+    /* Score/title strips occupy the top three tile rows in both gameplay
+     * scenes. The optional rectangle is the live shot-clock panel. */
+    if (rectangles_overlap(x, y, w, h, 0, 0, 320, 24)) return TRUE;
+    return spritePanelMaskEnabled &&
+           rectangles_overlap(x, y, w, h, spritePanelX, spritePanelY,
+                              spritePanelW, spritePanelH);
+}
 
 static s16 glyph_index(char c)
 {
@@ -58,6 +87,7 @@ static s16 glyph_index(char c)
 
 void ui_data_init(void)
 {
+    spritePanelMaskEnabled = FALSE;
     /* The full authored alphabet is large but still fits VRAM. Upload it
      * synchronously at boot: queuing 660 tiles into the same startup DMA
      * burst as players/logo/flags can overflow the transfer budget before
@@ -158,6 +188,13 @@ void ui_draw_panel(u16 x, u16 y, u16 w, u16 h, bool gold)
         {
             u16 tile = TILE_UI_FILL;
             bool hf = FALSE, vf = FALSE;
+            /* Text and frame both live on BG_A. Without a matching solid tile
+             * on BG_B, transparent glyph pixels reveal crowd/grass instead of
+             * the panel, producing noisy, broken-looking lettering. Make
+             * every panel self-contained so callers cannot forget its backer. */
+            VDP_setTileMapXY(BG_B,
+                TILE_ATTR_FULL(uiPalette, 1, FALSE, FALSE, TILE_UI_FILL),
+                x + col, y + row);
             if ((row == 0 || row == h - 1) && (col == 0 || col == w - 1))
             {
                 tile = corner; hf = (col == w - 1); vf = (row == h - 1);
@@ -170,8 +207,23 @@ void ui_draw_panel(u16 x, u16 y, u16 w, u16 h, bool gold)
             {
                 tile = vTile; hf = (col == w - 1);
             }
-            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(uiPalette, 0, vf, hf, tile), x + col, y + row);
-        }
+            /* UI panels are foreground surfaces. Their opaque fill and frame
+             * must mask gameplay sprites, including the permanent HUD strips
+             * at the top of Match and Eliminator scenes. */
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(uiPalette, 1, vf, hf, tile), x + col, y + row);
+    }
+}
+
+void ui_clear_panel_interior(u16 x, u16 y, u16 w, u16 h)
+{
+    u16 row, col;
+
+    if (w < 3 || h < 3) return;
+    for (row = 1; row < h - 1; row++)
+        for (col = 1; col < w - 1; col++)
+            VDP_setTileMapXY(BG_A,
+                TILE_ATTR_FULL(uiPalette, 1, FALSE, FALSE, TILE_UI_FILL),
+                x + col, y + row);
 }
 
 void ui_draw_hrule(u16 x, u16 y, u16 w)

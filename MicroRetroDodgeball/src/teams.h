@@ -10,6 +10,9 @@
 #define NUM_TEAMS 10
 
 extern const char* const teamNames[NUM_TEAMS];
+/* Three-letter broadcast codes used where the live HUD cannot safely fit
+ * full names beside the clock and score. */
+extern const char* const teamCodes[NUM_TEAMS];
 
 /* --- 8-team single-elimination cup ------------------------------------- *
  * Three rounds: quarter-final (8), semi-final (4), final (2). The bracket is

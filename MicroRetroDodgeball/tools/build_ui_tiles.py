@@ -68,10 +68,17 @@ def encode(px, x0=0, y0=0):
 def small(ch, face):
     px = [[0] * 8 for _ in range(8)]
     rows = FONT[ch]
-    # Navy one-pixel drop shadow, then the brighter face.
+    # A real dark keyline, not a detached drop shadow. On a CRT this keeps
+    # every stroke intact over crowd, flags and textured menu backdrops.
     for y, row in enumerate(rows):
         for x, bit in enumerate(row):
-            if bit == "1" and x + 2 < 8 and y + 1 < 8: px[y + 1][x + 2] = 4
+            if bit != "1":
+                continue
+            gx = x + 1
+            for ox, oy in ((-1, 0), (1, 0), (0, 1), (1, 1)):
+                dx, dy = gx + ox, y + oy
+                if 0 <= dx < 8 and 0 <= dy < 8:
+                    px[dy][dx] = 4
     for y, row in enumerate(rows):
         for x, bit in enumerate(row):
             if bit == "1": px[y][x + 1] = face
@@ -86,9 +93,16 @@ def big(ch, face):
             if bit == "1":
                 for yy in range(2):
                     for xx in range(2): mask[sy * 2 + yy][2 + sx * 2 + xx] = True
+    # One-pixel navy extrusion gives headings the crisp broadcast-title edge
+    # seen on premium 16-bit sports games, while staying inside 16x16.
     for y in range(16):
         for x in range(16):
-            if mask[y][x]: px[y][x] = face
+            if mask[y][x] and x + 1 < 16 and y + 1 < 16:
+                px[y + 1][x + 1] = 4
+    for y in range(16):
+        for x in range(16):
+            if mask[y][x]:
+                px[y][x] = face
     return [encode(px, tx * 8, ty * 8) for tx in range(2) for ty in range(2)]
 
 

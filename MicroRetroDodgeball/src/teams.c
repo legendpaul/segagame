@@ -14,6 +14,11 @@ const char* const teamNames[NUM_TEAMS] = {
     "MEXICO"
 };
 
+const char* const teamCodes[NUM_TEAMS] = {
+    "ESP", "ARG", "FRA", "ENG", "BRA",
+    "MAR", "POR", "BEL", "NED", "MEX"
+};
+
 u8 cupQF[CUP_TEAMS];
 u8 cupSF[4];
 u8 cupF[2];

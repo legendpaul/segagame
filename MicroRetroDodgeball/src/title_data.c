@@ -3,11 +3,12 @@
 #include "title_tiles.inc"
 
 #define TILE_TITLE_PROMPT (TILE_TITLE_BASE + TITLE_ART_TILE_COUNT)
+#define TILE_TITLE_TEXT   TILE_LOGO_BASE
 
 static s16 prompt_index(char c)
 {
     u16 i;
-    for (i = 0; i < TITLE_PROMPT_TILE_COUNT; i++)
+    for (i = 0; i < TITLE_PROMPT_GLYPH_COUNT; i++)
         if (title_prompt_order[i] == c) return (s16)i;
     return -1;
 }
@@ -22,8 +23,19 @@ void title_data_init(void)
 void title_data_set_prompt(bool visible)
 {
     static const char text[] = "> PRESS START <";
-    u16 i;
-    VDP_clearTileMapRect(BG_A, 12, 25, 16, 1);
+    u16 i, x;
+    /* Keep the call-to-action on a quiet three-row broadcast plate. The title
+     * illustration remains visible around it, but never competes with the
+     * smallest and most important instruction on the screen. */
+    for (x = 10; x < 30; x++)
+    {
+        VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL0, 1, FALSE, FALSE,
+            TILE_TITLE_PROMPT + TITLE_PROMPT_EDGE), x, 24);
+        VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL0, 1, FALSE, FALSE,
+            TILE_TITLE_PROMPT + TITLE_PROMPT_PANEL), x, 25);
+        VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL0, 1, TRUE, FALSE,
+            TILE_TITLE_PROMPT + TITLE_PROMPT_EDGE), x, 26);
+    }
     if (!visible) return;
 
     for (i = 0; text[i]; i++)
@@ -45,6 +57,8 @@ void title_data_draw(void)
                      TITLE_ART_TILE_COUNT, CPU);
     VDP_loadTileData(title_prompt_tiles[0], TILE_TITLE_PROMPT,
                      TITLE_PROMPT_TILE_COUNT, CPU);
+    VDP_loadTileData(title_text_tiles[0], TILE_TITLE_TEXT,
+                     TITLE_TEXT_TILE_COUNT, CPU);
 
     VDP_clearPlane(BG_A, TRUE);
     for (row = 0; row < 28; row++)
@@ -53,5 +67,14 @@ void title_data_draw(void)
                 TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
                     TILE_TITLE_BASE + title_art_tilemap[row][col]),
                 col, row);
+    for (row = 0; row < 28; row++)
+        for (col = 0; col < 40; col++)
+        {
+            u16 tile = title_text_tilemap[row][col];
+            if (tile)
+                VDP_setTileMapXY(BG_A,
+                    TILE_ATTR_FULL(PAL0, 1, FALSE, FALSE,
+                        TILE_TITLE_TEXT + tile - 1), col, row);
+        }
     title_data_set_prompt(TRUE);
 }

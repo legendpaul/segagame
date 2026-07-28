@@ -37,9 +37,9 @@ s16 ai_pickTargetX(s16 playerX)
  * lever that makes retrieval battles feel easy or punishing. */
 u16 ai_looseReactionFrames(void)
 {
-    if (gDifficulty == DIFF_EASY) return 48;   /* ~0.8s dither */
+    if (gDifficulty == DIFF_EASY) return 36;   /* ~0.6s dither */
     if (gDifficulty == DIFF_HARD) return 0;    /* instant */
-    return 16;                                 /* NORMAL ~0.27s */
+    return 8;                                  /* NORMAL reacts promptly */
 }
 
 u8 ai_pickSlot(u8 count)

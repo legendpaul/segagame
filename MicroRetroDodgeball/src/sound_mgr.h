@@ -1,10 +1,8 @@
 /*
  * sound_mgr.h - Tiny PSG sound-effect manager.
  *
- * Three PSG tone channels are used for simple beeps/blips (menu move,
- * throw, pickup, hit, score). Each call starts a note at full volume
- * that fades out over a handful of frames; sound_mgr_update() must be
- * called once per frame (from SYS_doVBlankProcess loop).
+ * PSG supplies crisp interface accents while four XGM PCM channels carry a
+ * continuous stadium bed, chants, scalable reactions and physical action.
  */
 #ifndef _SOUND_MGR_H_
 #define _SOUND_MGR_H_
@@ -17,6 +15,7 @@
 
 void sound_mgr_init(void);
 void sound_mgr_update(void);
+void sound_mgr_setMatchCrowd(bool enabled);
 void sound_mgr_play(u8 channel, u16 freq, u8 decayStep);
 
 /* Convenience shortcuts used across scenes */

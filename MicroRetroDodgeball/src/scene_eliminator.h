@@ -1,6 +1,6 @@
 /*
  * scene_eliminator.h - GLOBAL ELIMINATOR: a free-for-all with one player from
- * every nation on a single open court (no centre net), three balls in play at
+ * every nation on a single open court (no centre net), two balls in play at
  * once, and no teams - get hit and you are out. Last player standing wins; if
  * the final players are struck in the same instant it is a draw.
  */

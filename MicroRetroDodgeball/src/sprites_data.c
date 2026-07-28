@@ -159,6 +159,7 @@ static const u32 tile_player_run[16][8] = {
 #endif
 
 #include "player_isometric_tiles.inc"
+#include "eliminator_variant_tiles.inc"
 
 #if 0 /* Retired 8x8 ball; retained here only as art-source history. */
 static const u32 tile_ball[4][8] = {
@@ -282,69 +283,73 @@ static const u32 tile_marker_red[2][8] = {
 };
 #endif
 
-/* Per-team jersey palettes. Indices 2,5,6,7,12,13,14 are the "kit ramp"
- * - hue-rotated per team while preserving each shade's original
- * lightness (a real color-preserving recolor, not a single flat-color
- * swap), boosted to a minimum 0.45 saturation so the team color always
- * reads clearly even where the source art's shading was almost gray.
+/* Per-team jersey palettes. Indices 2,5,6,7,12,13,14 are the "kit ramp".
+ * Every country follows one semantic layout: 2/5/12 light, 6 mid, and
+ * 7/13/14 dark. Team Select, regular gameplay and compact Eliminator palettes
+ * therefore sample the same identity instead of accidentally choosing trim.
  * Indices 1,3,4,8,9,10,11 are fixed skin/hair/outline tones, identical
- * across every team. pal_teams[] maps these ramps onto the ten national
- * sides in FIFA ranking order; countries with the same primary kit hue
- * may deliberately share a ramp. */
+ * across every team. pal_teams[] maps a deliberately distinct national
+ * identity onto every side; no two countries share a kit ramp. */
 #define P(rgb24) RGB24_TO_VDPCOLOR(rgb24)
 
 static const u16 pal_team_red[16] = {
-    0x0000, P(0xE1A48E), P(0xCF8288), P(0xD2775A), P(0xBA7061), P(0xB8464F),
-    P(0xA84048), P(0x9F3C44), P(0xCA5B18), P(0x875051), P(0x953C20),
-    P(0x6A2822), P(0x95363E), P(0x732C32), P(0x4E1D21)
+    0x0000, P(0xE1A48E), P(0xFF5848), P(0xD2775A), P(0xBA7061), P(0xFF5848),
+    P(0xD82028), P(0x781018), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0xFF5848), P(0x781018), P(0x781018)
 };
 
 static const u16 pal_team_blue[16] = {
-    0x0000, P(0xE1A48E), P(0x82A2CF), P(0xD2775A), P(0xBA7061), P(0x4675B8),
-    P(0x406BA8), P(0x3C659F), P(0xCA5B18), P(0x875051), P(0x953C20),
-    P(0x6A2822), P(0x365E95), P(0x2C4A73), P(0x1D314E)
+    0x0000, P(0xE1A48E), P(0x7090F8), P(0xD2775A), P(0xBA7061), P(0x7090F8),
+    P(0x2850C8), P(0x102868), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0x7090F8), P(0x102868), P(0x102868)
 };
 
-static const u16 pal_team_green[16] = {
-    0x0000, P(0xE1A48E), P(0x82CF9C), P(0xD2775A), P(0xBA7061), P(0x46B86C),
-    P(0x40A863), P(0x3C9F5D), P(0xCA5B18), P(0x875051), P(0x953C20),
-    P(0x6A2822), P(0x369556), P(0x2C7344), P(0x1D4E2D)
+static const u16 pal_team_portugal[16] = {
+    0x0000, P(0xE1A48E), P(0x58D878), P(0xD2775A), P(0xBA7061), P(0x58D878),
+    P(0x20A850), P(0x086030), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0x58D878), P(0x086030), P(0x086030)
 };
 
 static const u16 pal_team_gold[16] = {
-    0x0000, P(0xE1A48E), P(0xCFBC82), P(0xD2775A), P(0xBA7061), P(0xB89C46),
-    P(0xA88E40), P(0x9F863C), P(0xCA5B18), P(0x875051), P(0x953C20),
-    P(0x6A2822), P(0x957D36), P(0x73612C), P(0x4E421D)
+    0x0000, P(0xE1A48E), P(0xFFE850), P(0xD2775A), P(0xBA7061), P(0xFFE850),
+    P(0xE8B818), P(0x806408), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0xFFE850), P(0x806408), P(0x806408)
 };
 
 static const u16 pal_team_lightblue[16] = {
-    0x0000, P(0xE1A48E), P(0xC8E8F0), P(0xD2775A), P(0xBA7061), P(0x82C8E0),
-    P(0x68B4D4), P(0x50A0C4), P(0xCA5B18), P(0x875051), P(0x953C20),
-    P(0x6A2822), P(0x3C8CB4), P(0x2C6C94), P(0x1C4868)
+    0x0000, P(0xE1A48E), P(0xA8F0FF), P(0xD2775A), P(0xBA7061), P(0xA8F0FF),
+    P(0x48B8E8), P(0x185878), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0xA8F0FF), P(0x185878), P(0x185878)
 };
 
 static const u16 pal_team_white[16] = {
-    0x0000, P(0xE1A48E), P(0xFFFFFF), P(0xD2775A), P(0xBA7061), P(0xE8E8E8),
-    P(0xC8CCD0), P(0xA8ACB0), P(0xCA5B18), P(0x875051), P(0x953C20),
-    P(0x6A2822), P(0x888C90), P(0x606468), P(0x383C40)
+    0x0000, P(0xE1A48E), P(0xF8F8F8), P(0xD2775A), P(0xBA7061), P(0xF8F8F8),
+    P(0xC8D0D8), P(0x687078), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0xF8F8F8), P(0x687078), P(0x687078)
 };
 
 static const u16 pal_team_maroon[16] = {
-    0x0000, P(0xE1A48E), P(0xD98A92), P(0xD2775A), P(0xBA7061), P(0xB83A48),
-    P(0x9C303C), P(0x842834), P(0xCA5B18), P(0x875051), P(0x953C20),
-    P(0x6A2822), P(0x70202C), P(0x541820), P(0x380F18)
+    0x0000, P(0xE1A48E), P(0xC878E8), P(0xD2775A), P(0xBA7061), P(0xC878E8),
+    P(0x8840B8), P(0x481868), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0xC878E8), P(0x481868), P(0x481868)
 };
 
 static const u16 pal_team_orange[16] = {
-    0x0000, P(0xE1A48E), P(0xFFD090), P(0xD2775A), P(0xBA7061), P(0xF09030),
-    P(0xD87820), P(0xBC6018), P(0xCA5B18), P(0x875051), P(0x953C20),
-    P(0x6A2822), P(0x984810), P(0x743408), P(0x482000)
+    0x0000, P(0xE1A48E), P(0xFFA040), P(0xD2775A), P(0xBA7061), P(0xFFA040),
+    P(0xD86818), P(0x783008), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0xFFA040), P(0x783008), P(0x783008)
 };
 
 static const u16 pal_team_belgium[16] = {
-    0x0000, P(0xE1A48E), P(0xF08A8A), P(0xD2775A), P(0xBA7061), P(0xD83038),
-    P(0xBC2028), P(0xA01820), P(0xCA5B18), P(0x875051), P(0x953C20),
-    P(0x6A2822), P(0x801018), P(0x600810), P(0x380008)
+    0x0000, P(0xE1A48E), P(0x707078), P(0xD2775A), P(0xBA7061), P(0x707078),
+    P(0x383840), P(0x101018), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0x707078), P(0x101018), P(0x101018)
+};
+
+static const u16 pal_team_mexico[16] = {
+    0x0000, P(0xE1A48E), P(0xFF88C8), P(0xD2775A), P(0xBA7061), P(0xFF88C8),
+    P(0xD83888), P(0x781048), P(0xCA5B18), P(0x875051), P(0x953C20),
+    P(0x6A2822), P(0xFF88C8), P(0x781048), P(0x781048)
 };
 
 static const u16 * const pal_teams[NUM_TEAMS] = {
@@ -354,11 +359,224 @@ static const u16 * const pal_teams[NUM_TEAMS] = {
     pal_team_white,     /* England */
     pal_team_gold,      /* Brazil */
     pal_team_maroon,    /* Morocco */
-    pal_team_green,     /* Portugal */
+    pal_team_portugal,  /* Portugal */
     pal_team_belgium,   /* Belgium */
     pal_team_orange,    /* Netherlands */
-    pal_team_green      /* Mexico */
+    pal_team_mexico     /* Mexico */
 };
+
+/* GLOBAL ELIMINATOR palette layout. Four two-shade kits fit beside seven
+ * shared Exhibition-derived skin/hair/outline shades. The deepest brown and
+ * black source inks share the final near-black slot, preserving clean hair,
+ * boots and silhouettes for all ten simultaneous countries. */
+static u16 pal_elim_a[16];
+static u16 pal_elim_b[16];
+static u16 pal_elim_c[16];
+static const u16 pal_ball[16];
+
+void sprites_data_load_eliminator_player(u8 teamIndex, u16 sourceBase,
+                                         u16 destination)
+{
+    u8 pose;
+    u8 variant;
+
+    if (sourceBase == TILE_PLAYER_FRONT_STAND) pose = 0;
+    else if (sourceBase == TILE_PLAYER_FRONT_RUN) pose = 1;
+    else if (sourceBase == TILE_PLAYER_FRONT_RUN_PASS) pose = 2;
+    else if (sourceBase == TILE_PLAYER_FRONT_RUN_ALT) pose = 3;
+    else if (sourceBase == TILE_PLAYER_FRONT_THROW) pose = 4;
+    else if (sourceBase == TILE_PLAYER_FRONT_PICKUP) pose = 5;
+    else if (sourceBase == TILE_PLAYER_FRONT_HIT) pose = 6;
+    else if (sourceBase == TILE_PLAYER_FRONT_FALL) pose = 7;
+    else if (sourceBase == TILE_PLAYER_FRONT_CELEBRATE) pose = 8;
+    else if (sourceBase == TILE_PLAYER_BACK_RUN) pose = 10;
+    else if (sourceBase == TILE_PLAYER_BACK_RUN_PASS) pose = 11;
+    else if (sourceBase == TILE_PLAYER_BACK_RUN_ALT) pose = 12;
+    else if (sourceBase == TILE_PLAYER_BACK_THROW) pose = 13;
+    else if (sourceBase == TILE_PLAYER_BACK_HIT) pose = 14;
+    else if (sourceBase == TILE_PLAYER_BACK_FALL) pose = 15;
+    else if (sourceBase == TILE_PLAYER_BACK_CELEBRATE) pose = 16;
+    else pose = 9;
+
+    /* These frames are already recoloured in ROM. Live gameplay now performs
+     * one queued 512-byte copy only—no per-pixel conversion and no RAM race. */
+    variant = teamIndex < 4 ? teamIndex
+            : teamIndex < 7 ? (u8)(teamIndex - 4)
+                            : (u8)(teamIndex - 7);
+    VDP_loadTileData(tile_elim_variants[variant][pose][0],
+                     destination, 16, DMA);
+}
+
+void sprites_data_load_eliminator_ball_art(void)
+{
+    static u32 converted[30][8];
+    u16 tile, row;
+    u8 pixel;
+
+    for (tile = 0; tile < 30; tile++)
+    {
+        const u32 *source;
+        if (tile == 0) source = tile_ball_shadow;
+        else if (tile == 1) source = tile_ball_shadow_air;
+        else if (tile < 18) source = tile_ball16[tile - 2];
+        else if (tile < 24) source = tile_ring_yellow[tile - 18];
+        else source = tile_ring_red[tile - 24];
+
+        for (row = 0; row < 8; row++)
+        {
+            u32 in = source[row];
+            u32 out = 0;
+            for (pixel = 0; pixel < 8; pixel++)
+            {
+                u8 shift = (u8)(28 - pixel * 4);
+                u8 colour = (u8)((in >> shift) & 15);
+                u8 mapped;
+                if (colour == 0) mapped = 0;
+                else if (tile < 2) mapped = 15;       /* shadow: dark */
+                else if (tile < 18)
+                    mapped = (colour == 1 || colour == 4) ? 14 : 15;
+                else if (tile < 24)
+                    mapped = colour == 4 ? 6 : 14;   /* PAL0 gold + outline */
+                else
+                    mapped = colour == 5 ? 9 : 14;   /* PAL0 red + outline */
+                out |= (u32)mapped << shift;
+            }
+            converted[tile][row] = out;
+        }
+    }
+    VDP_loadTileData(converted[0], TILE_ELIM_BALL_SHADOW, 30, CPU);
+}
+
+/* Add ordered, low-density light inside an existing open ring. The ellipse is
+ * smaller than the outline, so no glow leaks outside the coloured circle; the
+ * player's later sprite slot naturally draws feet and body over the light. */
+static void build_pulsed_ring(const u32 source[6][8], u32 output[6][8],
+                              u8 fillColour, u8 phase)
+{
+    static const u8 bayer[16] = {
+         0,  8,  2, 10,
+        12,  4, 14,  6,
+         3, 11,  1,  9,
+        15,  7, 13,  5
+    };
+    static const u8 density[4] = { 1, 2, 3, 2 };
+    u8 tile, row, x, y;
+    u8 limit = density[phase & 3];
+
+    for (tile = 0; tile < 6; tile++)
+        for (row = 0; row < 8; row++)
+            output[tile][row] = source[tile][row];
+
+    for (y = 0; y < 16; y++)
+    {
+        for (x = 0; x < 24; x++)
+        {
+            s16 dx = (s16)(x * 2) - 23;
+            s16 dy = (s16)(y * 2) - 15;
+            u8 sourceTile = (u8)((x >> 3) * 2 + (y >> 3));
+            u8 sourceRow = y & 7;
+            u8 shift = (u8)(28 - (x & 7) * 4);
+            u32 nibble = (output[sourceTile][sourceRow] >> shift) & 15;
+
+            /* 19x9 doubled-coordinate ellipse, inset from the 24x16 ring. */
+            if (nibble == 0 &&
+                (s32)dx * dx * 81 + (s32)dy * dy * 361 <= 29241 &&
+                bayer[(y & 3) * 4 + (x & 3)] < limit)
+            {
+                output[sourceTile][sourceRow] |= (u32)fillColour << shift;
+            }
+        }
+    }
+}
+
+void sprites_data_set_ring_pulse(u8 phase, bool eliminator)
+{
+    static u32 yellow[6][8];
+    static u32 red[6][8];
+    static u32 convertedYellow[6][8];
+    static u32 convertedRed[6][8];
+    u8 tile, row, pixel;
+
+    build_pulsed_ring(tile_ring_yellow, yellow, 4, phase);
+    build_pulsed_ring(tile_ring_red, red, 5, phase);
+
+    if (!eliminator)
+    {
+        VDP_loadTileData(yellow[0], TILE_RING_YELLOW, 6, DMA);
+        VDP_loadTileData(red[0], TILE_RING_RED, 6, DMA);
+        return;
+    }
+
+    /* Eliminator markers live on PAL0, so translate the normal ball-palette
+     * yellow/red and outline slots into the court's gold/red/charcoal slots. */
+    for (tile = 0; tile < 6; tile++)
+    {
+        for (row = 0; row < 8; row++)
+        {
+            u32 inYellow = yellow[tile][row];
+            u32 inRed = red[tile][row];
+            u32 outYellow = 0;
+            u32 outRed = 0;
+            for (pixel = 0; pixel < 8; pixel++)
+            {
+                u8 shift = (u8)(28 - pixel * 4);
+                u8 yellowColour = (u8)((inYellow >> shift) & 15);
+                u8 redColour = (u8)((inRed >> shift) & 15);
+                u8 mappedYellow = yellowColour == 0 ? 0
+                                : yellowColour == 4 ? 6 : 14;
+                u8 mappedRed = redColour == 0 ? 0
+                             : redColour == 5 ? 9 : 14;
+                outYellow |= (u32)mappedYellow << shift;
+                outRed |= (u32)mappedRed << shift;
+            }
+            convertedYellow[tile][row] = outYellow;
+            convertedRed[tile][row] = outRed;
+        }
+    }
+    VDP_loadTileData(convertedYellow[0], TILE_ELIM_RING_YELLOW, 6, CPU);
+    VDP_loadTileData(convertedRed[0], TILE_ELIM_RING_RED, 6, CPU);
+}
+
+void sprites_data_apply_eliminator_teams(void)
+{
+    u8 i;
+    /* Every full team palette now uses the same semantic layout: 5 is the
+     * primary light and 13 the primary dark. This guarantees Eliminator's
+     * compact pair exactly matches Team Select and regular gameplay. */
+    static const u8 kitLight[NUM_TEAMS] = {
+        5, 5, 5, 5, 5, 5, 5, 5, 5, 5
+    };
+    static const u8 kitDark[NUM_TEAMS] = {
+        13, 13, 13, 13, 13, 13, 13, 13, 13, 13
+    };
+    static const u16 fixed[8] = {
+        0x0000, P(0xE1A48E), P(0xD2775A), P(0xBA7061),
+        P(0xCA5B18), P(0x875051), P(0x953C20), P(0x181820)
+    };
+
+    for (i = 0; i < 8; i++)
+        pal_elim_a[i] = pal_elim_b[i] = pal_elim_c[i] = fixed[i];
+    for (i = 0; i < 4; i++)
+    {
+        pal_elim_a[8 + i * 2] = pal_teams[i][kitLight[i]];
+        pal_elim_a[9 + i * 2] = pal_teams[i][kitDark[i]];
+    }
+    for (i = 0; i < 3; i++)
+    {
+        u8 teamB = (u8)(i + 4);
+        u8 teamC = (u8)(i + 7);
+        pal_elim_b[8 + i * 2] = pal_teams[teamB][kitLight[teamB]];
+        pal_elim_b[9 + i * 2] = pal_teams[teamB][kitDark[teamB]];
+        pal_elim_c[8 + i * 2] = pal_teams[teamC][kitLight[teamC]];
+        pal_elim_c[9 + i * 2] = pal_teams[teamC][kitDark[teamC]];
+    }
+    /* PAL3 also carries the simplified two-colour Eliminator ball. */
+    pal_elim_c[14] = P(0xF8F8F8);
+    pal_elim_c[15] = P(0x181820);
+    PAL_setPalette(PAL_TEAM_A, pal_elim_a, DMA);
+    PAL_setPalette(PAL_TEAM_B, pal_elim_b, DMA);
+    PAL_setPalette(PAL_BALL, pal_elim_c, DMA);
+}
 
 static const u16 pal_ball[16] = {
     0x0000, P(0xF8F8F8), P(0x9098A0), P(0x101010),
@@ -366,6 +584,114 @@ static const u16 pal_ball[16] = {
     P(0xD82830), P(0x2048B0), P(0xF8C820), P(0x101018),
     P(0x70C0E8), P(0x189048), P(0xE87018), 0
 };
+
+/* A 10x10 visible star centred in a 16x16 hardware container: approximately
+ * 60% of the former silhouette, without changing its carefully aligned anchor.
+ * Gold marks player hits; slate grey marks court and wall hits. */
+static const u32 tile_impact_burst[4][8] = {
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000004,
+      0x00000046, 0x00046666, 0x00004666, 0x00000466 },
+    { 0x00000466, 0x00004640, 0x00046400, 0x00044000,
+      0x00040000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x40000000,
+      0x64000000, 0x66640000, 0x66400000, 0x64000000 },
+    { 0x64000000, 0x06400000, 0x00640000, 0x00440000,
+      0x00040000, 0x00000000, 0x00000000, 0x00000000 }
+};
+
+static const u32 tile_impact_grey[4][8] = {
+    { 0x00000000, 0x00000000, 0x00000000, 0x00000004,
+      0x0000004d, 0x0004dddd, 0x00004ddd, 0x000004dd },
+    { 0x000004dd, 0x00004d40, 0x0004d400, 0x00044000,
+      0x00040000, 0x00000000, 0x00000000, 0x00000000 },
+    { 0x00000000, 0x00000000, 0x00000000, 0x40000000,
+      0xd4000000, 0xddd40000, 0xdd400000, 0xd4000000 },
+    { 0xd4000000, 0x0d400000, 0x00d40000, 0x00440000,
+      0x00040000, 0x00000000, 0x00000000, 0x00000000 }
+};
+
+void sprites_data_load_impact_art(void)
+{
+    VDP_loadTileData(tile_impact_burst[0], TILE_IMPACT_BURST, 4, DMA);
+    VDP_loadTileData(tile_impact_grey[0], TILE_IMPACT_GREY, 4, DMA);
+}
+
+void sprites_data_load_referee_art(u16 frontStandDestination,
+                                   u16 frontRunDestination,
+                                   u16 backStandDestination,
+                                   u16 backRunDestination)
+{
+    const u32 (*frames[8])[8] = {
+        tile_iso_front_stand,
+        tile_iso_front_run,
+        tile_iso_front_run_pass,
+        tile_iso_front_run_alt,
+        tile_iso_back_stand,
+        tile_iso_back_run,
+        tile_iso_back_run_pass,
+        tile_iso_back_run_alt
+    };
+    static u32 converted[16][8];
+    u8 frame, tile, row, pixel;
+
+    for (frame = 0; frame < 8; frame++)
+    {
+        for (tile = 0; tile < 16; tile++)
+        {
+            for (row = 0; row < 8; row++)
+            {
+                u32 source = frames[frame][tile][row];
+                u32 output = 0;
+                for (pixel = 0; pixel < 8; pixel++)
+                {
+                    u8 shift = (u8)(28 - pixel * 4);
+                    u8 colour = (u8)((source >> shift) & 15);
+                    u8 globalX = (u8)((tile / 4) * 8 + pixel);
+                    u8 globalY = (u8)((tile & 3) * 8 + row);
+                    u8 mapped;
+
+                    if (colour == 0)
+                        mapped = 0;                       /* transparent */
+                    else if (colour == 1 || colour == 3)
+                        mapped = 7;                       /* light/mid skin */
+                    else if (colour == 4)
+                        mapped = 15;                      /* skin shade */
+                    else if (colour >= 8 && colour <= 11)
+                        mapped = 3;                       /* black hair/outline/shoes */
+                    else if (globalY >= 6 && globalY <= 19)
+                    {
+                        /* All seven team-kit shades become crisp vertical
+                         * referee stripes on the shirt. Three-pixel bands are
+                         * broad enough to survive the 32px sprite cleanly. */
+                        mapped = ((globalX / 3) & 1) ? 3 : 1;
+                    }
+                    else
+                    {
+                        /* Below the shirt every former kit pixel belongs to
+                         * shorts, socks or footwear: keep the whole lower
+                         * uniform solid black as a referee should read. */
+                        mapped = 3;
+                    }
+                    output |= (u32)mapped << shift;
+                }
+                converted[tile][row] = output;
+            }
+        }
+
+        /* CPU upload is deliberate: the one-frame scratch buffer is reused
+         * immediately, so queued DMA would race the next conversion. This is
+         * a scene-entry-only 512-byte transfer hidden by the fade. */
+        {
+            u16 destination;
+            if (frame == 0) destination = frontStandDestination;
+            else if (frame < 4)
+                destination = (u16)(frontRunDestination + (frame - 1) * 16);
+            else if (frame == 4) destination = backStandDestination;
+            else destination = (u16)(backRunDestination + (frame - 5) * 16);
+            VDP_loadTileData(converted[0], destination, 16, CPU);
+        }
+    }
+}
 
 void sprites_data_init(void)
 {

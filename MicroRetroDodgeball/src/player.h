@@ -20,6 +20,19 @@ typedef enum {
     POSE_CELEBRATE
 } PlayerPose;
 
+/* Every player state now resolves through eight animation beats. The previous
+ * four-phase cycles repeated single silhouettes too abruptly, especially for
+ * throws, pickups and falls. */
+#define PLAYER_ANIM_FRAMES 8
+#define PLAYER_ANIM_MASK   (PLAYER_ANIM_FRAMES - 1)
+
+/* Shared projected ground-contact point used by movement, half-court target
+ * generation and boundary clamping. Keep AI navigation on the player's feet,
+ * never on the sprite's upper-left origin. */
+#define PLAYER_FEET_DX   8
+#define PLAYER_FEET_DY  16
+#define PLAYER_HALF_W    8
+
 typedef struct {
     s16 x;
     s16 y;
@@ -31,17 +44,14 @@ typedef struct {
     u8  pal;
     u8  pose;
     u8  poseTimer;    /* frames left before a transient pose reverts */
-    u8  animFrame;    /* 0..3 - run, idle and action animation phase */
+    u8  animFrame;    /* 0..7 - run, idle and action animation phase */
     u8  animCounter;  /* frame counter that paces the run cycle */
     u8  small;        /* TRUE = render the dedicated 24x24 far-side size */
     bool farSide;     /* gameplay half, independent of visual sprite scale */
     bool freeRoam;    /* TRUE = no centre net, may use the WHOLE court */
-    /* Which recoloured copy of the player art to draw. Variant 0 is the
-     * original bank; higher variants are identical artwork whose kit pixels
-     * use a different set of palette indices, so several kits can share one
-     * palette line. Combined with the sprite's palette line this is what lets
-     * every nation wear its own colours at once. */
-    u8   kitVariant;
+    /* Optional scene-local 16-tile pose block. Zero uses the normal shared
+     * player art; Eliminator uses one recoloured slot per fighter. */
+    u16  tileBaseOverride;
     bool facingLeft;  /* horizontal travel direction; mirrors current front/rear bank */
 } Player;
 
@@ -64,9 +74,12 @@ void player_clampToCourt(Player *p);
 void player_tickAnim(Player *p, bool isMoving);
 /* Forces a transient action pose for "timer" frames. */
 void player_setPose(Player *p, u8 pose, u8 timer);
-/* Translate a pose tile base into the given kit variant's copy of that pose.
- * Variant 0 is always the original artwork. */
-u16 player_variant_base(u16 base, u8 variant);
+/* Returns the exact 16-tile art block selected by pose/view/animation. */
+u16 player_currentTileBase(const Player *p);
+/* Returns the rendered feet / ground-contact point after the current pose's
+ * authored pixel offsets have been applied. Depth sorting must use this
+ * rather than the unshifted logical position, especially during hit/fall. */
+void player_visualGround(const Player *p, s16 *x, s16 *y);
 void player_draw(Player *p);
 
 #endif /* _PLAYER_H_ */

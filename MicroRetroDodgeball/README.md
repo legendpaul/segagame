@@ -29,7 +29,12 @@ a break, or handing it to a different AI/developer? Start with
   - First to 3 points wins the match.
   - The CPU chooses targets, retrieves loose rebounds and throws back with some inaccuracy.
 - **Scoring/HUD**: compact flag/name/clock/score broadcast strip.
-- **Sound**: YM2612 music plus PSG cues for menus, throws, pickups, bounces, hits and scoring.
+- **Sound**: separate original YM2612 distorted-rock title and Sega-CD-era
+  sports-menu arrangements. Matches deliberately use no music: four-channel
+  PCM stadium audio supplies a continuous crowd bed, periodic chants, a cheer
+  on every throw, escalating elimination/round/game-over roars, and sampled
+  throws, pickups, bounces, hits and referee whistles. PSG remains available
+  for crisp interface and score accents.
 - **Game over**: winner announcement with final score, returns to the menu.
 
 The repository contains the generated tile data needed to build the complete ROM offline.

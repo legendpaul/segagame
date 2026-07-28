@@ -2,9 +2,19 @@
 #include "input_mgr.h"
 #include "sprites_data.h"
 #include "game_state.h"
+#include "ui_data.h"
+#include "court_bg.h"
 
-#define RUN_FRAME_LEN   4   /* frames between four-beat run phases */
-#define IDLE_FRAME_LEN  28  /* restrained breathing cadence */
+#define RUN_FRAME_LEN   2   /* eight beats retain the old full-cycle speed */
+#define IDLE_FRAME_LEN  14  /* eight-beat breathing retains its slow cadence */
+
+static u8 action_frame_len(u8 pose)
+{
+    if (pose == POSE_PICKUP) return 1;
+    if (pose == POSE_THROW || pose == POSE_HIT) return 2;
+    if (pose == POSE_FALL) return 3;
+    return 4; /* celebration */
+}
 
 /* The player's ground-contact point (feet / control-ring centre) sits 8px
  * right of and 8px below the sprite origin - the same point the game uses for
@@ -13,10 +23,6 @@
  * no foot or marker overhangs the line. */
 /* Middle-bottom of the 32x32 sprite (drawn at x-8, y-16): the feet/ground
  * point the control ring already marks. All court alignment keys off this. */
-#define PLAYER_FEET_DX   8
-#define PLAYER_FEET_DY  16
-#define PLAYER_HALF_W    8   /* half the foot stance, so shoes touch the line */
-
 #define OFFSCREEN_X   -100
 #define OFFSCREEN_Y   -100
 
@@ -29,7 +35,7 @@ void player_init(Player *p, s16 startX, s16 y, u8 spriteSlot, u8 pal)
     p->eliminated = FALSE;
     p->exiting = FALSE;
     p->freeRoam = FALSE;
-    p->kitVariant = 0;
+    p->tileBaseOverride = 0;
     p->spriteSlot = spriteSlot;
     p->pal = pal;
     p->pose = POSE_STAND;
@@ -83,6 +89,12 @@ void player_restore(Player *p)
 void player_moveHuman(Player *p, bool hasBall)
 {
     s16 oldX = p->x;
+
+    /* A celebration is a committed action, just like a throw or fall. Keep
+     * the player's ground position locked until its authored pose timer has
+     * completed; directional input becomes active again on the next frame. */
+    if (p->pose == POSE_CELEBRATE && p->poseTimer > 0) return;
+
     /* Carrying the ball costs a step: position only advances on every
      * other frame instead of scaling the per-frame delta down. That
      * keeps the exact 2:1 diagonal ratio (so facing/clamping math never
@@ -160,15 +172,15 @@ void player_tickAnim(Player *p, bool isMoving)
 {
     if (p->poseTimer > 0)
     {
-        /* Three readable beats for every action: anticipation/contact,
-         * commitment, then recovery. Even with one authored silhouette
-         * per action, offsets and timing now create actual motion. */
-        if (++p->animCounter >= 4)
+        /* Eight beats give every action anticipation, commitment, contact and
+         * recovery. The frame length is fitted to each state's real timer so
+         * even the short pickup animation reaches its recovery pose. */
+        if (++p->animCounter >= action_frame_len(p->pose))
         {
             p->animCounter = 0;
             if (p->pose == POSE_CELEBRATE)
-                p->animFrame = (p->animFrame + 1) & 3;
-            else if (p->animFrame < 3)
+                p->animFrame = (p->animFrame + 1) & PLAYER_ANIM_MASK;
+            else if (p->animFrame < PLAYER_ANIM_MASK)
                 p->animFrame++;
         }
         p->poseTimer--;
@@ -182,7 +194,7 @@ void player_tickAnim(Player *p, bool isMoving)
         if (++p->animCounter >= RUN_FRAME_LEN)
         {
             p->animCounter = 0;
-            p->animFrame = (p->animFrame + 1) & 3;
+            p->animFrame = (p->animFrame + 1) & PLAYER_ANIM_MASK;
         }
     }
     else
@@ -190,7 +202,7 @@ void player_tickAnim(Player *p, bool isMoving)
         if (++p->animCounter >= IDLE_FRAME_LEN)
         {
             p->animCounter = 0;
-            p->animFrame = (p->animFrame + 1) & 3;
+            p->animFrame = (p->animFrame + 1) & PLAYER_ANIM_MASK;
         }
     }
 }
@@ -203,18 +215,105 @@ void player_setPose(Player *p, u8 pose, u8 timer)
     p->animCounter = 0;
 }
 
-/* Map a pose's tile base onto a recoloured variant of the same pose.
- *
- * PHASE 1 (this commit) deliberately returns the original base for every
- * variant, so behaviour is bit-identical to before and the plumbing can be
- * proven safe on its own. Phase 2 uploads the extra variant banks into the
- * reclaimed VRAM (unused court reserve + the dead boot-logo region) and this
- * becomes a real lookup. Keeping the translation in ONE place is what stops a
- * repeat of the tile-index chain corruption we hit previously. */
-u16 player_variant_base(u16 base, u8 variant)
+u16 player_currentTileBase(const Player *p)
 {
-    if (variant == 0) return base;
-    return base;   /* variant banks not uploaded yet - Phase 2 */
+    bool backView = !p->farSide;
+    u8 phase = p->animFrame & PLAYER_ANIM_MASK;
+    u8 gait = phase >> 1;
+    if (p->pose == POSE_RUN)
+    {
+        if (gait & 1)
+            return backView ? TILE_PLAYER_BACK_RUN_PASS : TILE_PLAYER_FRONT_RUN_PASS;
+        if (backView)
+            return (gait == 2) ? TILE_PLAYER_BACK_RUN_ALT : TILE_PLAYER_BACK_RUN;
+        return (gait == 2) ? TILE_PLAYER_FRONT_RUN_ALT : TILE_PLAYER_FRONT_RUN;
+    }
+    if (p->pose == POSE_THROW)
+        return (phase < 2 || phase == 7)
+            ? (backView ? TILE_PLAYER_BACK_STAND : TILE_PLAYER_FRONT_STAND)
+            : (backView ? TILE_PLAYER_BACK_THROW : TILE_PLAYER_FRONT_THROW);
+    if (p->pose == POSE_PICKUP)
+        return (phase < 2 || phase == 7)
+            ? (backView ? TILE_PLAYER_BACK_STAND : TILE_PLAYER_FRONT_STAND)
+            : (backView ? TILE_PLAYER_BACK_STAND : TILE_PLAYER_FRONT_PICKUP);
+    if (p->pose == POSE_HIT)
+        return phase == 0
+            ? (backView ? TILE_PLAYER_BACK_STAND : TILE_PLAYER_FRONT_STAND)
+            : (phase >= 6
+                ? (backView ? TILE_PLAYER_BACK_FALL : TILE_PLAYER_FRONT_FALL)
+                : (backView ? TILE_PLAYER_BACK_HIT : TILE_PLAYER_FRONT_HIT));
+    if (p->pose == POSE_FALL)
+        return phase == 0
+            ? (backView ? TILE_PLAYER_BACK_HIT : TILE_PLAYER_FRONT_HIT)
+            : (backView ? TILE_PLAYER_BACK_FALL : TILE_PLAYER_FRONT_FALL);
+    if (p->pose == POSE_CELEBRATE)
+        return backView ? TILE_PLAYER_BACK_CELEBRATE : TILE_PLAYER_FRONT_CELEBRATE;
+    return backView ? TILE_PLAYER_BACK_STAND : TILE_PLAYER_FRONT_STAND;
+}
+
+/* Keep pose placement in one place. The depth sorter and renderer must see
+ * exactly the same displaced body or a falling/eliminated player can retain
+ * the wrong hardware-sprite slot while its artwork crosses another actor. */
+static void player_poseOffset(const Player *p, s16 *offsetX, s16 *offsetY)
+{
+    u8 phase = p->animFrame & PLAYER_ANIM_MASK;
+    s16 direction = p->facingLeft ? -1 : 1;
+
+    *offsetX = 0;
+    *offsetY = 0;
+    if (p->pose == POSE_RUN)
+    {
+        static const s8 runX[PLAYER_ANIM_FRAMES] = { 0, 0, 0, 1, 0, 0, -1, 0 };
+        static const s8 runY[PLAYER_ANIM_FRAMES] = { 0, -1, -1, -2, 0, -1, -1, -2 };
+        *offsetX = runX[phase] * direction;
+        *offsetY = runY[phase];
+    }
+    else if (p->pose == POSE_THROW)
+    {
+        static const s8 throwX[PLAYER_ANIM_FRAMES] = { 0, -1, -1, 1, 3, 3, 2, 1 };
+        static const s8 throwY[PLAYER_ANIM_FRAMES] = { 0, 1, -1, -2, -4, -3, -2, -1 };
+        *offsetX = throwX[phase] * direction;
+        *offsetY = throwY[phase];
+    }
+    else if (p->pose == POSE_PICKUP)
+    {
+        static const s8 pickupX[PLAYER_ANIM_FRAMES] = { 0, 0, 0, 1, 2, 2, 1, 0 };
+        static const s8 pickupY[PLAYER_ANIM_FRAMES] = { 0, 1, 2, 4, 5, 4, 2, 0 };
+        *offsetX = pickupX[phase] * direction;
+        *offsetY = pickupY[phase];
+    }
+    else if (p->pose == POSE_HIT)
+    {
+        static const s8 hitX[PLAYER_ANIM_FRAMES] = { 0, 1, 2, 3, 4, 4, 3, 2 };
+        static const s8 hitY[PLAYER_ANIM_FRAMES] = { 0, 0, 1, 0, 1, 2, 2, 2 };
+        *offsetX = -direction * hitX[phase];
+        *offsetY = hitY[phase];
+    }
+    else if (p->pose == POSE_FALL)
+    {
+        static const s8 fallX[PLAYER_ANIM_FRAMES] = { 0, 0, 1, 1, 2, 2, 3, 3 };
+        static const s8 fallY[PLAYER_ANIM_FRAMES] = { 0, 1, 1, 2, 2, 3, 3, 3 };
+        *offsetX = -direction * fallX[phase];
+        *offsetY = fallY[phase];
+    }
+    else if (p->pose == POSE_CELEBRATE)
+    {
+        static const s8 victoryY[PLAYER_ANIM_FRAMES] = { 0, -2, -4, -2, 0, -3, -5, -2 };
+        *offsetY = victoryY[phase];
+    }
+    else
+    {
+        static const s8 breatheY[PLAYER_ANIM_FRAMES] = { 0, 0, -1, -1, -2, -1, 0, 0 };
+        *offsetY = breatheY[phase];
+    }
+}
+
+void player_visualGround(const Player *p, s16 *x, s16 *y)
+{
+    s16 offsetX, offsetY;
+    player_poseOffset(p, &offsetX, &offsetY);
+    *x = p->x + PLAYER_FEET_DX + offsetX;
+    *y = p->y + PLAYER_FEET_DY + offsetY;
 }
 
 void player_draw(Player *p)
@@ -226,80 +325,32 @@ void player_draw(Player *p)
      * movement only mirrors that bank. This preserves true front/rear
      * anatomy while letting runners face their actual travel direction. */
     bool backView = !p->farSide;
-    u16 base = backView ? TILE_PLAYER_BACK_STAND : TILE_PLAYER_FRONT_STAND;
+    u16 base = player_currentTileBase(p);
     bool flip = p->facingLeft;
     s16 poseOffsetX = 0;
     s16 poseOffsetY = 0;
-    s16 direction = p->facingLeft ? -1 : 1;
+    u8 spritePriority;
 
-    /* A grounded four-beat gait: contact, passing step, opposite contact,
-     * passing step. The torso stays level; all perceived motion comes from
-     * actual leg silhouettes instead of moving the whole player up/down. */
-    if (p->pose == POSE_RUN)
-    {
-        if (p->animFrame & 1)
-            base = backView ? TILE_PLAYER_BACK_RUN_PASS : TILE_PLAYER_FRONT_RUN_PASS;
-        else if (backView)
-            base = (p->animFrame == 2) ? TILE_PLAYER_BACK_RUN_ALT : TILE_PLAYER_BACK_RUN;
-        else
-            base = (p->animFrame == 2) ? TILE_PLAYER_FRONT_RUN_ALT : TILE_PLAYER_FRONT_RUN;
-        /* A one-pixel bounce on the passing steps gives the run a real gait
-         * rhythm instead of a flat glide - the body rises as it strides
-         * through, drops back down on each foot-contact frame. */
-        poseOffsetY = (p->animFrame & 1) ? -1 : 0;
-    }
-    else if (p->pose == POSE_THROW)
-    {
-        base = backView ? TILE_PLAYER_BACK_THROW : TILE_PLAYER_FRONT_THROW;
-        poseOffsetX = ((p->animFrame == 0) ? -1 :
-                      (p->animFrame < 3 ? 3 : 1)) * direction;
-        poseOffsetY = (p->animFrame == 0) ? 0 :
-                      (p->animFrame < 3 ? -4 : -1);
-    }
-    else if (p->pose == POSE_PICKUP)
-    {
-        base = backView ? TILE_PLAYER_BACK_STAND : TILE_PLAYER_FRONT_PICKUP;
-        poseOffsetX = (p->animFrame < 2) ? 0 : direction;
-        poseOffsetY = (p->animFrame < 2) ? 0 : 4;
-    }
-    else if (p->pose == POSE_HIT)
-    {
-        base = backView ? TILE_PLAYER_BACK_HIT : TILE_PLAYER_FRONT_HIT;
-        poseOffsetX = -direction * (2 + (p->animFrame & 1));
-        poseOffsetY = p->animFrame & 1;
-    }
-    else if (p->pose == POSE_FALL)
-    {
-        base = backView ? TILE_PLAYER_BACK_FALL : TILE_PLAYER_FRONT_FALL;
-        /* Settle by two pixels after the initial collapse instead of freezing
-         * the fallen silhouette at exactly one coordinate. */
-        poseOffsetX = -direction * (p->animFrame > 1 ? 2 : 0);
-        poseOffsetY = p->animFrame > 1 ? 2 : 0;
-    }
-    else if (p->pose == POSE_CELEBRATE)
-    {
-        static const s8 victoryY[4] = { 0, -3, -1, -3 };
-        base = backView ? TILE_PLAYER_BACK_CELEBRATE : TILE_PLAYER_FRONT_CELEBRATE;
-        poseOffsetY = victoryY[p->animFrame & 3];
-    }
-    else
-    {
-        /* Idle breathing: a slow four-phase chest rise so a standing player
-         * looks alive and poised rather than frozen between actions. */
-        static const s8 breatheY[4] = { 0, 0, -1, 0 };
-        poseOffsetY = breatheY[p->animFrame & 3];
-    }
+    /* Eight gait beats hold each authored contact/pass silhouette for two
+     * subtly different body positions, making the cycle read smoothly at 50Hz. */
+    player_poseOffset(p, &poseOffsetX, &poseOffsetY);
 
-    /* Swap in this player's recoloured copy of whichever pose was selected.
-     * Variant 0 resolves to the original bank, so the default path is exactly
-     * the artwork used before this existed. */
-    base = player_variant_base(base, p->kitVariant);
+    if (p->tileBaseOverride != 0) base = p->tileBaseOverride;
 
     /* The centre board is a high-priority BG_A foreground. Near-half players
      * must use high sprite priority to cover it; far-half players remain low
      * priority so the same board correctly passes in front of them. */
+    spritePriority = backView ? 1 : 0;
+    /* High-priority sprites outrank high-priority planes on Mega Drive. Drop
+     * only a player intersecting the score strip or live shot-clock panel to
+     * low priority so those UI surfaces always remain in front. */
+    if (ui_sprite_behind_panel(p->x - 8 + poseOffsetX,
+                               p->y - 16 + poseOffsetY, 32, 32) ||
+        court_bg_spriteBehindRoof(p->x - 8 + poseOffsetX,
+                                  p->y - 16 + poseOffsetY, 32, 32))
+        spritePriority = 0;
     VDP_setSpriteFull(p->spriteSlot, p->x - 8 + poseOffsetX,
                        p->y - 16 + poseOffsetY, SPRITE_SIZE(4, 4),
-                       TILE_ATTR_FULL(p->pal, backView ? 1 : 0, FALSE, flip, base),
+                       TILE_ATTR_FULL(p->pal, spritePriority, FALSE, flip, base),
                        p->spriteSlot + 1);
 }

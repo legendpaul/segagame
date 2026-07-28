@@ -47,11 +47,21 @@
 #define HIT_WINDOW_Y        10      /* airborne torso collision half-height */
 #define PICKUP_WINDOW_X     11      /* feet must physically reach loose ball */
 #define PICKUP_WINDOW_Y      9
+/* Loose-ball collection is measured from the same lower-body point in every
+ * mode.  Keeping these offsets shared prevents AI steering, collision tests
+ * and the visible player marker from silently describing different players. */
+#define PLAYER_PICKUP_DX     8
+#define PLAYER_PICKUP_DY    10
+#define BALL_WALL_MARGIN      8      /* 16px ball centre touches outer wall */
+#define BALL_NET_MARGIN     10      /* resting balls stay clear of centre rail */
 #define AI_REACTION_MIN     20      /* frames CPU waits before throwing */
 #define AI_REACTION_VAR     30
 
 #define TEAM_SIZE           3       /* real dodgeball squad size per side */
 #define WIN_SCORE           3       /* rounds (full-team eliminations) to win the match */
+/* Every completed-match/result presentation remains readable for one minute
+ * unless the player dismisses it with a controller button. */
+#define RESULT_SCREEN_TIMEOUT_SECONDS 60
 
 /* --- Scene management --- */
 typedef enum {
@@ -68,7 +78,7 @@ extern GameScene gCurrentScene;
 typedef enum {
     MODE_EXHIBITION = 0,   /* pick both teams, single match */
     MODE_TOURNAMENT,       /* pick your team, gauntlet the rest to be champion */
-    MODE_ELIMINATOR,       /* every nation, one player each, no net, 3 balls */
+    MODE_ELIMINATOR,       /* every nation, one player each, no net, 2 balls */
     MODE_COUNT
 } GameMode;
 

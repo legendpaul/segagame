@@ -85,6 +85,12 @@
 /* First tile index free for court_bg.c to use */
 #define TILE_COURT_BASE     (TILE_USER_INDEX + 303)
 
+/* Shared impact art occupies the eight-tile gap immediately after the
+ * referee and before the standard-match foreground bank. It must not share
+ * the small-flag bank: those flags remain visible in the gameplay HUD. */
+#define TILE_IMPACT_BURST   (TILE_USER_INDEX + 869)
+#define TILE_IMPACT_GREY    (TILE_IMPACT_BURST + 4)
+
 /* Palette lines: PAL0 is used by the system font + pitch background,
  * so sprites use 1-3. PAL1/PAL2 are *slots*, not fixed teams - which
  * actual team colors live there is set per-match by
@@ -99,6 +105,43 @@ void sprites_data_init(void);
  * teams actually chosen on the menu. Call once per match, before the
  * first player_draw(). */
 void sprites_data_apply_teams(u8 teamAIndex, u8 teamBIndex);
+
+/* GLOBAL ELIMINATOR spreads ten compact national kits across PAL1/PAL2/PAL3.
+ * Each fighter owns one scene-local tile slot refreshed when its pose changes.
+ * Poses retain the Exhibition hair, boots and near-black outline; only the
+ * country-dependent kit ramp is compacted. */
+void sprites_data_load_eliminator_player(u8 teamIndex, u16 sourceBase,
+                                         u16 destination);
+void sprites_data_apply_eliminator_teams(void);
+void sprites_data_load_eliminator_ball_art(void);
+/* Rebuilds the two 24x16 control rings with a faint four-phase interior glow.
+ * Call only when the phase changes; the marker remains one ground sprite. */
+void sprites_data_set_ring_pulse(u8 phase, bool eliminator);
+void sprites_data_load_impact_art(void);
+
+/* Builds four front and four rear official frames from the same authored
+ * 32x32 player anatomy. Stand/run groups use scene-local VRAM gaps. */
+void sprites_data_load_referee_art(u16 frontStandDestination,
+                                   u16 frontRunDestination,
+                                   u16 backStandDestination,
+                                   u16 backRunDestination);
+
+/* Eliminator owns one 16-tile pose cache per fighter. Keep all ten caches in
+ * one contiguous scene-local bank above the 75-tile roof foreground and below
+ * TILE_UI_BASE. The title/flag banks do not coexist with live Eliminator play,
+ * so they are safe to reuse; the shared HUD font is not. */
+#define TILE_ELIM_PLAYER_LOW_BASE  (TILE_USER_INDEX + 1000)
+
+/* Eliminator-only ball and ring art follows all ten player slots. This
+ * deliberately overlaps the boot/menu logo and flag bank, which is absent in
+ * Eliminator. The shared impact art above cannot use this range because the
+ * standard-match HUD keeps its small flags resident during gameplay. */
+#define TILE_ELIM_EFFECT_BASE     (TILE_ELIM_PLAYER_LOW_BASE + 10 * 16)
+#define TILE_ELIM_BALL_SHADOW     (TILE_ELIM_EFFECT_BASE + 0)
+#define TILE_ELIM_BALL_SHADOW_AIR (TILE_ELIM_EFFECT_BASE + 1)
+#define TILE_ELIM_BALL16_FRAME_0  (TILE_ELIM_EFFECT_BASE + 2)
+#define TILE_ELIM_RING_YELLOW     (TILE_ELIM_EFFECT_BASE + 18)
+#define TILE_ELIM_RING_RED        (TILE_ELIM_EFFECT_BASE + 24)
 
 /* Briefly whites-out a team's kit-ramp colors for an impact flash.
  * Only 4 palette lines exist total (PAL0 court/font, PAL1/PAL2 teams,

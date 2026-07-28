@@ -9,7 +9,7 @@
 #include "logo_data.h"
 #include "input_mgr.h"
 #include "sound_mgr.h"
-#include "ui_data.h"
+#include "screen_transition.h"
 
 #define BOOT_DURATION   150   /* ~2.5s at 60fps */
 
@@ -20,15 +20,11 @@ void scene_boot_enter(void)
     VDP_clearPlane(BG_A, TRUE);
     VDP_clearPlane(BG_B, TRUE);
     VDP_clearSprites();
-    VDP_clearTextArea(0, 0, 40, 28);
 
     logo_data_draw();
-    ui_set_palette(PAL3);
-    ui_apply_palette();
-    ui_draw_text_center("PRESENTS", 4, UI_GOLD);
-    ui_draw_text_center("ORIGINAL 16 BIT SPORTS", 23, UI_CYAN);
 
     bootTimer = BOOT_DURATION;
+    screen_transition_fade_in();
 }
 
 void scene_boot_update(void)
@@ -40,7 +36,7 @@ void scene_boot_update(void)
     if ((bootTimer == 0) || input_pressed(BUTTON_START))
     {
         sound_mgr_confirm();
-        PAL_fadeOutAll(20, FALSE);
+        screen_transition_fade_out();
         gCurrentScene = GS_MENU;
     }
 }

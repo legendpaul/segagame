@@ -1,26 +1,43 @@
 #include "sound_mgr.h"
+#include "audio.h"
+
+/* PCM channels are mixed independently by SGDK's XGM driver.  Keeping the
+ * stadium bed, chants, reactions and physical action on separate channels is
+ * what lets the match sound like a place rather than a sequence of beeps. */
+#define PCM_CH_BED       SOUND_PCM_CH1
+#define PCM_CH_REACTION  SOUND_PCM_CH2
+#define PCM_CH_CHANT     SOUND_PCM_CH3
+#define PCM_CH_ACTION    SOUND_PCM_CH4
+
+#define PCM_ID_CROWD_BED          64
+#define PCM_ID_CROWD_CHANT        65
+#define PCM_ID_CROWD_THROW        66
+#define PCM_ID_CROWD_ELIMINATION  67
+#define PCM_ID_CROWD_ROUND        68
+#define PCM_ID_CROWD_GAMEOVER     69
+#define PCM_ID_THROW              70
+#define PCM_ID_PICKUP             71
+#define PCM_ID_HIT                72
+#define PCM_ID_BOUNCE             73
+#define PCM_ID_WHISTLE            74
 
 static u8 envelope[4];
 static u8 decay[4];
 static u8 active[4];
 static u8 priority[4];
+static u16 toneFrequency[4];
+static s16 pitchSweep[4];
 
-/* Sustained crowd-roar state (2026-07-22). The old crowd cues were a
- * single one-frame PSG noise blip that was over before you registered it.
- * A real crowd is a swell: it rises, holds with a churning texture, then
- * falls over roughly a second. crowdTimer counts DOWN the frames left;
- * crowdLen is the full length so the update can tell where in the
- * attack/sustain/release shape it is; crowdPeak is the loudest PSG
- * attenuation reached (LOWER = LOUDER, since PSG env 0 = full, 15 =
- * silent). It owns the shared noise channel (3) for its whole duration. */
-static u16 crowdTimer;
-static u16 crowdLen;
-static u8  crowdPeak;
-static u16 crowdSeed = 0x1234;
+static bool matchCrowd;
+static u16 crowdBedTimer;
+static u16 chantTimer;
 
-/* Four deterministic-sized offsets avoid identical machine-gun retriggers
- * without adding a large random range that would make the ball sound comedic. */
-static const s16 pitchVariation[4] = { 0, 32, -24, 16 };
+static const s16 pitchVariation[4] = { 0, 28, -20, 13 };
+
+static u16 real_frames(u16 ntscFrames)
+{
+    return SYS_isPAL() ? (u16)((ntscFrames * 5) / 6) : ntscFrames;
+}
 
 static u16 varied_frequency(u16 base)
 {
@@ -28,7 +45,13 @@ static u16 varied_frequency(u16 base)
     return (u16)((varied < 32) ? 32 : varied);
 }
 
-static void sound_mgr_play_priority(u8 channel, u16 freq, u8 decayStep, u8 newPriority)
+static void play_pcm(u8 id, u8 priorityValue, SoundPCMChannel channel)
+{
+    XGM_startPlayPCM(id, priorityValue, channel);
+}
+
+static void sound_mgr_play_swept(u8 channel, u16 freq, u8 decayStep,
+                                 u8 newPriority, s16 sweep)
 {
     if (active[channel] && priority[channel] > newPriority) return;
 
@@ -38,103 +61,102 @@ static void sound_mgr_play_priority(u8 channel, u16 freq, u8 decayStep, u8 newPr
     decay[channel] = decayStep;
     active[channel] = 1;
     priority[channel] = newPriority;
+    toneFrequency[channel] = freq;
+    pitchSweep[channel] = sweep;
+}
+
+static void register_pcm(void)
+{
+    XGM_setPCM(PCM_ID_CROWD_BED, crowd_bed, sizeof(crowd_bed));
+    XGM_setPCM(PCM_ID_CROWD_CHANT, crowd_chant, sizeof(crowd_chant));
+    XGM_setPCM(PCM_ID_CROWD_THROW, crowd_throw, sizeof(crowd_throw));
+    XGM_setPCM(PCM_ID_CROWD_ELIMINATION, crowd_elimination,
+               sizeof(crowd_elimination));
+    XGM_setPCM(PCM_ID_CROWD_ROUND, crowd_round, sizeof(crowd_round));
+    XGM_setPCM(PCM_ID_CROWD_GAMEOVER, crowd_gameover,
+               sizeof(crowd_gameover));
+    XGM_setPCM(PCM_ID_THROW, sfx_throw, sizeof(sfx_throw));
+    XGM_setPCM(PCM_ID_PICKUP, sfx_pickup, sizeof(sfx_pickup));
+    XGM_setPCM(PCM_ID_HIT, sfx_hit, sizeof(sfx_hit));
+    XGM_setPCM(PCM_ID_BOUNCE, sfx_bounce, sizeof(sfx_bounce));
+    XGM_setPCM(PCM_ID_WHISTLE, sfx_whistle, sizeof(sfx_whistle));
 }
 
 void sound_mgr_init(void)
 {
-    PSG_reset();
     u8 i;
+
+    PSG_reset();
+    Z80_loadDriver(Z80_DRIVER_XGM, TRUE);
+    register_pcm();
+
     for (i = 0; i < 4; i++)
     {
         envelope[i] = PSG_ENVELOPE_MIN;
         decay[i] = 0;
         active[i] = 0;
         priority[i] = 0;
+        toneFrequency[i] = 0;
+        pitchSweep[i] = 0;
+    }
+    matchCrowd = FALSE;
+    crowdBedTimer = 0;
+    chantTimer = 0;
+}
+
+void sound_mgr_setMatchCrowd(bool enabled)
+{
+    if (matchCrowd == enabled) return;
+    matchCrowd = enabled;
+
+    if (enabled)
+    {
+        crowdBedTimer = 0;
+        chantTimer = real_frames((u16)(390 + (random() & 255)));
+    }
+    else
+    {
+        XGM_stopPlayPCM(PCM_CH_BED);
+        XGM_stopPlayPCM(PCM_CH_CHANT);
+        crowdBedTimer = 0;
+        chantTimer = 0;
     }
 }
 
 void sound_mgr_play(u8 channel, u16 freq, u8 decayStep)
 {
-    sound_mgr_play_priority(channel, freq, decayStep, 0);
+    sound_mgr_play_swept(channel, freq, decayStep, 0, 0);
 }
 
-static void sound_mgr_noise(u8 noiseFreq, u8 decayStep, u8 newPriority)
+static void update_stadium(void)
 {
-    /* A crowd swell owns the noise channel for its whole length; a stray
-     * hit/bounce blip mid-cheer would just chop a hole in the roar. These
-     * cheers only fire at elimination/round-end/game-over moments when
-     * little else is happening, so nothing gameplay-critical is lost. */
-    if (crowdTimer > 0) return;
-    if (active[3] && priority[3] > newPriority) return;
-    PSG_setNoise(PSG_NOISE_TYPE_WHITE, noiseFreq);
-    PSG_setEnvelope(3, PSG_ENVELOPE_MAX);
-    envelope[3] = PSG_ENVELOPE_MAX;
-    decay[3] = decayStep;
-    active[3] = 1;
-    priority[3] = newPriority;
-}
+    if (!matchCrowd) return;
 
-/* Start (or upgrade) a crowd roar. A quieter cheer cannot stomp a louder
- * one already ringing - so a single knockout during a round-win swell
- * won't cut the bigger celebration short. */
-static void sound_mgr_crowd_start(u16 len, u8 peak)
-{
-    if (crowdTimer > 0 && crowdPeak < peak) return;  /* keep the louder cheer */
-    crowdTimer = len;
-    crowdLen = len;
-    crowdPeak = peak;
-}
-
-/* Drive the crowd channel one frame along its attack/sustain/release
- * envelope, with a churning texture so it reads as a stadium roar rather
- * than a flat hiss. Called once per frame from sound_mgr_update(). */
-static void sound_mgr_crowd_update(void)
-{
-    u16 pos, atk, rel;
-    u8 env, wob;
-
-    if (crowdTimer == 0) return;
-
-    pos = crowdLen - crowdTimer;   /* frames elapsed so far */
-    atk = crowdLen / 5;            /* ~20% fade-in */
-    rel = crowdLen / 2;            /* last ~50% fades back out */
-    if (atk == 0) atk = 1;
-    if (rel == 0) rel = 1;
-
-    if (pos < atk)
-        env = 15 - (u8)(((15 - crowdPeak) * pos) / atk);       /* rise */
-    else if (crowdTimer < rel)
-        env = crowdPeak + (u8)(((15 - crowdPeak) * (rel - crowdTimer)) / rel); /* fall */
-    else
-        env = crowdPeak;                                        /* hold */
-
-    /* Cheap LCG for a per-frame loudness flutter + churning noise pitch. */
-    crowdSeed = (u16)(crowdSeed * 41 + 13);
-    wob = (crowdSeed >> 9) & 1;
-    if (env + wob <= 15) env += wob;
-
-    if ((crowdTimer & 7) == 0)
-        PSG_setNoise(PSG_NOISE_TYPE_WHITE,
-                     (crowdSeed & 1) ? PSG_NOISE_FREQ_CLOCK4 : PSG_NOISE_FREQ_CLOCK8);
-    PSG_setEnvelope(3, env);
-
-    crowdTimer--;
-    if (crowdTimer == 0)
+    /* Retrigger just before the authored bed ends, giving a continuous broad
+     * wash with no silent seam.  Replacing the same low-priority channel is
+     * safe even if PAL/NTSC frame timing differs slightly. */
+    if (crowdBedTimer == 0)
     {
-        PSG_setEnvelope(3, PSG_ENVELOPE_MIN);
-        active[3] = 0;
-        priority[3] = 0;
+        play_pcm(PCM_ID_CROWD_BED, 1, PCM_CH_BED);
+        crowdBedTimer = real_frames(64);
     }
+    else crowdBedTimer--;
+
+    if (chantTimer == 0)
+    {
+        play_pcm(PCM_ID_CROWD_CHANT, 3, PCM_CH_CHANT);
+        chantTimer = real_frames((u16)(420 + (random() & 255)));
+    }
+    else chantTimer--;
 }
 
 void sound_mgr_update(void)
 {
     u8 i;
-    sound_mgr_crowd_update();
+
+    update_stadium();
     for (i = 0; i < 4; i++)
     {
-        /* The crowd swell drives the noise channel itself while it runs. */
-        if (i == 3 && crowdTimer > 0) continue;
         if (!active[i]) continue;
 
         if (envelope[i] + decay[i] >= PSG_ENVELOPE_MIN)
@@ -142,50 +164,91 @@ void sound_mgr_update(void)
             envelope[i] = PSG_ENVELOPE_MIN;
             active[i] = 0;
             priority[i] = 0;
+            pitchSweep[i] = 0;
         }
-        else
-        {
-            envelope[i] += decay[i];
-        }
+        else envelope[i] += decay[i];
 
+        if (i < 3 && active[i] && pitchSweep[i] != 0)
+        {
+            s32 next = (s32)toneFrequency[i] + pitchSweep[i];
+            if (next < 50) next = 50;
+            if (next > 4000) next = 4000;
+            toneFrequency[i] = (u16)next;
+            PSG_setFrequency(i, toneFrequency[i]);
+        }
         PSG_setEnvelope(i, envelope[i]);
     }
 }
 
-void sound_mgr_blip(void)   { sound_mgr_play_priority(SFX_CH_UI, 1800, 3, 1); }
-void sound_mgr_confirm(void){ sound_mgr_play_priority(SFX_CH_UI, 1200, 2, 2); }
-void sound_mgr_cancel(void) { sound_mgr_play_priority(SFX_CH_UI, 620, 3, 2); }
-void sound_mgr_throw(void)  { sound_mgr_play_priority(SFX_CH_ACTION, varied_frequency(780), 2, 4); }
-void sound_mgr_pickup(void) { sound_mgr_play_priority(SFX_CH_ACTION, 1320, 2, 4); }
+void sound_mgr_blip(void)
+{
+    /* Tight broadcast-console tick: quick enough not to smear while cycling
+     * rapidly through teams. */
+    sound_mgr_play_swept(SFX_CH_UI, 1320, 5, 1, 110);
+}
+
+void sound_mgr_confirm(void)
+{
+    sound_mgr_play_swept(SFX_CH_UI, 988, 2, 2, 34);
+    sound_mgr_play_swept(SFX_CH_SCORE, 1480, 3, 2, 22);
+}
+
+void sound_mgr_cancel(void)
+{
+    sound_mgr_play_swept(SFX_CH_UI, 820, 3, 2, -92);
+}
+
+void sound_mgr_throw(void)
+{
+    play_pcm(PCM_ID_THROW, 5, PCM_CH_ACTION);
+    play_pcm(PCM_ID_CROWD_THROW, 4, PCM_CH_REACTION);
+    sound_mgr_play_swept(SFX_CH_ACTION, varied_frequency(430), 3, 4, 65);
+}
+
+void sound_mgr_pickup(void)
+{
+    play_pcm(PCM_ID_PICKUP, 4, PCM_CH_ACTION);
+    sound_mgr_play_swept(SFX_CH_ACTION, 860, 4, 3, 74);
+}
+
 void sound_mgr_hit(void)
 {
-    sound_mgr_play_priority(SFX_CH_ACTION, varied_frequency(300), 1, 6);
-    sound_mgr_noise(PSG_NOISE_FREQ_CLOCK4, 2, 6);
+    play_pcm(PCM_ID_HIT, 10, PCM_CH_ACTION);
+    sound_mgr_play_swept(SFX_CH_ACTION, varied_frequency(205), 2, 7, -13);
 }
+
 void sound_mgr_bounce(void)
 {
-    sound_mgr_play_priority(SFX_CH_ACTION, varied_frequency(460), 3, 3);
-    sound_mgr_noise(PSG_NOISE_FREQ_CLOCK8, 3, 3);
+    play_pcm(PCM_ID_BOUNCE, 3, PCM_CH_ACTION);
+    sound_mgr_play_swept(SFX_CH_ACTION, varied_frequency(345), 5, 3, -31);
 }
-void sound_mgr_whistle(void){ sound_mgr_play_priority(SFX_CH_SCORE, 1700, 1, 7); }
-void sound_mgr_score(void)  { sound_mgr_play_priority(SFX_CH_SCORE, 2200, 1, 6); }
 
-/* Sustained crowd roars (2026-07-22), shaped by sound_mgr_crowd_update().
- * Longer + louder = bigger moment. peak is PSG attenuation at the crest,
- * LOWER = LOUDER (0 full .. 15 silent). Tuned so a single knockout is an
- * appreciative swell (~0.9s), a round win is a real celebration (~1.5s),
- * and the match win is the biggest roar of all (~2.5s). */
+void sound_mgr_whistle(void)
+{
+    play_pcm(PCM_ID_WHISTLE, 12, PCM_CH_ACTION);
+}
+
+void sound_mgr_score(void)
+{
+    sound_mgr_play_swept(SFX_CH_SCORE, 1568, 1, 7, 31);
+    sound_mgr_play_swept(SFX_CH_UI, 2093, 2, 7, 19);
+}
+
 void sound_mgr_crowdKnockout(void)
 {
-    sound_mgr_crowd_start(54, 6);
+    play_pcm(PCM_ID_CROWD_ELIMINATION, 8, PCM_CH_REACTION);
 }
 
 void sound_mgr_crowdVictory(void)
 {
-    sound_mgr_crowd_start(90, 2);
+    play_pcm(PCM_ID_CROWD_ROUND, 12, PCM_CH_REACTION);
 }
 
 void sound_mgr_crowdGameOver(void)
 {
-    sound_mgr_crowd_start(150, 0);
+    /* The final roar is authored longest and has absolute reaction priority.
+     * The quiet bed is stopped so the climax retains headroom. */
+    XGM_stopPlayPCM(PCM_CH_BED);
+    XGM_stopPlayPCM(PCM_CH_CHANT);
+    play_pcm(PCM_ID_CROWD_GAMEOVER, 15, PCM_CH_REACTION);
 }
