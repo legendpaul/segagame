@@ -42,6 +42,12 @@ int main(bool hardReset)
      * whatever the previous scene drew there. */
     VDP_setTextPlane(BG_A);
 
+    /* Enable 6-button joypad support explicitly on both controller ports.
+     * This is backward-compatible with 3-button joypads but ensures that
+     * 6-button joypads are read and polled correctly. */
+    JOY_setSupport(PORT_1, JOY_SUPPORT_6BTN);
+    JOY_setSupport(PORT_2, JOY_SUPPORT_6BTN);
+
     sprites_data_init();
     court_bg_init();
     flag_data_init();
