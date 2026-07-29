@@ -5,10 +5,8 @@
 
 // Music Resources (PCM4, 8-bit mono, 16 kHz)
 extern const u8 MUSIC_TITLE_LOOP[876288];
-extern const u8 MUSIC_TITLE_ONESHOT[906240];
 extern const u8 MUSIC_MENU_LOOP[463872];
 extern const u8 MUSIC_TOURNAMENT_LOOP[553216];
-extern const u8 MUSIC_MATCH_ALT_LOOP[537856];
 extern const u8 MUSIC_TOURNAMENT_WIN[384000];
 
 // Stadium Crowd & SFX Resources (PCM4, 8-bit mono, 16 kHz)
