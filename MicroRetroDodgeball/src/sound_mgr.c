@@ -1,25 +1,10 @@
 #include "sound_mgr.h"
 #include "audio.h"
 
-/* PCM channels are mixed independently by SGDK's XGM driver.  Keeping the
- * stadium bed, chants, reactions and physical action on separate channels is
- * what lets the match sound like a place rather than a sequence of beeps. */
-#define PCM_CH_BED       SOUND_PCM_CH1
-#define PCM_CH_REACTION  SOUND_PCM_CH2
-#define PCM_CH_CHANT     SOUND_PCM_CH3
+#define PCM_CH_MUSIC     SOUND_PCM_CH1
+#define PCM_CH_AMBIENCE  SOUND_PCM_CH2
+#define PCM_CH_EVENT     SOUND_PCM_CH3
 #define PCM_CH_ACTION    SOUND_PCM_CH4
-
-#define PCM_ID_CROWD_BED          64
-#define PCM_ID_CROWD_CHANT        65
-#define PCM_ID_CROWD_THROW        66
-#define PCM_ID_CROWD_ELIMINATION  67
-#define PCM_ID_CROWD_ROUND        68
-#define PCM_ID_CROWD_GAMEOVER     69
-#define PCM_ID_THROW              70
-#define PCM_ID_PICKUP             71
-#define PCM_ID_HIT                72
-#define PCM_ID_BOUNCE             73
-#define PCM_ID_WHISTLE            74
 
 static u8 envelope[4];
 static u8 decay[4];
@@ -29,8 +14,8 @@ static u16 toneFrequency[4];
 static s16 pitchSweep[4];
 
 static bool matchCrowd;
-static u16 crowdBedTimer;
-static u16 chantTimer;
+static u8 ambienceState;
+static u16 ambienceTimer;
 
 static const s16 pitchVariation[4] = { 0, 28, -20, 13 };
 
@@ -43,11 +28,6 @@ static u16 varied_frequency(u16 base)
 {
     s16 varied = (s16)base + pitchVariation[random() & 3];
     return (u16)((varied < 32) ? 32 : varied);
-}
-
-static void play_pcm(u8 id, u8 priorityValue, SoundPCMChannel channel)
-{
-    XGM_startPlayPCM(id, priorityValue, channel);
 }
 
 static void sound_mgr_play_swept(u8 channel, u16 freq, u8 decayStep,
@@ -65,30 +45,16 @@ static void sound_mgr_play_swept(u8 channel, u16 freq, u8 decayStep,
     pitchSweep[channel] = sweep;
 }
 
-static void register_pcm(void)
-{
-    XGM_setPCM(PCM_ID_CROWD_BED, crowd_bed, sizeof(crowd_bed));
-    XGM_setPCM(PCM_ID_CROWD_CHANT, crowd_chant, sizeof(crowd_chant));
-    XGM_setPCM(PCM_ID_CROWD_THROW, crowd_throw, sizeof(crowd_throw));
-    XGM_setPCM(PCM_ID_CROWD_ELIMINATION, crowd_elimination,
-               sizeof(crowd_elimination));
-    XGM_setPCM(PCM_ID_CROWD_ROUND, crowd_round, sizeof(crowd_round));
-    XGM_setPCM(PCM_ID_CROWD_GAMEOVER, crowd_gameover,
-               sizeof(crowd_gameover));
-    XGM_setPCM(PCM_ID_THROW, sfx_throw, sizeof(sfx_throw));
-    XGM_setPCM(PCM_ID_PICKUP, sfx_pickup, sizeof(sfx_pickup));
-    XGM_setPCM(PCM_ID_HIT, sfx_hit, sizeof(sfx_hit));
-    XGM_setPCM(PCM_ID_BOUNCE, sfx_bounce, sizeof(sfx_bounce));
-    XGM_setPCM(PCM_ID_WHISTLE, sfx_whistle, sizeof(sfx_whistle));
-}
-
 void sound_mgr_init(void)
 {
     u8 i;
 
     PSG_reset();
-    Z80_loadDriver(Z80_DRIVER_XGM, TRUE);
-    register_pcm();
+    SND_PCM4_loadDriver(TRUE);
+    SND_PCM4_setVolume(SOUND_PCM_CH1, 12); /* music */
+    SND_PCM4_setVolume(SOUND_PCM_CH2, 7);  /* ambience: deliberately quiet */
+    SND_PCM4_setVolume(SOUND_PCM_CH3, 14); /* goal/win crowd */
+    SND_PCM4_setVolume(SOUND_PCM_CH4, 15); /* whistle and action SFX */
 
     for (i = 0; i < 4; i++)
     {
@@ -100,8 +66,32 @@ void sound_mgr_init(void)
         pitchSweep[i] = 0;
     }
     matchCrowd = FALSE;
-    crowdBedTimer = 0;
-    chantTimer = 0;
+    ambienceState = 0;
+    ambienceTimer = 0;
+}
+
+static void play_ambience(void)
+{
+    const u8 *data = CROWD_NORMAL_01;
+    u32 len = sizeof(CROWD_NORMAL_01);
+
+    if (ambienceState == 1)
+    {
+        data = CROWD_NORMAL_02;
+        len = sizeof(CROWD_NORMAL_02);
+    }
+    else if (ambienceState == 2)
+    {
+        data = CROWD_CHANT;
+        len = sizeof(CROWD_CHANT);
+    }
+    else if (ambienceState == 3)
+    {
+        data = CROWD_NORMAL_03;
+        len = sizeof(CROWD_NORMAL_03);
+    }
+
+    SND_PCM4_startPlay(data, len, PCM_CH_AMBIENCE, TRUE);
 }
 
 void sound_mgr_setMatchCrowd(bool enabled)
@@ -111,15 +101,15 @@ void sound_mgr_setMatchCrowd(bool enabled)
 
     if (enabled)
     {
-        crowdBedTimer = 0;
-        chantTimer = real_frames((u16)(390 + (random() & 255)));
+        ambienceState = 0;
+        play_ambience();
+        ambienceTimer = real_frames(900); /* 15 seconds */
     }
     else
     {
-        XGM_stopPlayPCM(PCM_CH_BED);
-        XGM_stopPlayPCM(PCM_CH_CHANT);
-        crowdBedTimer = 0;
-        chantTimer = 0;
+        SND_PCM4_stopPlay(PCM_CH_AMBIENCE);
+        ambienceState = 0;
+        ambienceTimer = 0;
     }
 }
 
@@ -132,22 +122,16 @@ static void update_stadium(void)
 {
     if (!matchCrowd) return;
 
-    /* Retrigger just before the authored bed ends, giving a continuous broad
-     * wash with no silent seam.  Replacing the same low-priority channel is
-     * safe even if PAL/NTSC frame timing differs slightly. */
-    if (crowdBedTimer == 0)
+    if (ambienceTimer == 0)
     {
-        play_pcm(PCM_ID_CROWD_BED, 1, PCM_CH_BED);
-        crowdBedTimer = real_frames(64);
+        ambienceState = (ambienceState + 1) % 4;
+        play_ambience();
+        ambienceTimer = real_frames(900); /* 15 seconds */
     }
-    else crowdBedTimer--;
-
-    if (chantTimer == 0)
+    else
     {
-        play_pcm(PCM_ID_CROWD_CHANT, 3, PCM_CH_CHANT);
-        chantTimer = real_frames((u16)(420 + (random() & 255)));
+        ambienceTimer--;
     }
-    else chantTimer--;
 }
 
 void sound_mgr_update(void)
@@ -182,13 +166,14 @@ void sound_mgr_update(void)
 
 void sound_mgr_blip(void)
 {
-    /* Tight broadcast-console tick: quick enough not to smear while cycling
-     * rapidly through teams. */
+    /* Tight broadcast-console tick + new move swipe */
+    SND_PCM4_startPlay(SFX_MENU_MOVE, sizeof(SFX_MENU_MOVE), PCM_CH_ACTION, FALSE);
     sound_mgr_play_swept(SFX_CH_UI, 1320, 5, 1, 110);
 }
 
 void sound_mgr_confirm(void)
 {
+    SND_PCM4_startPlay(SFX_MENU_SELECT, sizeof(SFX_MENU_SELECT), PCM_CH_ACTION, FALSE);
     sound_mgr_play_swept(SFX_CH_UI, 988, 2, 2, 34);
     sound_mgr_play_swept(SFX_CH_SCORE, 1480, 3, 2, 22);
 }
@@ -200,32 +185,31 @@ void sound_mgr_cancel(void)
 
 void sound_mgr_throw(void)
 {
-    play_pcm(PCM_ID_THROW, 5, PCM_CH_ACTION);
-    play_pcm(PCM_ID_CROWD_THROW, 4, PCM_CH_REACTION);
+    SND_PCM4_startPlay(SFX_THROW, sizeof(SFX_THROW), PCM_CH_ACTION, FALSE);
     sound_mgr_play_swept(SFX_CH_ACTION, varied_frequency(430), 3, 4, 65);
 }
 
 void sound_mgr_pickup(void)
 {
-    play_pcm(PCM_ID_PICKUP, 4, PCM_CH_ACTION);
+    SND_PCM4_startPlay(SFX_PICKUP, sizeof(SFX_PICKUP), PCM_CH_ACTION, FALSE);
     sound_mgr_play_swept(SFX_CH_ACTION, 860, 4, 3, 74);
 }
 
 void sound_mgr_hit(void)
 {
-    play_pcm(PCM_ID_HIT, 10, PCM_CH_ACTION);
+    SND_PCM4_startPlay(SFX_HIT, sizeof(SFX_HIT), PCM_CH_ACTION, FALSE);
     sound_mgr_play_swept(SFX_CH_ACTION, varied_frequency(205), 2, 7, -13);
 }
 
 void sound_mgr_bounce(void)
 {
-    play_pcm(PCM_ID_BOUNCE, 3, PCM_CH_ACTION);
+    SND_PCM4_startPlay(SFX_BOUNCE, sizeof(SFX_BOUNCE), PCM_CH_ACTION, FALSE);
     sound_mgr_play_swept(SFX_CH_ACTION, varied_frequency(345), 5, 3, -31);
 }
 
 void sound_mgr_whistle(void)
 {
-    play_pcm(PCM_ID_WHISTLE, 12, PCM_CH_ACTION);
+    SND_PCM4_startPlay(SFX_WHISTLE, sizeof(SFX_WHISTLE), PCM_CH_ACTION, FALSE);
 }
 
 void sound_mgr_score(void)
@@ -236,19 +220,18 @@ void sound_mgr_score(void)
 
 void sound_mgr_crowdKnockout(void)
 {
-    play_pcm(PCM_ID_CROWD_ELIMINATION, 8, PCM_CH_REACTION);
+    SND_PCM4_startPlay(CROWD_GOAL, sizeof(CROWD_GOAL), PCM_CH_EVENT, FALSE);
 }
 
 void sound_mgr_crowdVictory(void)
 {
-    play_pcm(PCM_ID_CROWD_ROUND, 12, PCM_CH_REACTION);
+    SND_PCM4_startPlay(CROWD_MATCH_WIN, sizeof(CROWD_MATCH_WIN), PCM_CH_EVENT, FALSE);
 }
 
 void sound_mgr_crowdGameOver(void)
 {
     /* The final roar is authored longest and has absolute reaction priority.
      * The quiet bed is stopped so the climax retains headroom. */
-    XGM_stopPlayPCM(PCM_CH_BED);
-    XGM_stopPlayPCM(PCM_CH_CHANT);
-    play_pcm(PCM_ID_CROWD_GAMEOVER, 15, PCM_CH_REACTION);
+    SND_PCM4_stopPlay(PCM_CH_AMBIENCE);
+    SND_PCM4_startPlay(CROWD_WORLD_CUP_WIN, sizeof(CROWD_WORLD_CUP_WIN), PCM_CH_EVENT, FALSE);
 }

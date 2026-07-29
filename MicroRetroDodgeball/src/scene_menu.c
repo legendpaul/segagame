@@ -494,3 +494,8 @@ void scene_menu_update(void)
     }
 
 }
+
+u8 scene_menu_get_phase(void)
+{
+    return (u8)phase;
+}
