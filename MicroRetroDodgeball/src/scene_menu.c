@@ -107,21 +107,26 @@ static void page_set(u8 v)
 /* Running summary of every choice, always visible at the foot of the page. */
 static void draw_setup_summary(void)
 {
-    VDP_clearTileMapRect(BG_A, 1, 22, 38, 1);
+    /* An unconfirmed choice shows NOTHING at all - no label, no value. Both
+     * lines are cleared and rewritten together, so the heading only ever
+     * appears once its value has actually been picked. */
+    VDP_clearTileMapRect(BG_A, 1, 21, 38, 2);
+
     if (setupConfirmed & 1)
+    {
+        ui_draw_text("MODE", 2, 21, UI_CYAN);
         ui_draw_text(MODE_OPTS[gGameMode], 2, 22, UI_WHITE);
-    else
-        ui_draw_text("[EMPTY]", 2, 22, UI_CYAN);
-
+    }
     if (setupConfirmed & 2)
+    {
+        ui_draw_text("PLAYERS", 15, 21, UI_CYAN);
         ui_draw_text(PLAYER_OPTS[gPlayerMode], 15, 22, UI_WHITE);
-    else
-        ui_draw_text("[EMPTY]", 15, 22, UI_CYAN);
-
+    }
     if (setupConfirmed & 4)
+    {
+        ui_draw_text("LEVEL", 32, 21, UI_CYAN);
         ui_draw_text(DIFF_OPTS[gDifficulty], 32, 22, UI_WHITE);
-    else
-        ui_draw_text("[EMPTY]", 32, 22, UI_CYAN);
+    }
 }
 
 /* The chosen option is drawn in the DOUBLE-HEIGHT font in gold; the others use
@@ -184,11 +189,9 @@ static void draw_mode(void)
 
     ui_draw_panel(2, 8, 36, 12, FALSE);
 
-    /* Summary strip: every choice made so far, always on screen. */
+    /* Summary strip: only the choices already confirmed appear here - the
+     * headings are drawn by draw_setup_summary() alongside their values. */
     ui_draw_panel(0, 20, 40, 4, FALSE);
-    ui_draw_text("MODE", 2, 21, UI_CYAN);
-    ui_draw_text("PLAYERS", 15, 21, UI_CYAN);
-    ui_draw_text("LEVEL", 32, 21, UI_CYAN);
 
     ui_draw_button(setupPage == (SETUP_ROWS - 1) ? "A START" : "A NEXT",
                    5, 25, 13);
