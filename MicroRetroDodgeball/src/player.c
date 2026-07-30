@@ -88,6 +88,11 @@ void player_restore(Player *p)
 
 void player_moveHuman(Player *p, bool hasBall)
 {
+    player_moveHumanPad(p, hasBall, 0);
+}
+
+void player_moveHumanPad(Player *p, bool hasBall, u8 pad)
+{
     s16 oldX = p->x;
 
     /* A celebration is a committed action, just like a throw or fall. Keep
@@ -123,10 +128,10 @@ void player_moveHuman(Player *p, bool hasBall)
          * frame and y by 1 every other frame (= 4:1 over two frames), while
          * up/down moves y by 2 three frames in four and 1 on the fourth
          * (= 7 per 4 frames against x's 4). Average direction is exact. */
-        if (input_held(BUTTON_LEFT))  { p->x -= 2; if (movePhase & 1) p->y -= 1; }
-        if (input_held(BUTTON_RIGHT)) { p->x += 2; if (movePhase & 1) p->y += 1; }
-        if (input_held(BUTTON_UP))    { p->x += 1; p->y -= ((movePhase & 3) ? 2 : 1); }
-        if (input_held(BUTTON_DOWN))  { p->x -= 1; p->y += ((movePhase & 3) ? 2 : 1); }
+        if (input_held_p(pad, BUTTON_LEFT))  { p->x -= 2; if (movePhase & 1) p->y -= 1; }
+        if (input_held_p(pad, BUTTON_RIGHT)) { p->x += 2; if (movePhase & 1) p->y += 1; }
+        if (input_held_p(pad, BUTTON_UP))    { p->x += 1; p->y -= ((movePhase & 3) ? 2 : 1); }
+        if (input_held_p(pad, BUTTON_DOWN))  { p->x -= 1; p->y += ((movePhase & 3) ? 2 : 1); }
         movePhase++;
     }
 

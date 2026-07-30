@@ -92,6 +92,14 @@ static u16 announceTimer;
 static u16 matchSeconds;
 static u8  clockFrameCounter;
 static u16 aiDelay;
+/* Which team B player pad 2 is driving in 2 PLAYER VS. Team B is otherwise
+ * CPU-run, so this is only meaningful while human_b() is true. */
+static u8  activeB;
+/* TRUE when the far side is a second human rather than the AI. */
+static bool human_b(void)
+{
+    return gPlayerMode == PLAYERS_2P_VS;
+}
 static bool aiCarrierRepositions;
 static s8  aiCarrierOffset;
 static u8  aiCarrierMoveFloor; /* minimum visible movement before an armed CPU throws */
@@ -1045,6 +1053,7 @@ static void start_round(void)
 
     wander_init();   /* independent per-player off-ball movement */
     activeA = 0;
+    activeB = 0;
 
     draw_hud();
     begin_announce();
@@ -1570,6 +1579,16 @@ void scene_match_update(void)
     if (activeA_can_move())
         player_moveHuman(&teamA[activeA], activeA_has_ball());
 
+    /* Player 2 keeps a valid team B player: START cycles to the next one still
+     * in, and an eliminated selection is handed on automatically. */
+    if (human_b())
+    {
+        if (teamB[activeB].eliminated || teamB[activeB].exiting)
+            activeB = first_in_play_from(teamB, (u8)(activeB + 1));
+        if (input_pressed_p(1, BUTTON_START))
+            activeB = first_in_play_from(teamB, (u8)(activeB + 1));
+    }
+
     /* Watchdog: force whatever this state is waiting on to complete if
      * it's gone on far longer than any real delay ever should. */
     if (!stallTrackerInit) { stallTrackerInit = TRUE; lastState = state; stallCounter = 0; }
@@ -1669,6 +1688,26 @@ void scene_match_update(void)
         case MS_B_HOLD:
         {
             place_ball_in_hand(&teamB[holderB], FALSE);
+            if (human_b())
+            {
+                /* Player 2 carries and throws exactly like player 1 does: move
+                 * freely, then A/B/C picks one of the three target lanes. */
+                player_moveHumanPad(&teamB[holderB], TRUE, 1);
+                place_ball_in_hand(&teamB[holderB], FALSE);
+                if (input_pressed_p(1, BUTTON_A) || input_pressed_p(1, BUTTON_B) ||
+                    input_pressed_p(1, BUTTON_C))
+                {
+                    u8 lane = input_pressed_p(1, BUTTON_A) ? 0 :
+                              input_pressed_p(1, BUTTON_B) ? 1 : 2;
+                    pendingSpin = input_held_p(1, BUTTON_LEFT) ? -1 :
+                                  input_held_p(1, BUTTON_RIGHT) ? 1 : 0;
+                    fixed_back_target(FALSE, lane, &pendingTargetX, &pendingTargetY);
+                    player_setPose(&teamB[holderB], POSE_THROW, 18);
+                    windupTimer = 8;
+                    state = MS_B_WINDUP;
+                }
+                break;
+            }
             if (aiDelay > 0 || aiCarrierMoveFloor > 0)
             {
                 /* Most armed CPU possessions reposition toward a useful lane;
@@ -1744,9 +1783,18 @@ void scene_match_update(void)
         case MS_LOOSE_B:
         {
             update_loose_ball();
+            if (human_b())
+            {
+                /* Player 2 chases the loose ball themselves - no AI reaction
+                 * delay, and the nearest team B player is theirs to steer. */
+                aiLooseReact = 0;
+                holderB = activeB;
+                cpuMoved = TRUE;
+                player_moveHumanPad(&teamB[holderB], FALSE, 1);
+            }
             /* Hesitate for the difficulty-scaled reaction window before the CPU
              * commits to the ball, so EASY gives the human a real head start. */
-            if (aiLooseReact > 0) aiLooseReact--;
+            else if (aiLooseReact > 0) aiLooseReact--;
             else
             {
                 /* Reassign every frame as the rebound rolls: this is the same

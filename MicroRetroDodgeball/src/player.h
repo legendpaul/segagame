@@ -66,6 +66,8 @@ void player_restore(Player *p);
 /* hasBall slows movement (see player.c) so the carrier reads as
  * slightly more vulnerable/committed than an off-ball defender. */
 void player_moveHuman(Player *p, bool hasBall);
+/* Same, but driven by a specific pad: 0 = player 1, 1 = player 2. */
+void player_moveHumanPad(Player *p, bool hasBall, u8 pad);
 /* Keeps a player inside their half of the projected isometric court. */
 void player_clampToCourt(Player *p);
 /* Advances all action animation and, once any transient pose has timed
