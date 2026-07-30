@@ -1662,6 +1662,17 @@ void scene_match_update(void)
     if (activeA_can_move())
         player_moveHuman(&teamA[activeA], activeA_has_ball());
 
+    /* Control follows the ball: whoever on player 2's side ends up holding it
+     * becomes their controlled man, exactly as player 1's selection jumps to
+     * their own carrier. Without this they were left steering an empty-handed
+     * team mate while a different one stood there with the ball. */
+    if (human_b() && (state == MS_B_HOLD || state == MS_B_WINDUP) &&
+        !teamB[holderB].eliminated)
+        activeB = holderB;
+    if (team_share() && (state == MS_A_HOLD || state == MS_A_WINDUP) &&
+        holderA != activeA && !teamA[holderA].eliminated)
+        activeA2 = holderA;   /* player 1 keeps his own; else P2 takes the carrier */
+
     /* 2 PLAYER VS: player 2's man moves on input EVERY frame, exactly like
      * player 1's - previously they could only be steered while holding the
      * ball or chasing a loose one, which made the far side look CPU-run. */

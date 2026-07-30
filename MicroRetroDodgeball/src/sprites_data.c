@@ -489,6 +489,8 @@ static void build_pulsed_ring(const u32 source[6][8], u32 output[6][8],
     }
 }
 
+static u16 altRingBase = 0;
+
 void sprites_data_load_alt_rings(u16 base)
 {
     /* Player 2 needs rings that can never be mistaken for player 1's. The ring
@@ -496,28 +498,58 @@ void sprites_data_load_alt_rings(u16 base)
      * 5 red) - so two extra banks are produced by remapping that one nibble to
      * unused PAL_BALL entries: 9 (blue) when free, 12 (pale blue) when
      * carrying. Four rings, four clearly different colours. */
-    u32 blue[6][8], pale[6][8];
+    altRingBase = base;
+    /* PAL_BALL index 7 is unused by the ball art - make it PINK for player 2's
+     * carrying ring. (The referee escort briefly borrows 7/15 for skin tones,
+     * so the ring takes the referee's colour for those few seconds.) */
+    PAL_setColor(PAL_BALL * 16 + 7, RGB24_TO_VDPCOLOR(0xF870C0));
+    sprites_data_update_alt_rings(0);
+}
+
+/* Rebuild player 2's rings at the given pulse phase. Player 1's pair is
+ * animated by sprites_data_set_ring_pulse(); this keeps player 2's in step so
+ * both markers breathe together instead of only one. */
+void sprites_data_update_alt_rings(u8 phase)
+{
+    static u32 srcFree[6][8], srcBall[6][8];
+    u32 out[6][8];
     u8 t, r, n;
+    if (!altRingBase) return;
+
+    build_pulsed_ring(tile_ring_yellow, srcFree, 4, phase);
+    build_pulsed_ring(tile_ring_red, srcBall, 5, phase);
+
+    /* Remap the fill nibble onto player 2's own colours: 9 = blue when free,
+     * 7 = pink when carrying. */
     for (t = 0; t < 6; t++)
         for (r = 0; r < 8; r++)
         {
-            u32 sy = tile_ring_yellow[t][r], sr = tile_ring_red[t][r];
-            u32 ob = 0, op = 0;
+            u32 s = srcFree[t][r], o = 0;
             for (n = 0; n < 8; n++)
             {
-                u8 shift = (u8)(28 - 4 * n);
-                u8 vy = (u8)((sy >> shift) & 0xF);
-                u8 vr = (u8)((sr >> shift) & 0xF);
-                if (vy == 4) vy = 9;
-                if (vr == 5) vr = 12;
-                ob |= (u32)vy << shift;
-                op |= (u32)vr << shift;
+                u8 sh = (u8)(28 - 4 * n);
+                u8 v = (u8)((s >> sh) & 0xF);
+                if (v == 4) v = 9;
+                o |= (u32)v << sh;
             }
-            blue[t][r] = ob;
-            pale[t][r] = op;
+            out[t][r] = o;
         }
-    VDP_loadTileData(blue[0], base, 6, DMA);
-    VDP_loadTileData(pale[0], (u16)(base + 6), 6, DMA);
+    VDP_loadTileData(out[0], altRingBase, 6, DMA);
+
+    for (t = 0; t < 6; t++)
+        for (r = 0; r < 8; r++)
+        {
+            u32 s = srcBall[t][r], o = 0;
+            for (n = 0; n < 8; n++)
+            {
+                u8 sh = (u8)(28 - 4 * n);
+                u8 v = (u8)((s >> sh) & 0xF);
+                if (v == 5) v = 7;
+                o |= (u32)v << sh;
+            }
+            out[t][r] = o;
+        }
+    VDP_loadTileData(out[0], (u16)(altRingBase + 6), 6, DMA);
 }
 
 void sprites_data_set_ring_pulse(u8 phase, bool eliminator)
@@ -535,6 +567,8 @@ void sprites_data_set_ring_pulse(u8 phase, bool eliminator)
     {
         VDP_loadTileData(yellow[0], TILE_RING_YELLOW, 6, DMA);
         VDP_loadTileData(red[0], TILE_RING_RED, 6, DMA);
+        /* Keep player 2's pair breathing in step with player 1's. */
+        sprites_data_update_alt_rings(phase);
         return;
     }
 

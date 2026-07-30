@@ -157,6 +157,8 @@ void sprites_data_kit_ramp(u8 teamIndex, u16 *out);
 /* Build player 2's two control rings (free / carrying) into 12 tiles at base,
  * recoloured so they can never be confused with player 1's pair. */
 void sprites_data_load_alt_rings(u16 base);
+/* Re-render player 2's rings at a pulse phase so both markers breathe alike. */
+void sprites_data_update_alt_rings(u8 phase);
 
 /* Parks every gameplay sprite slot off-screen with a terminating link chain,
  * so stale match sprites (players/ball/shadows) can't bleed onto a
