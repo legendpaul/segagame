@@ -567,10 +567,22 @@ void scene_menu_update(void)
     else if (input_pressed(BUTTON_A) || input_pressed(BUTTON_START))
     {
         sound_mgr_confirm();
-        if (phase == MENU_TEAM_A && gGameMode == MODE_ELIMINATOR)
+        if (phase == MENU_TEAM_A && gGameMode == MODE_ELIMINATOR &&
+            TWO_PLAYERS())
         {
-            /* Free-for-all: every nation is already in, so there is no second
-             * team to choose - straight onto the court. */
+            /* Free-for-all with two humans: player 2 picks their nation too. */
+            gPlayer2Team = (u8)((gTeamAIndex + 1) % NUM_TEAMS);
+            gTeamBIndex = gPlayer2Team;
+            screen_transition_fade_out();
+            enter_selector(MENU_TEAM_B);
+            screen_transition_fade_in();
+            return;
+        }
+        if (gGameMode == MODE_ELIMINATOR)
+        {
+            /* Every other nation is already in, so there is nothing else to
+             * choose - straight onto the court. */
+            gPlayer2Team = (phase == MENU_TEAM_B) ? gTeamBIndex : NO_TEAM;
             screen_transition_fade_out();
             gCurrentScene = GS_ELIMINATOR;
             return;

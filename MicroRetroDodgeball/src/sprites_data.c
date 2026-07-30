@@ -600,6 +600,34 @@ void sprites_data_set_ring_pulse(u8 phase, bool eliminator)
     }
     VDP_loadTileData(convertedYellow[0], TILE_ELIM_RING_YELLOW, 6, CPU);
     VDP_loadTileData(convertedRed[0], TILE_ELIM_RING_RED, 6, CPU);
+
+    /* Player 2's pair, from the SAME pulsed source so both humans' rings
+     * breathe together: blue (11) when free, pink (9 is taken by red here, so
+     * use the court's white 1) when carrying - neither can be confused with
+     * player 1's gold/red. */
+    for (tile = 0; tile < 6; tile++)
+    {
+        for (row = 0; row < 8; row++)
+        {
+            u32 inYellow = yellow[tile][row];
+            u32 inRed = red[tile][row];
+            u32 outBlue = 0, outPink = 0;
+            for (pixel = 0; pixel < 8; pixel++)
+            {
+                u8 shift = (u8)(28 - 4 * pixel);
+                u8 yc = (u8)((inYellow >> shift) & 0xF);
+                u8 rc = (u8)((inRed >> shift) & 0xF);
+                u8 mb = yc == 0 ? 0 : yc == 4 ? 11 : 14;
+                u8 mp = rc == 0 ? 0 : rc == 5 ? 1  : 14;
+                outBlue |= (u32)mb << shift;
+                outPink |= (u32)mp << shift;
+            }
+            convertedYellow[tile][row] = outBlue;
+            convertedRed[tile][row] = outPink;
+        }
+    }
+    VDP_loadTileData(convertedYellow[0], TILE_ELIM_RING_BLUE, 6, CPU);
+    VDP_loadTileData(convertedRed[0], TILE_ELIM_RING_PINK, 6, CPU);
 }
 
 void sprites_data_apply_eliminator_teams(void)

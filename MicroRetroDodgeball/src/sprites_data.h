@@ -142,6 +142,10 @@ void sprites_data_load_referee_art(u16 frontStandDestination,
 #define TILE_ELIM_BALL16_FRAME_0  (TILE_ELIM_EFFECT_BASE + 2)
 #define TILE_ELIM_RING_YELLOW     (TILE_ELIM_EFFECT_BASE + 18)
 #define TILE_ELIM_RING_RED        (TILE_ELIM_EFFECT_BASE + 24)
+/* Player 2's pair in a two-player free-for-all, so the two humans are never
+ * marked by the same colour. Generated alongside the first pair. */
+#define TILE_ELIM_RING_BLUE       (TILE_ELIM_EFFECT_BASE + 30)
+#define TILE_ELIM_RING_PINK       (TILE_ELIM_EFFECT_BASE + 36)
 
 /* Briefly whites-out a team's kit-ramp colors for an impact flash.
  * Only 4 palette lines exist total (PAL0 court/font, PAL1/PAL2 teams,

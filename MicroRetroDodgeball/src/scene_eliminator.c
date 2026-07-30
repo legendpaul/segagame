@@ -78,6 +78,14 @@ static u16     ballLock[ELIM_BALLS];
 #define PLAYER_BUFFER_Y  12
 #define PLAYER_BOUNCE     2
 static u8      humanIdx;
+/* Fighter slots the humans occupy: player 1 is always slot 0, player 2 slot 1
+ * in a two-player game. */
+#define HUMAN2_IDX 1
+static u8 human_index(u8 pad) { return pad ? HUMAN2_IDX : humanIdx; }
+static bool is_human(u8 idx)
+{
+    return (idx == humanIdx) || (TWO_PLAYERS() && idx == HUMAN2_IDX);
+}
 static u8      aliveCount;
 static u16     endTimer;
 static u8      result;        /* 0 playing, 1 winner, 2 draw, 3 clearing pitch */
@@ -313,6 +321,8 @@ void scene_eliminator_enter(void)
         s16 y = COURT_Y_AT_DEPTH_X(depth, x);
 
         fighters[i].team = (i == humanIdx) ? gTeamAIndex
+                         : (TWO_PLAYERS() && i == HUMAN2_IDX && gPlayer2Team != NO_TEAM)
+                           ? gPlayer2Team
                          : (u8)((gTeamAIndex + i) % NUM_TEAMS);
         fighters[i].out  = FALSE;
         fighters[i].ball = NO_BALL;
@@ -665,36 +675,45 @@ void scene_eliminator_update(void)
     {
         for (i = 0; i < ELIM_PLAYERS; i++) fighters[i].moving = FALSE;
 
-        /* --- human --- */
-        Fighter *me = &fighters[humanIdx];
-        if (!me->out)
+        /* --- humans --- one pad each; player 2 only exists in a 2 player game */
         {
-            player_moveHuman(&me->p, me->ball != NO_BALL);
-            /* Animate from intent, as normal match play does. A carrier only
-             * advances every other frame and court edges can clamp movement;
-             * neither should make held directional input look frozen. */
-            me->moving = input_held(BUTTON_LEFT) || input_held(BUTTON_RIGHT) ||
-                         input_held(BUTTON_UP) || input_held(BUTTON_DOWN);
-            if (input_held(BUTTON_UP)) face_vertical(me, TRUE);
-            else if (input_held(BUTTON_DOWN)) face_vertical(me, FALSE);
-            if (me->ball != NO_BALL)
+            u8 h;
+            for (h = 0; h < (TWO_PLAYERS() ? 2 : 1); h++)
             {
-                hold_ball_in_hand(me);
-                if (input_pressed(BUTTON_A) || input_pressed(BUTTON_B) ||
-                    input_pressed(BUTTON_C))
+                u8 idx = human_index(h);
+                Fighter *me = &fighters[idx];
+                if (me->out) continue;
+
+                player_moveHumanPad(&me->p, me->ball != NO_BALL, h);
+                /* Animate from intent, as normal match play does. A carrier
+                 * only advances every other frame and court edges can clamp
+                 * movement; neither should make held input look frozen. */
+                me->moving = input_held_p(h, BUTTON_LEFT) ||
+                             input_held_p(h, BUTTON_RIGHT) ||
+                             input_held_p(h, BUTTON_UP) ||
+                             input_held_p(h, BUTTON_DOWN);
+                if (input_held_p(h, BUTTON_UP)) face_vertical(me, TRUE);
+                else if (input_held_p(h, BUTTON_DOWN)) face_vertical(me, FALSE);
+                if (me->ball != NO_BALL)
                 {
-                    u8 lane = input_pressed(BUTTON_A) ? 0 :
-                              input_pressed(BUTTON_B) ? 1 : 2;
-                    s16 tx, ty;
-                    fixed_throw_target(!me->p.farSide, lane, &tx, &ty);
-                    throw_ball(humanIdx, tx, ty, !me->p.farSide);
+                    hold_ball_in_hand(me);
+                    if (input_pressed_p(h, BUTTON_A) ||
+                        input_pressed_p(h, BUTTON_B) ||
+                        input_pressed_p(h, BUTTON_C))
+                    {
+                        u8 lane = input_pressed_p(h, BUTTON_A) ? 0 :
+                                  input_pressed_p(h, BUTTON_B) ? 1 : 2;
+                        s16 tx, ty;
+                        fixed_throw_target(!me->p.farSide, lane, &tx, &ty);
+                        throw_ball(idx, tx, ty, !me->p.farSide);
+                    }
                 }
             }
         }
 
-        /* --- CPU --- */
+        /* --- CPU --- everyone who is not a human */
         for (i = 0; i < ELIM_PLAYERS; i++)
-            if (i != humanIdx && !fighters[i].out) update_ai(i);
+            if (!is_human(i) && !fighters[i].out) update_ai(i);
 
         separate_fighters();
         /* Separation happens after movement, so refresh every carried ball's
@@ -919,6 +938,22 @@ void scene_eliminator_update(void)
         VDP_setSpriteFull(SLOT_MARKER, -32, -32, SPRITE_SIZE(1, 1),
                           TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE,
                                          TILE_BALL_SHADOW), 0);
+
+    /* Player 2 gets their own ring in their own colours, so neither human can
+     * lose track of which body is theirs in a ten-way scrap. */
+    if (TWO_PLAYERS())
+    {
+        Fighter *p2 = &fighters[HUMAN2_IDX];
+        bool show = !p2->out;
+        VDP_setSpriteFull(SLOT_MARKER + 1,
+                          show ? (s16)(p2->p.x - 4) : (s16)-32,
+                          show ? (s16)(p2->p.y + 8) : (s16)-32,
+                          SPRITE_SIZE(3, 2),
+                          TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
+                                         p2->ball == NO_BALL
+                                             ? TILE_ELIM_RING_BLUE
+                                             : TILE_ELIM_RING_PINK), 0);
+    }
 
     if (++hudTick >= 30) { hudTick = 0; if (result == 0) draw_hud(); }
 }
