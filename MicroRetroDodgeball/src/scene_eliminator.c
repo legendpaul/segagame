@@ -927,17 +927,23 @@ void scene_eliminator_update(void)
     if ((markerPulseTick & 15) == 0)
         sprites_data_set_ring_pulse((u8)((markerPulseTick >> 4) & 3), TRUE);
     markerPulseTick++;
-    if (!fighters[humanIdx].out)
-        VDP_setSpriteFull(SLOT_MARKER, fighters[humanIdx].p.x - 4,
-                          fighters[humanIdx].p.y + 8, SPRITE_SIZE(3, 2),
-                          TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
-                                         fighters[humanIdx].ball == NO_BALL
-                                             ? TILE_ELIM_RING_YELLOW
-                                             : TILE_ELIM_RING_RED), 0);
-    else
-        VDP_setSpriteFull(SLOT_MARKER, -32, -32, SPRITE_SIZE(1, 1),
-                          TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE,
-                                         TILE_BALL_SHADOW), 0);
+    /* With two humans the chain must CARRY ON to player 2's ring - terminating
+     * here left their marker unreachable and therefore invisible. */
+    {
+        u8 markerLink = TWO_PLAYERS() ? (u8)(SLOT_MARKER + 1) : 0;
+        if (!fighters[humanIdx].out)
+            VDP_setSpriteFull(SLOT_MARKER, fighters[humanIdx].p.x - 4,
+                              fighters[humanIdx].p.y + 8, SPRITE_SIZE(3, 2),
+                              TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE,
+                                             fighters[humanIdx].ball == NO_BALL
+                                                 ? TILE_ELIM_RING_YELLOW
+                                                 : TILE_ELIM_RING_RED),
+                              markerLink);
+        else
+            VDP_setSpriteFull(SLOT_MARKER, -32, -32, SPRITE_SIZE(1, 1),
+                              TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE,
+                                             TILE_BALL_SHADOW), markerLink);
+    }
 
     /* Player 2 gets their own ring in their own colours, so neither human can
      * lose track of which body is theirs in a ten-way scrap. */
