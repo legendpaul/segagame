@@ -62,6 +62,7 @@ static const u32 tile_ball_tether[8] = {
  * depth-sorted slots 0..14. Only ground underlays remain behind that list. */
 #define SLOT_BALL_SHADOW 15
 #define SLOT_MARKER      16
+#define SLOT_MARKER2     17   /* player 2's ring in shared-team play */
 
 typedef enum {
     MS_ANNOUNCE = 0,
@@ -100,6 +101,17 @@ static bool human_b(void)
 {
     return gPlayerMode == PLAYERS_2P_VS;
 }
+
+/* TRUE when both humans share the NEAR side, a player each. */
+static bool team_share(void)
+{
+    return gPlayerMode == PLAYERS_2P_TEAM;
+}
+
+/* Player 2's man on the shared near side. */
+static u8 activeA2;
+static u8 count_in_play(Player team[]);
+static u8 first_in_play_from(Player team[], u8 start);
 static bool aiCarrierRepositions;
 static s8  aiCarrierOffset;
 static u8  aiCarrierMoveFloor; /* minimum visible movement before an armed CPU throws */
@@ -227,6 +239,11 @@ static bool control_candidate(u8 index)
     if (p->eliminated || p->exiting) return FALSE;
     if (state == MS_HIT_A && index == responderA) return FALSE;
     if (state == MS_ESCORT && escortIsA && index == escortIdx) return FALSE;
+    /* In shared-team play the two humans can never grab the same body: player
+     * 2's man is off limits to player 1's switching. The exception is the last
+     * survivor, who has to remain selectable by whoever already holds him. */
+    if (team_share() && index == activeA2 && count_in_play(teamA) > 1)
+        return FALSE;
     return TRUE;
 }
 
@@ -331,17 +348,38 @@ static void draw_control_marker(void)
     if ((markerPulseTick & 15) == 0)
         sprites_data_set_ring_pulse((u8)((markerPulseTick >> 4) & 3), FALSE);
     markerPulseTick++;
-    if (!control_candidate(activeA))
+    /* In shared-team play the chain carries on to player 2's own ring. */
+    u8 link = team_share() ? SLOT_MARKER2 : 0;
+    if (!control_candidate(activeA) && !(team_share() && activeA == activeA2))
     {
         VDP_setSpriteFull(SLOT_MARKER, -24, -24, SPRITE_SIZE(3, 2),
                            TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, markerTile),
-                           0);
-        return;
+                           link);
     }
-    /* A 24px open ellipse stays readable without covering the runner's feet. */
-    VDP_setSpriteFull(SLOT_MARKER, p->x - 4, p->y + 8 + worldOffsetY, SPRITE_SIZE(3, 2),
-                       TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, markerTile),
-                       0);
+    else
+    {
+        /* A 24px open ellipse stays readable without covering the feet. */
+        VDP_setSpriteFull(SLOT_MARKER, p->x - 4, p->y + 8 + worldOffsetY,
+                           SPRITE_SIZE(3, 2),
+                           TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, markerTile),
+                           link);
+    }
+
+    /* Player 2's man wears a DIFFERENT coloured ring so the two humans can
+     * always tell their own player apart at a glance. */
+    if (team_share())
+    {
+        Player *q = &teamA[activeA2];
+        bool p2Ball = (holderA == activeA2) &&
+                      (state == MS_A_HOLD || state == MS_A_WINDUP);
+        bool show = (activeA2 != activeA) && !q->eliminated && !q->exiting;
+        u16 tile2 = p2Ball ? TILE_RING_YELLOW : TILE_RING_RED;
+        VDP_setSpriteFull(SLOT_MARKER2,
+                           show ? (s16)(q->x - 4) : (s16)-24,
+                           show ? (s16)(q->y + 8 + worldOffsetY) : (s16)-24,
+                           SPRITE_SIZE(3, 2),
+                           TILE_ATTR_FULL(PAL_BALL, 0, FALSE, FALSE, tile2), 0);
+    }
 }
 
 /* The six ex-player-shadow slots now draw a dotted white line from the ball's
@@ -1054,6 +1092,7 @@ static void start_round(void)
     wander_init();   /* independent per-player off-ball movement */
     activeA = 0;
     activeB = 0;
+    activeA2 = (TEAM_SIZE > 1) ? 1 : 0;   /* the two humans start on different men */
 
     draw_hud();
     begin_announce();
@@ -1578,6 +1617,23 @@ void scene_match_update(void)
      * you reposition a teammate while another exchange is in flight. */
     if (activeA_can_move())
         player_moveHuman(&teamA[activeA], activeA_has_ball());
+
+    /* Shared-team play: player 2 steers their own man on the near side. When
+     * only one team mate is left, whoever already had him keeps him and the
+     * other pad simply has nobody to move. */
+    if (team_share())
+    {
+        if (teamA[activeA2].eliminated || teamA[activeA2].exiting)
+        {
+            u8 next = first_in_play_from(teamA, (u8)(activeA2 + 1));
+            /* Never take over player 1's man unless he is the last one left. */
+            if (next != activeA || count_in_play(teamA) <= 1) activeA2 = next;
+        }
+        if (activeA2 != activeA && !teamA[activeA2].eliminated &&
+            state != MS_A_WINDUP && state != MS_HIT_A && state != MS_HIT_B &&
+            state != MS_ROUND_END && state != MS_ESCORT)
+            player_moveHumanPad(&teamA[activeA2], holderA == activeA2, 1);
+    }
 
     /* Player 2 keeps a valid team B player: START cycles to the next one still
      * in, and an eliminated selection is handed on automatically. */
