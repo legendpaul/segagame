@@ -154,6 +154,9 @@ void sprites_data_flash_team(u8 palLine);
 /* Writes the 3-shade kit ramp (light, mid, dark) for a team into out[0..2]
  * as VDP colour words. Used by the matchup screen's recolourable figures. */
 void sprites_data_kit_ramp(u8 teamIndex, u16 *out);
+/* Build player 2's two control rings (free / carrying) into 12 tiles at base,
+ * recoloured so they can never be confused with player 1's pair. */
+void sprites_data_load_alt_rings(u16 base);
 
 /* Parks every gameplay sprite slot off-screen with a terminating link chain,
  * so stale match sprites (players/ball/shadows) can't bleed onto a

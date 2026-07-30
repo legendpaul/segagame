@@ -489,6 +489,37 @@ static void build_pulsed_ring(const u32 source[6][8], u32 output[6][8],
     }
 }
 
+void sprites_data_load_alt_rings(u16 base)
+{
+    /* Player 2 needs rings that can never be mistaken for player 1's. The ring
+     * artwork is identical in both banks - only the fill index differs (4 gold,
+     * 5 red) - so two extra banks are produced by remapping that one nibble to
+     * unused PAL_BALL entries: 9 (blue) when free, 12 (pale blue) when
+     * carrying. Four rings, four clearly different colours. */
+    u32 blue[6][8], pale[6][8];
+    u8 t, r, n;
+    for (t = 0; t < 6; t++)
+        for (r = 0; r < 8; r++)
+        {
+            u32 sy = tile_ring_yellow[t][r], sr = tile_ring_red[t][r];
+            u32 ob = 0, op = 0;
+            for (n = 0; n < 8; n++)
+            {
+                u8 shift = (u8)(28 - 4 * n);
+                u8 vy = (u8)((sy >> shift) & 0xF);
+                u8 vr = (u8)((sr >> shift) & 0xF);
+                if (vy == 4) vy = 9;
+                if (vr == 5) vr = 12;
+                ob |= (u32)vy << shift;
+                op |= (u32)vr << shift;
+            }
+            blue[t][r] = ob;
+            pale[t][r] = op;
+        }
+    VDP_loadTileData(blue[0], base, 6, DMA);
+    VDP_loadTileData(pale[0], (u16)(base + 6), 6, DMA);
+}
+
 void sprites_data_set_ring_pulse(u8 phase, bool eliminator)
 {
     static u32 yellow[6][8];

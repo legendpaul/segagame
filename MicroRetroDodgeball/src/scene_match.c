@@ -51,6 +51,15 @@ static const u32 tile_ball_tether[8] = {
     0x00000000,
     0x00000000
 };
+/* Player 2's two control rings sit right after the tether tile: 6 tiles for
+ * the free ring, 6 for the carrying ring. Four rings total across both humans,
+ * all four in different colours so they can never be confused. */
+#define TILE_RING_P2_FREE (TILE_BALL_TETHER + 1)
+#define TILE_RING_P2_BALL (TILE_RING_P2_FREE + 6)
+#if (TILE_RING_P2_BALL + 6) > TILE_COURT_FG_BASE
+#error "player 2 ring tiles overflow the court foreground bank"
+#endif
+
 #define REF_SKIN_LIGHT 0xD8A878
 #define REF_SKIN_DARK  0x9C6C40
 
@@ -378,7 +387,9 @@ static void draw_control_marker(void)
                          (state == MS_A_HOLD || state == MS_A_WINDUP));
         bool show = !q->eliminated && !q->exiting &&
                     (human_b() || (activeA2 != activeA));
-        u16 tile2 = p2Ball ? TILE_RING_YELLOW : TILE_RING_RED;
+        /* Player 2's own colours: pale blue carrying, blue when free. Player 1
+         * keeps gold/red, so no two states ever share a colour. */
+        u16 tile2 = p2Ball ? TILE_RING_P2_BALL : TILE_RING_P2_FREE;
         VDP_setSpriteFull(SLOT_MARKER2,
                            show ? (s16)(q->x - 4) : (s16)-24,
                            show ? (s16)(q->y + 8 + worldOffsetY) : (s16)-24,
@@ -1131,6 +1142,7 @@ void scene_match_enter(void)
                                   TILE_REFEREE_BACK,
                                   TILE_REFEREE_BACK_EXTRA);
     VDP_loadTileData(tile_ball_tether, TILE_BALL_TETHER, 1, DMA);
+    sprites_data_load_alt_rings(TILE_RING_P2_FREE);   /* player 2's ring pair */
 
     /* Solid navy behind the HUD strip so the score/clock glyphs never reveal
      * the crowd through their transparent pixels (and no fans sit under it). */
@@ -1559,6 +1571,29 @@ void scene_match_update(void)
             rotate_controlled_player(TRUE, TRUE);
     }
 
+    /* Player 2 gets the SAME off-ball switching on their own pad: A/C step
+     * through their side's players, B grabs the one nearest the ball. */
+    if (TWO_PLAYERS() && state != MS_ROUND_END &&
+        (input_pressed_p(1, BUTTON_A) || input_pressed_p(1, BUTTON_B) ||
+         input_pressed_p(1, BUTTON_C)))
+    {
+        Player *side = human_b() ? teamB : teamA;
+        u8 *sel = human_b() ? &activeB : &activeA2;
+        bool carrying = human_b()
+                        ? ((holderB == activeB) &&
+                           (state == MS_B_HOLD || state == MS_B_WINDUP))
+                        : ((holderA == activeA2) &&
+                           (state == MS_A_HOLD || state == MS_A_WINDUP));
+        if (!carrying)
+        {
+            u8 start = (u8)(*sel + 1), next = first_in_play_from(side, start);
+            /* In shared-team play never steal player 1's man. */
+            if (team_share() && next == activeA && count_in_play(teamA) > 1)
+                next = first_in_play_from(side, (u8)(next + 1));
+            if (next != *sel) { *sel = next; sound_mgr_blip(); }
+        }
+    }
+
     impact_fx_update();
 
     if (++clockFrameCounter >= (SYS_isPAL() ? 50 : 60))
@@ -1605,7 +1640,8 @@ void scene_match_update(void)
         {
             bool cpuBusy = (i == holderB) &&
                 (state == MS_B_HOLD || state == MS_B_WINDUP || state == MS_LOOSE_B);
-            if (i != activeA && !teamA[i].eliminated && !teamA[i].exiting)
+            if (i != activeA && !(team_share() && i == activeA2) &&
+                !teamA[i].eliminated && !teamA[i].exiting)
                 ambientMovedA[i] = move_ambient(&teamA[i], i);
             /* In 2 PLAYER VS the man player 2 is steering must never be driven
              * by the CPU wander as well, or he fights the pad. */
@@ -2092,12 +2128,21 @@ void scene_match_update(void)
         bool aMoving = teamA[i].exiting || ambientMovedA[i] ||
                        ((i == activeA) && !teamA[i].eliminated &&
                        (input_held(BUTTON_LEFT) || input_held(BUTTON_RIGHT) ||
-                        input_held(BUTTON_UP) || input_held(BUTTON_DOWN)));
+                        input_held(BUTTON_UP) || input_held(BUTTON_DOWN))) ||
+                       /* Shared-team play: player 2's man runs off pad 2. */
+                       (team_share() && (i == activeA2) && !teamA[i].eliminated &&
+                        (input_held_p(1, BUTTON_LEFT) || input_held_p(1, BUTTON_RIGHT) ||
+                         input_held_p(1, BUTTON_UP) || input_held_p(1, BUTTON_DOWN)));
         player_tickAnim(&teamA[i], aMoving);
 
+        /* A human-steered player animates off their own PAD, exactly like
+         * player 1's does - the CPU movement flags never get set for them. */
         bool bMoving = teamB[i].exiting || ambientMovedB[i] ||
                        (cpuMoved && (i == holderB) &&
-                        (state == MS_LOOSE_B || state == MS_B_HOLD));
+                        (state == MS_LOOSE_B || state == MS_B_HOLD)) ||
+                       (human_b() && (i == activeB) && !teamB[i].eliminated &&
+                        (input_held_p(1, BUTTON_LEFT) || input_held_p(1, BUTTON_RIGHT) ||
+                         input_held_p(1, BUTTON_UP) || input_held_p(1, BUTTON_DOWN)));
         player_tickAnim(&teamB[i], bMoving);
     }
 
