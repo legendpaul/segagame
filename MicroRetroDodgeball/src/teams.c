@@ -1,5 +1,6 @@
 #include "genesis.h"
 #include "teams.h"
+#include "game_state.h"   /* NO_TEAM */
 
 const char* const teamNames[NUM_TEAMS] = {
     "SPAIN",
@@ -32,13 +33,13 @@ static u8 *round_slots(u8 round, u8 *count)
     *count = 2;                            return cupF;
 }
 
-void cup_build(u8 playerTeam)
+void cup_build(u8 playerTeam, u8 player2Team)
 {
     u8 pool[NUM_TEAMS];
-    u8 poolCount = 0, i, slot;
+    u8 poolCount = 0, i, slot, slot2 = CUP_TBD;
 
     for (i = 0; i < NUM_TEAMS; i++)
-        if (i != playerTeam) pool[poolCount++] = i;
+        if (i != playerTeam && i != player2Team) pool[poolCount++] = i;
 
     /* Shuffle the rivals so every cup run has a different draw. */
     for (i = poolCount; i > 1; i--)
@@ -47,12 +48,19 @@ void cup_build(u8 playerTeam)
         u8 tmp = pool[i - 1]; pool[i - 1] = pool[j]; pool[j] = tmp;
     }
 
-    /* The player takes a random bracket slot; rivals fill the rest, so the
-     * player is not always in the same tie. */
+    /* Each human takes a random bracket slot; rivals fill the rest, so neither
+     * is ever in the same tie twice running. With two players the second slot
+     * is drawn separately from the first - they may or may not meet early. */
     slot = (u8)(random() % CUP_TEAMS);
+    if (player2Team != NO_TEAM)
+    {
+        do { slot2 = (u8)(random() % CUP_TEAMS); } while (slot2 == slot);
+    }
     poolCount = 0;
     for (i = 0; i < CUP_TEAMS; i++)
-        cupQF[i] = (i == slot) ? playerTeam : pool[poolCount++];
+        cupQF[i] = (i == slot)  ? playerTeam
+                 : (i == slot2) ? player2Team
+                                : pool[poolCount++];
 
     for (i = 0; i < 4; i++) cupSF[i] = CUP_TBD;
     cupF[0] = cupF[1] = CUP_TBD;

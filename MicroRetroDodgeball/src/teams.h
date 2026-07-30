@@ -29,7 +29,9 @@ extern u8 cupF[2];            /* semi-final winners */
 extern u8 cupChampion;
 
 /* Draw a fresh bracket containing the player's team plus 7 random rivals. */
-void cup_build(u8 playerTeam);
+/* Draw a bracket containing both humans' teams (player2Team may be NO_TEAM for
+ * a solo cup) plus random rivals. Each human lands in a random slot. */
+void cup_build(u8 playerTeam, u8 player2Team);
 /* The player's opponent in the current round (round 0..2). */
 u8   cup_opponent_now(u8 playerTeam, u8 round);
 /* Record the player's win in this round and simulate the other ties. */

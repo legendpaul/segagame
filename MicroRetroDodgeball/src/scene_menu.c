@@ -232,10 +232,14 @@ static const u16 PLATE_ROW[4] = { 6, 10, 16, 20 };
 static void bracket_plate(u8 team, u16 x, u16 row, u16 w, u8 round)
 {
     u8 style;
-    bool mine = (team == gTeamAIndex);
-    ui_draw_panel(x, (u16)(row - 1), w, 3, mine);
+    bool p1 = (team == gTeamAIndex);
+    bool p2 = (gPlayer2Team != NO_TEAM) && (team == gPlayer2Team);
+    /* Both humans get the gold frame so they stand out from the CPU field;
+     * the name colour then tells them apart - player 1 gold, player 2 cyan. */
+    ui_draw_panel(x, (u16)(row - 1), w, 3, p1 || p2);
     if (team == CUP_TBD) return;
-    style = mine ? UI_GOLD : cup_is_out(team, round) ? UI_CYAN : UI_WHITE;
+    style = p1 ? UI_GOLD : p2 ? UI_CYAN
+          : cup_is_out(team, round) ? UI_CYAN : UI_WHITE;
     ui_draw_text(teamNames[team], (u16)(x + 1), row, style);
 }
 
@@ -434,6 +438,7 @@ void scene_menu_update(void)
             phase = MENU_MODE;
             setupPage = 0;
             setupConfirmed = 0;   /* nothing chosen yet - summary reads empty */
+            gPlayer2Team = NO_TEAM;   /* re-established when P2 picks a side */
             draw_mode();
             screen_transition_fade_in();
         }
@@ -570,14 +575,29 @@ void scene_menu_update(void)
             gCurrentScene = GS_ELIMINATOR;
             return;
         }
-        if (phase == MENU_TEAM_A && gGameMode == MODE_TOURNAMENT)
+        if (phase == MENU_TEAM_A && gGameMode == MODE_TOURNAMENT &&
+            TWO_PLAYERS())
         {
-            /* Tournament: you only pick your own team, then face the whole
-             * gauntlet. Seed the cup and jump straight to the first matchup. */
+            /* Two-player cup: player 2 enters a team as well, and both are
+             * drawn into the bracket at random slots. */
+            gPlayer2Team = (u8)((gTeamAIndex + 1) % NUM_TEAMS);
+            gTeamBIndex = gPlayer2Team;
+            screen_transition_fade_out();
+            enter_selector(MENU_TEAM_B);
+            screen_transition_fade_in();
+            return;
+        }
+        if ((phase == MENU_TEAM_A || phase == MENU_TEAM_B) &&
+            gGameMode == MODE_TOURNAMENT)
+        {
+            /* Seed the cup. In a solo run only your team is placed; in a
+             * two-player run player 2's team was just chosen on TEAM_B. */
+            if (phase == MENU_TEAM_B) gPlayer2Team = gTeamBIndex;
+            else                      gPlayer2Team = NO_TEAM;
             gCupStage = 0;
             gScoreA = 0;
             gScoreB = 0;
-            cup_build(gTeamAIndex);   /* fresh 8-team knockout draw */
+            cup_build(gTeamAIndex, gPlayer2Team);   /* fresh knockout draw */
             gTeamBIndex = cup_opponent_now(gTeamAIndex, 0);
             screen_transition_fade_out();
             enter_cup_ladder();   /* show the bracket, then A -> matchup */

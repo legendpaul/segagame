@@ -101,6 +101,10 @@ typedef enum {
 } PlayerMode;
 
 extern u8 gPlayerMode;     /* PlayerMode */
+/* Player 2's chosen nation, or NO_TEAM when only one human is playing. In a
+ * two-player cup BOTH teams are drawn into the bracket at random slots. */
+#define NO_TEAM 0xFF
+extern u8 gPlayer2Team;
 /* TRUE when the second pad is active at all. */
 #define TWO_PLAYERS() (gPlayerMode != PLAYERS_1P)
 
