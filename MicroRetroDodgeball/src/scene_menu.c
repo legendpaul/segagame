@@ -68,6 +68,10 @@ static const char *PAGE_TITLE[SETUP_ROWS] =
 
 /* Which sub-menu page is showing: 0 mode, 1 players, 2 difficulty. */
 static u8 setupPage;
+/* One bit per page, set when that page is CONFIRMED with A/START. The summary
+ * strip lists confirmed choices only - an unconfirmed page reads [EMPTY]
+ * rather than advertising a default the player never actually picked. */
+static u8 setupConfirmed;
 static u8 players_option_count(void);
 
 static u8 page_option_count(void)
@@ -104,9 +108,20 @@ static void page_set(u8 v)
 static void draw_setup_summary(void)
 {
     VDP_clearTileMapRect(BG_A, 1, 22, 38, 1);
-    ui_draw_text(MODE_OPTS[gGameMode],     2, 22, UI_WHITE);
-    ui_draw_text(PLAYER_OPTS[gPlayerMode], 15, 22, UI_WHITE);
-    ui_draw_text(DIFF_OPTS[gDifficulty],   32, 22, UI_WHITE);
+    if (setupConfirmed & 1)
+        ui_draw_text(MODE_OPTS[gGameMode], 2, 22, UI_WHITE);
+    else
+        ui_draw_text("[EMPTY]", 2, 22, UI_CYAN);
+
+    if (setupConfirmed & 2)
+        ui_draw_text(PLAYER_OPTS[gPlayerMode], 15, 22, UI_WHITE);
+    else
+        ui_draw_text("[EMPTY]", 15, 22, UI_CYAN);
+
+    if (setupConfirmed & 4)
+        ui_draw_text(DIFF_OPTS[gDifficulty], 32, 22, UI_WHITE);
+    else
+        ui_draw_text("[EMPTY]", 32, 22, UI_CYAN);
 }
 
 /* The chosen option is drawn in the DOUBLE-HEIGHT font in gold; the others use
@@ -165,11 +180,6 @@ static void draw_mode(void)
     /* One sub-menu per page, with the running summary pinned at the foot. */
     ui_draw_panel(0, 0, 40, 4, FALSE);
     ui_draw_big_center("GAME SETUP", 1, UI_WHITE);
-    {
-        char page[12] = "PAGE _ OF 3";
-        page[5] = (char)('1' + setupPage);
-        ui_draw_text(page, 2, 5, UI_CYAN);
-    }
     ui_draw_text_center(PAGE_TITLE[setupPage], 6, UI_WHITE);
 
     ui_draw_panel(2, 8, 36, 12, FALSE);
@@ -420,6 +430,7 @@ void scene_menu_update(void)
             flag_data_init();
             phase = MENU_MODE;
             setupPage = 0;
+            setupConfirmed = 0;   /* nothing chosen yet - summary reads empty */
             draw_mode();
             screen_transition_fade_in();
         }
@@ -443,7 +454,8 @@ void scene_menu_update(void)
             sound_mgr_cancel();
             if (setupPage > 0)
             {
-                setupPage--;        /* back a page */
+                setupPage--;        /* back a page - that choice is open again */
+                setupConfirmed &= (u8)~(1 << setupPage);
                 draw_mode();
             }
             else
@@ -457,6 +469,7 @@ void scene_menu_update(void)
         else if (input_pressed(BUTTON_A) || input_pressed(BUTTON_START))
         {
             sound_mgr_confirm();
+            setupConfirmed |= (u8)(1 << setupPage);   /* this choice is locked in */
             if (setupPage < (SETUP_ROWS - 1))
             {
                 setupPage++;        /* on to the next sub-menu */
