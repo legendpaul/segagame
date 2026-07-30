@@ -63,22 +63,69 @@ static const char *PLAYER_OPTS[PLAYERS_COUNT] =
     { "1 PLAYER", "2 PLAYER VS", "2 PLAYER TEAM" };
 static const char *DIFF_OPTS[3] = { "EASY", "MED", "HARD" };
 
-/* Draw one option list centred on its row: selected gold when that row has the
- * cursor (white when it does not), every other choice faint cyan. */
-static void draw_option_line(u16 y, const char * const *opts, u8 count,
-                             u8 sel, bool active)
+static const char *PAGE_TITLE[SETUP_ROWS] =
+    { "GAME MODE", "PLAYERS", "DIFFICULTY" };
+
+/* Which sub-menu page is showing: 0 mode, 1 players, 2 difficulty. */
+static u8 setupPage;
+static u8 players_option_count(void);
+
+static u8 page_option_count(void)
 {
-    u16 total = 0, x;
-    u8 i;
-    for (i = 0; i < count; i++) total += (u16)strlen(opts[i]) + 2;
-    total -= 2;
-    x = (u16)((40 - total) / 2);
-    for (i = 0; i < count; i++)
+    return (setupPage == 0) ? MODE_COUNT
+         : (setupPage == 1) ? players_option_count() : 3;
+}
+
+static u8 page_value(void)
+{
+    return (setupPage == 0) ? gGameMode
+         : (setupPage == 1) ? gPlayerMode : gDifficulty;
+}
+
+static const char * const *page_opts(void)
+{
+    return (setupPage == 0) ? MODE_OPTS
+         : (setupPage == 1) ? PLAYER_OPTS : DIFF_OPTS;
+}
+
+static void page_set(u8 v)
+{
+    if (setupPage == 0)
     {
-        u8 style = (i == sel) ? (active ? UI_GOLD : UI_WHITE) : UI_CYAN;
-        ui_draw_text(opts[i], x, y, style);
-        x += (u16)strlen(opts[i]) + 2;
+        gGameMode = v;
+        /* Eliminator has no teams - drop team play if it was chosen. */
+        if (gPlayerMode >= players_option_count()) gPlayerMode = PLAYERS_1P;
     }
+    else if (setupPage == 1) gPlayerMode = v;
+    else gDifficulty = v;
+}
+
+/* Running summary of every choice, always visible at the foot of the page. */
+static void draw_setup_summary(void)
+{
+    VDP_clearTileMapRect(BG_A, 1, 22, 38, 1);
+    ui_draw_text(MODE_OPTS[gGameMode],     2, 22, UI_WHITE);
+    ui_draw_text(PLAYER_OPTS[gPlayerMode], 15, 22, UI_WHITE);
+    ui_draw_text(DIFF_OPTS[gDifficulty],   32, 22, UI_WHITE);
+}
+
+/* The chosen option is drawn in the DOUBLE-HEIGHT font in gold; the others use
+ * the small font in faint cyan. 8x8 is the smallest glyph set in the game, so
+ * the size contrast comes from enlarging the selection rather than shrinking
+ * the rest - the effect is the same and it is unmistakable which is picked. */
+static void draw_setup_options(void)
+{
+    const char * const *opts = page_opts();
+    u8 n = page_option_count(), sel = page_value(), i;
+
+    VDP_clearTileMapRect(BG_A, 1, 9, 38, 11);
+    for (i = 0; i < n; i++)
+    {
+        u16 y = (u16)(10 + i * 3);
+        if (i == sel) ui_draw_big_center(opts[i], y, UI_GOLD);
+        else          ui_draw_text_center(opts[i], (u16)(y + 1), UI_CYAN);
+    }
+    draw_setup_summary();
 }
 
 static const char *players_name(void)
@@ -101,35 +148,7 @@ static u8 players_option_count(void)
  * and description); the fixed-width mode name is simply overwritten. */
 static void draw_mode_rows(void)
 {
-    u8 r;
-
-    /* Only the lines that change are cleared, so the screen never flashes. */
-    for (r = 0; r < SETUP_ROWS; r++)
-    {
-        VDP_clearTileMapRect(BG_A, 1, SETUP_LABEL_Y[r], 38, 1);
-        VDP_clearTileMapRect(BG_A, 1, SETUP_OPTION_Y[r], 38, 1);
-    }
-    VDP_clearTileMapRect(BG_A, 2, 21, 36, 1);
-
-    /* A chevron marks which row the D-pad is currently on. */
-    ui_draw_text("MODE",    4, SETUP_LABEL_Y[0], UI_CYAN);
-    ui_draw_text("PLAYERS", 4, SETUP_LABEL_Y[1], UI_CYAN);
-    ui_draw_text("LEVEL",   4, SETUP_LABEL_Y[2], UI_CYAN);
-    for (r = 0; r < SETUP_ROWS; r++)
-        if (modeRow == r) ui_draw_text(">", 2, SETUP_LABEL_Y[r], UI_GOLD);
-
-    draw_option_line(SETUP_OPTION_Y[0], MODE_OPTS, MODE_COUNT,
-                     gGameMode, modeRow == 0);
-    draw_option_line(SETUP_OPTION_Y[1], PLAYER_OPTS, players_option_count(),
-                     gPlayerMode, modeRow == 1);
-    draw_option_line(SETUP_OPTION_Y[2], DIFF_OPTS, 3,
-                     gDifficulty, modeRow == 2);
-
-    ui_draw_text_center(gGameMode == MODE_EXHIBITION
-                 ? "SINGLE MATCH VS ONE RIVAL"
-                 : gGameMode == MODE_TOURNAMENT
-                 ? "BEAT EVERY RIVAL TO WIN THE CUP"
-                 : "ALL NATIONS NO NET NO TEAMS", 21, UI_CYAN);
+    draw_setup_options();
 }
 
 static void draw_mode(void)
@@ -143,15 +162,28 @@ static void draw_mode(void)
     ui_apply_palette();
     PAL_setColor(0, RGB24_TO_VDPCOLOR(0x081830));
 
+    /* One sub-menu per page, with the running summary pinned at the foot. */
     ui_draw_panel(0, 0, 40, 4, FALSE);
     ui_draw_big_center("GAME SETUP", 1, UI_WHITE);
-    ui_draw_text_center("CHOOSE YOUR COMPETITION", 6, UI_CYAN);
-    /* Full-width panel: the option lines need every column available. */
-    ui_draw_panel(0, 8, 40, 12, FALSE);
-    ui_draw_text_center("D-PAD SELECT AND CHANGE", 23, UI_WHITE);
-    ui_draw_button("A START", 5, 25, 13);
+    {
+        char page[12] = "PAGE _ OF 3";
+        page[5] = (char)('1' + setupPage);
+        ui_draw_text(page, 2, 5, UI_CYAN);
+    }
+    ui_draw_text_center(PAGE_TITLE[setupPage], 6, UI_WHITE);
+
+    ui_draw_panel(2, 8, 36, 12, FALSE);
+
+    /* Summary strip: every choice made so far, always on screen. */
+    ui_draw_panel(0, 20, 40, 4, FALSE);
+    ui_draw_text("MODE", 2, 21, UI_CYAN);
+    ui_draw_text("PLAYERS", 15, 21, UI_CYAN);
+    ui_draw_text("LEVEL", 32, 21, UI_CYAN);
+
+    ui_draw_button(setupPage == (SETUP_ROWS - 1) ? "A START" : "A NEXT",
+                   5, 25, 13);
     ui_draw_panel(22, 24, 13, 3, FALSE);
-    ui_draw_text("C BACK", 25, 25, UI_CYAN);
+    ui_draw_text(setupPage == 0 ? "C BACK" : "C PREV", 25, 25, UI_CYAN);
     draw_mode_rows();
 }
 
@@ -387,7 +419,7 @@ void scene_menu_update(void)
             ui_data_init();
             flag_data_init();
             phase = MENU_MODE;
-            modeRow = 0;
+            setupPage = 0;
             draw_mode();
             screen_transition_fade_in();
         }
@@ -396,57 +428,46 @@ void scene_menu_update(void)
 
     if (phase == MENU_MODE)
     {
-        if (input_pressed(BUTTON_UP))
+        /* Up/down and left/right both move through this page's choices. */
+        if (input_pressed(BUTTON_UP) || input_pressed(BUTTON_LEFT) ||
+            input_pressed(BUTTON_DOWN) || input_pressed(BUTTON_RIGHT))
         {
-            modeRow = (u8)((modeRow + SETUP_ROWS - 1) % SETUP_ROWS);
+            u8 n = page_option_count();
+            bool back = input_pressed(BUTTON_UP) || input_pressed(BUTTON_LEFT);
+            page_set((u8)((page_value() + (back ? (n - 1) : 1)) % n));
             sound_mgr_blip();
-            draw_mode_rows();   /* in-place value update, no plane clear/flash */
-        }
-        else if (input_pressed(BUTTON_DOWN))
-        {
-            modeRow = (u8)((modeRow + 1) % SETUP_ROWS);
-            sound_mgr_blip();
-            draw_mode_rows();
-        }
-        else if (input_pressed(BUTTON_LEFT) || input_pressed(BUTTON_RIGHT))
-        {
-            bool back = input_pressed(BUTTON_LEFT);
-            if (modeRow == 0)
-            {
-                s8 d = back ? (MODE_COUNT - 1) : 1;
-                gGameMode = (u8)((gGameMode + d) % MODE_COUNT);
-                /* Eliminator has no teams: drop team play if it was selected. */
-                if (gPlayerMode >= players_option_count())
-                    gPlayerMode = PLAYERS_1P;
-            }
-            else if (modeRow == 1)
-            {
-                u8 n = players_option_count();
-                s8 d = back ? (s8)(n - 1) : 1;
-                gPlayerMode = (u8)((gPlayerMode + d) % n);
-            }
-            else
-            {
-                s8 d = back ? 2 : 1;   /* -1 == +2 mod 3 */
-                gDifficulty = (u8)((gDifficulty + d) % 3);
-            }
-            sound_mgr_blip();
-            draw_mode_rows();   /* in-place value update, no plane clear/flash */
+            draw_setup_options();   /* value only - the page frame stays put */
         }
         else if (input_pressed(BUTTON_C) || input_pressed(BUTTON_B))
         {
             sound_mgr_cancel();
-            screen_transition_fade_out();
-            phase = MENU_TITLE;
-            draw_title();
-            screen_transition_fade_in();
+            if (setupPage > 0)
+            {
+                setupPage--;        /* back a page */
+                draw_mode();
+            }
+            else
+            {
+                screen_transition_fade_out();
+                phase = MENU_TITLE;
+                draw_title();
+                screen_transition_fade_in();
+            }
         }
         else if (input_pressed(BUTTON_A) || input_pressed(BUTTON_START))
         {
             sound_mgr_confirm();
-            screen_transition_fade_out();
-            enter_selector(MENU_TEAM_A);
-            screen_transition_fade_in();
+            if (setupPage < (SETUP_ROWS - 1))
+            {
+                setupPage++;        /* on to the next sub-menu */
+                draw_mode();
+            }
+            else
+            {
+                screen_transition_fade_out();
+                enter_selector(MENU_TEAM_A);
+                screen_transition_fade_in();
+            }
         }
         return;
     }
