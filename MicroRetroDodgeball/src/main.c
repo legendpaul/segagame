@@ -30,6 +30,7 @@ u8 gGameMode;
 u8 gDifficulty;
 u8 gCupStage;
 u8 gMenuEntry;
+u8 gPlayerMode;
 
 int main(bool hardReset)
 {
@@ -65,6 +66,7 @@ int main(bool hardReset)
     gDifficulty = DIFF_NORMAL;
     gCupStage = 0;
     gMenuEntry = MENU_ENTRY_TITLE;
+    gPlayerMode = PLAYERS_1P;
 
     while (TRUE)
     {

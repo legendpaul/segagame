@@ -88,6 +88,22 @@ typedef enum {
     DIFF_HARD
 } Difficulty;
 
+/* How many humans are playing, and how the second one joins in.
+ *   1P       - one human, everyone else CPU
+ *   2P_VS    - pad 2 takes the opposing side
+ *   2P_TEAM  - both pads share one side, a player each (not for Eliminator,
+ *              which has no teams) */
+typedef enum {
+    PLAYERS_1P = 0,
+    PLAYERS_2P_VS,
+    PLAYERS_2P_TEAM,
+    PLAYERS_COUNT
+} PlayerMode;
+
+extern u8 gPlayerMode;     /* PlayerMode */
+/* TRUE when the second pad is active at all. */
+#define TWO_PLAYERS() (gPlayerMode != PLAYERS_1P)
+
 /* The cup is an 8-team single-elimination bracket: see CUP_ROUNDS in teams.h
  * (quarter-final, semi-final, final). gCupStage is the current round, 0..2. */
 

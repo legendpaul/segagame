@@ -46,34 +46,63 @@ static void draw_title(void)
     promptVisible = TRUE;
 }
 
+/* Setup rows: 0 = game mode, 1 = how many players, 2 = difficulty. */
+#define SETUP_ROWS 3
+static const u16 SETUP_ROW_Y[SETUP_ROWS] = { 11, 14, 17 };
+
+static const char *players_name(void)
+{
+    return (gPlayerMode == PLAYERS_1P)    ? "1 PLAYER"
+         : (gPlayerMode == PLAYERS_2P_VS) ? "2 PLAYER VS"
+                                          : "2 PLAYER TEAM";
+}
+
+/* Eliminator is a free-for-all with no teams, so team play does not apply
+ * there - that mode offers only 1 PLAYER and 2 PLAYER VS. */
+static u8 players_option_count(void)
+{
+    return (gGameMode == MODE_ELIMINATOR) ? 2 : PLAYERS_COUNT;
+}
+
 /* Redraw only the values that change on input - no full-plane clear, so the
  * setup screen never blanks/flashes on a keypress. Only the small cells that
  * actually change are cleared (marker columns, the variable-width level name
  * and description); the fixed-width mode name is simply overwritten. */
 static void draw_mode_rows(void)
 {
-    static const char *diffName[3] = { "EASY", "NORMAL", "HARD" };
-    VDP_clearTileMapRect(BG_A, 18, 11, 1, 1);
-    VDP_clearTileMapRect(BG_A, 31, 11, 1, 1);
-    VDP_clearTileMapRect(BG_A, 18, 14, 1, 1);
-    VDP_clearTileMapRect(BG_A, 31, 14, 1, 1);
-    VDP_clearTileMapRect(BG_A, 20, 14, 8, 1);
-    VDP_clearTileMapRect(BG_A, 5, 20, 31, 1);
+    static const char *diffName[3] = { "EASY", "MED", "HARD" };
+    u8 r;
+
+    /* Only the cells that change are cleared, so the screen never flashes. */
+    for (r = 0; r < SETUP_ROWS; r++)
+    {
+        VDP_clearTileMapRect(BG_A, 18, SETUP_ROW_Y[r], 1, 1);
+        VDP_clearTileMapRect(BG_A, 31, SETUP_ROW_Y[r], 1, 1);
+        VDP_clearTileMapRect(BG_A, 20, SETUP_ROW_Y[r], 11, 1);
+    }
+    VDP_clearTileMapRect(BG_A, 4, 20, 33, 1);
 
     ui_draw_text(gGameMode == MODE_EXHIBITION ? "EXHIBITION"
                : gGameMode == MODE_TOURNAMENT ? "TOURNAMENT"
                                               : "ELIMINATOR",
-                 20, 11, (modeRow == 0) ? UI_GOLD : UI_WHITE);
-    if (modeRow == 0) { ui_draw_text(">", 18, 11, UI_GOLD); ui_draw_text("<", 31, 11, UI_GOLD); }
+                 20, SETUP_ROW_Y[0], (modeRow == 0) ? UI_GOLD : UI_WHITE);
+    ui_draw_text(players_name(), 20, SETUP_ROW_Y[1],
+                 (modeRow == 1) ? UI_GOLD : UI_WHITE);
+    ui_draw_text(diffName[gDifficulty], 20, SETUP_ROW_Y[2],
+                 (modeRow == 2) ? UI_GOLD : UI_WHITE);
 
-    ui_draw_text(diffName[gDifficulty], 20, 14, (modeRow == 1) ? UI_GOLD : UI_WHITE);
-    if (modeRow == 1) { ui_draw_text(">", 18, 14, UI_GOLD); ui_draw_text("<", 31, 14, UI_GOLD); }
+    for (r = 0; r < SETUP_ROWS; r++)
+        if (modeRow == r)
+        {
+            ui_draw_text(">", 18, SETUP_ROW_Y[r], UI_GOLD);
+            ui_draw_text("<", 31, SETUP_ROW_Y[r], UI_GOLD);
+        }
 
     ui_draw_text(gGameMode == MODE_EXHIBITION
                  ? "SINGLE MATCH VS ONE RIVAL"
                  : gGameMode == MODE_TOURNAMENT
                  ? "BEAT EVERY RIVAL TO WIN THE CUP"
-                 : "ALL NATIONS NO NET 2 BALLS", 5, 20, UI_CYAN);
+                 : "ALL NATIONS NO NET NO TEAMS", 4, 20, UI_CYAN);
 }
 
 static void draw_mode(void)
@@ -90,9 +119,10 @@ static void draw_mode(void)
     ui_draw_panel(0, 0, 40, 4, FALSE);
     ui_draw_big_center("GAME SETUP", 1, UI_WHITE);
     ui_draw_text_center("CHOOSE YOUR COMPETITION", 6, UI_CYAN);
-    ui_draw_panel(6, 9, 28, 9, FALSE);
-    ui_draw_text("MODE", 9, 11, UI_CYAN);
-    ui_draw_text("LEVEL", 9, 14, UI_CYAN);
+    ui_draw_panel(6, 9, 28, 11, FALSE);
+    ui_draw_text("MODE",    9, SETUP_ROW_Y[0], UI_CYAN);
+    ui_draw_text("PLAYERS", 9, SETUP_ROW_Y[1], UI_CYAN);
+    ui_draw_text("LEVEL",   9, SETUP_ROW_Y[2], UI_CYAN);
     ui_draw_text_center("D-PAD CHANGE", 22, UI_WHITE);
     ui_draw_button("A START", 5, 25, 13);
     ui_draw_panel(22, 24, 13, 3, FALSE);
@@ -341,22 +371,38 @@ void scene_menu_update(void)
 
     if (phase == MENU_MODE)
     {
-        if (input_pressed(BUTTON_UP) || input_pressed(BUTTON_DOWN))
+        if (input_pressed(BUTTON_UP))
         {
-            modeRow ^= 1;
+            modeRow = (u8)((modeRow + SETUP_ROWS - 1) % SETUP_ROWS);
             sound_mgr_blip();
             draw_mode_rows();   /* in-place value update, no plane clear/flash */
         }
+        else if (input_pressed(BUTTON_DOWN))
+        {
+            modeRow = (u8)((modeRow + 1) % SETUP_ROWS);
+            sound_mgr_blip();
+            draw_mode_rows();
+        }
         else if (input_pressed(BUTTON_LEFT) || input_pressed(BUTTON_RIGHT))
         {
+            bool back = input_pressed(BUTTON_LEFT);
             if (modeRow == 0)
             {
-                s8 d = input_pressed(BUTTON_LEFT) ? (MODE_COUNT - 1) : 1;
+                s8 d = back ? (MODE_COUNT - 1) : 1;
                 gGameMode = (u8)((gGameMode + d) % MODE_COUNT);
+                /* Eliminator has no teams: drop team play if it was selected. */
+                if (gPlayerMode >= players_option_count())
+                    gPlayerMode = PLAYERS_1P;
+            }
+            else if (modeRow == 1)
+            {
+                u8 n = players_option_count();
+                s8 d = back ? (s8)(n - 1) : 1;
+                gPlayerMode = (u8)((gPlayerMode + d) % n);
             }
             else
             {
-                s8 d = input_pressed(BUTTON_LEFT) ? 2 : 1;   /* -1 == +2 mod 3 */
+                s8 d = back ? 2 : 1;   /* -1 == +2 mod 3 */
                 gDifficulty = (u8)((gDifficulty + d) % 3);
             }
             sound_mgr_blip();
