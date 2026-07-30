@@ -348,8 +348,8 @@ static void draw_control_marker(void)
     if ((markerPulseTick & 15) == 0)
         sprites_data_set_ring_pulse((u8)((markerPulseTick >> 4) & 3), FALSE);
     markerPulseTick++;
-    /* In shared-team play the chain carries on to player 2's own ring. */
-    u8 link = team_share() ? SLOT_MARKER2 : 0;
+    /* With a second human on either side the chain carries on to their ring. */
+    u8 link = (team_share() || human_b()) ? SLOT_MARKER2 : 0;
     if (!control_candidate(activeA) && !(team_share() && activeA == activeA2))
     {
         VDP_setSpriteFull(SLOT_MARKER, -24, -24, SPRITE_SIZE(3, 2),
@@ -366,13 +366,18 @@ static void draw_control_marker(void)
     }
 
     /* Player 2's man wears a DIFFERENT coloured ring so the two humans can
-     * always tell their own player apart at a glance. */
-    if (team_share())
+     * always tell their own player apart at a glance - on the shared near side
+     * in team play, or on the far side in VS. */
+    if (team_share() || human_b())
     {
-        Player *q = &teamA[activeA2];
-        bool p2Ball = (holderA == activeA2) &&
-                      (state == MS_A_HOLD || state == MS_A_WINDUP);
-        bool show = (activeA2 != activeA) && !q->eliminated && !q->exiting;
+        Player *q = human_b() ? &teamB[activeB] : &teamA[activeA2];
+        bool p2Ball = human_b()
+                      ? ((holderB == activeB) &&
+                         (state == MS_B_HOLD || state == MS_B_WINDUP))
+                      : ((holderA == activeA2) &&
+                         (state == MS_A_HOLD || state == MS_A_WINDUP));
+        bool show = !q->eliminated && !q->exiting &&
+                    (human_b() || (activeA2 != activeA));
         u16 tile2 = p2Ball ? TILE_RING_YELLOW : TILE_RING_RED;
         VDP_setSpriteFull(SLOT_MARKER2,
                            show ? (s16)(q->x - 4) : (s16)-24,
@@ -1602,6 +1607,9 @@ void scene_match_update(void)
                 (state == MS_B_HOLD || state == MS_B_WINDUP || state == MS_LOOSE_B);
             if (i != activeA && !teamA[i].eliminated && !teamA[i].exiting)
                 ambientMovedA[i] = move_ambient(&teamA[i], i);
+            /* In 2 PLAYER VS the man player 2 is steering must never be driven
+             * by the CPU wander as well, or he fights the pad. */
+            if (human_b() && i == activeB) continue;
             if (!cpuBusy && !teamB[i].eliminated && !teamB[i].exiting)
             {
                 if (state == MS_FLY_TO_B)
@@ -1617,6 +1625,15 @@ void scene_match_update(void)
      * you reposition a teammate while another exchange is in flight. */
     if (activeA_can_move())
         player_moveHuman(&teamA[activeA], activeA_has_ball());
+
+    /* 2 PLAYER VS: player 2's man moves on input EVERY frame, exactly like
+     * player 1's - previously they could only be steered while holding the
+     * ball or chasing a loose one, which made the far side look CPU-run. */
+    if (human_b() && !teamB[activeB].eliminated && !teamB[activeB].exiting &&
+        state != MS_B_WINDUP && state != MS_HIT_A && state != MS_HIT_B &&
+        state != MS_ROUND_END && state != MS_ESCORT && state != MS_ANNOUNCE)
+        player_moveHumanPad(&teamB[activeB], (holderB == activeB) &&
+                            (state == MS_B_HOLD), 1);
 
     /* Shared-team play: player 2 steers their own man on the near side. When
      * only one team mate is left, whoever already had him keeps him and the
@@ -1746,9 +1763,9 @@ void scene_match_update(void)
             place_ball_in_hand(&teamB[holderB], FALSE);
             if (human_b())
             {
-                /* Player 2 carries and throws exactly like player 1 does: move
-                 * freely, then A/B/C picks one of the three target lanes. */
-                player_moveHumanPad(&teamB[holderB], TRUE, 1);
+                /* Player 2 carries and throws exactly like player 1 does. The
+                 * movement itself happens in the common per-frame block above;
+                 * here we only read the throw. */
                 place_ball_in_hand(&teamB[holderB], FALSE);
                 if (input_pressed_p(1, BUTTON_A) || input_pressed_p(1, BUTTON_B) ||
                     input_pressed_p(1, BUTTON_C))
@@ -1842,11 +1859,12 @@ void scene_match_update(void)
             if (human_b())
             {
                 /* Player 2 chases the loose ball themselves - no AI reaction
-                 * delay, and the nearest team B player is theirs to steer. */
+                 * delay, and no nearest-player reassignment: the man they are
+                 * steering is the one who can collect it. Movement comes from
+                 * the common per-frame block above. */
                 aiLooseReact = 0;
                 holderB = activeB;
                 cpuMoved = TRUE;
-                player_moveHumanPad(&teamB[holderB], FALSE, 1);
             }
             /* Hesitate for the difficulty-scaled reaction window before the CPU
              * commits to the ball, so EASY gives the human a real head start. */
