@@ -46,9 +46,40 @@ static void draw_title(void)
     promptVisible = TRUE;
 }
 
-/* Setup rows: 0 = game mode, 1 = how many players, 2 = difficulty. */
+/* Setup rows: 0 = game mode, 1 = how many players, 2 = difficulty.
+ * Each row is a label line with every option laid out beneath it, so the whole
+ * choice is visible at once: the selected value is gold, its neighbours sit
+ * faint (cyan) to either side. The option line needs the full screen width -
+ * "1 PLAYER  2 PLAYER VS  2 PLAYER TEAM" is 36 tiles - hence label above
+ * rather than beside. (8x8 is the smallest font in the game; there is no
+ * smaller glyph set to dim the neighbours further.) */
 #define SETUP_ROWS 3
-static const u16 SETUP_ROW_Y[SETUP_ROWS] = { 11, 14, 17 };
+static const u16 SETUP_LABEL_Y[SETUP_ROWS]  = {  9, 13, 17 };
+static const u16 SETUP_OPTION_Y[SETUP_ROWS] = { 10, 14, 18 };
+
+static const char *MODE_OPTS[MODE_COUNT] =
+    { "EXHIBITION", "TOURNAMENT", "ELIMINATOR" };
+static const char *PLAYER_OPTS[PLAYERS_COUNT] =
+    { "1 PLAYER", "2 PLAYER VS", "2 PLAYER TEAM" };
+static const char *DIFF_OPTS[3] = { "EASY", "MED", "HARD" };
+
+/* Draw one option list centred on its row: selected gold when that row has the
+ * cursor (white when it does not), every other choice faint cyan. */
+static void draw_option_line(u16 y, const char * const *opts, u8 count,
+                             u8 sel, bool active)
+{
+    u16 total = 0, x;
+    u8 i;
+    for (i = 0; i < count; i++) total += (u16)strlen(opts[i]) + 2;
+    total -= 2;
+    x = (u16)((40 - total) / 2);
+    for (i = 0; i < count; i++)
+    {
+        u8 style = (i == sel) ? (active ? UI_GOLD : UI_WHITE) : UI_CYAN;
+        ui_draw_text(opts[i], x, y, style);
+        x += (u16)strlen(opts[i]) + 2;
+    }
+}
 
 static const char *players_name(void)
 {
@@ -70,39 +101,35 @@ static u8 players_option_count(void)
  * and description); the fixed-width mode name is simply overwritten. */
 static void draw_mode_rows(void)
 {
-    static const char *diffName[3] = { "EASY", "MED", "HARD" };
     u8 r;
 
-    /* Only the cells that change are cleared, so the screen never flashes. */
+    /* Only the lines that change are cleared, so the screen never flashes. */
     for (r = 0; r < SETUP_ROWS; r++)
     {
-        VDP_clearTileMapRect(BG_A, 18, SETUP_ROW_Y[r], 1, 1);
-        VDP_clearTileMapRect(BG_A, 31, SETUP_ROW_Y[r], 1, 1);
-        VDP_clearTileMapRect(BG_A, 20, SETUP_ROW_Y[r], 11, 1);
+        VDP_clearTileMapRect(BG_A, 1, SETUP_LABEL_Y[r], 38, 1);
+        VDP_clearTileMapRect(BG_A, 1, SETUP_OPTION_Y[r], 38, 1);
     }
-    VDP_clearTileMapRect(BG_A, 4, 20, 33, 1);
+    VDP_clearTileMapRect(BG_A, 2, 21, 36, 1);
 
-    ui_draw_text(gGameMode == MODE_EXHIBITION ? "EXHIBITION"
-               : gGameMode == MODE_TOURNAMENT ? "TOURNAMENT"
-                                              : "ELIMINATOR",
-                 20, SETUP_ROW_Y[0], (modeRow == 0) ? UI_GOLD : UI_WHITE);
-    ui_draw_text(players_name(), 20, SETUP_ROW_Y[1],
-                 (modeRow == 1) ? UI_GOLD : UI_WHITE);
-    ui_draw_text(diffName[gDifficulty], 20, SETUP_ROW_Y[2],
-                 (modeRow == 2) ? UI_GOLD : UI_WHITE);
-
+    /* A chevron marks which row the D-pad is currently on. */
+    ui_draw_text("MODE",    4, SETUP_LABEL_Y[0], UI_CYAN);
+    ui_draw_text("PLAYERS", 4, SETUP_LABEL_Y[1], UI_CYAN);
+    ui_draw_text("LEVEL",   4, SETUP_LABEL_Y[2], UI_CYAN);
     for (r = 0; r < SETUP_ROWS; r++)
-        if (modeRow == r)
-        {
-            ui_draw_text(">", 18, SETUP_ROW_Y[r], UI_GOLD);
-            ui_draw_text("<", 31, SETUP_ROW_Y[r], UI_GOLD);
-        }
+        if (modeRow == r) ui_draw_text(">", 2, SETUP_LABEL_Y[r], UI_GOLD);
 
-    ui_draw_text(gGameMode == MODE_EXHIBITION
+    draw_option_line(SETUP_OPTION_Y[0], MODE_OPTS, MODE_COUNT,
+                     gGameMode, modeRow == 0);
+    draw_option_line(SETUP_OPTION_Y[1], PLAYER_OPTS, players_option_count(),
+                     gPlayerMode, modeRow == 1);
+    draw_option_line(SETUP_OPTION_Y[2], DIFF_OPTS, 3,
+                     gDifficulty, modeRow == 2);
+
+    ui_draw_text_center(gGameMode == MODE_EXHIBITION
                  ? "SINGLE MATCH VS ONE RIVAL"
                  : gGameMode == MODE_TOURNAMENT
                  ? "BEAT EVERY RIVAL TO WIN THE CUP"
-                 : "ALL NATIONS NO NET NO TEAMS", 4, 20, UI_CYAN);
+                 : "ALL NATIONS NO NET NO TEAMS", 21, UI_CYAN);
 }
 
 static void draw_mode(void)
@@ -119,11 +146,9 @@ static void draw_mode(void)
     ui_draw_panel(0, 0, 40, 4, FALSE);
     ui_draw_big_center("GAME SETUP", 1, UI_WHITE);
     ui_draw_text_center("CHOOSE YOUR COMPETITION", 6, UI_CYAN);
-    ui_draw_panel(6, 9, 28, 11, FALSE);
-    ui_draw_text("MODE",    9, SETUP_ROW_Y[0], UI_CYAN);
-    ui_draw_text("PLAYERS", 9, SETUP_ROW_Y[1], UI_CYAN);
-    ui_draw_text("LEVEL",   9, SETUP_ROW_Y[2], UI_CYAN);
-    ui_draw_text_center("D-PAD CHANGE", 22, UI_WHITE);
+    /* Full-width panel: the option lines need every column available. */
+    ui_draw_panel(0, 8, 40, 12, FALSE);
+    ui_draw_text_center("D-PAD SELECT AND CHANGE", 23, UI_WHITE);
     ui_draw_button("A START", 5, 25, 13);
     ui_draw_panel(22, 24, 13, 3, FALSE);
     ui_draw_text("C BACK", 25, 25, UI_CYAN);
